@@ -73,7 +73,7 @@ class WelcomeScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Smart Expense Tracker',
+                        'Welcome to BudgetBuddy app',
                         style: TextStyle(
                           fontSize: 28,
                           color: Color(0xFF2E7D32),
