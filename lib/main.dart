@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:project1/view/login/welcome.dart';
+import 'package:project1/view/login/WelcomeView.dart';
 
 void main() {
   runApp(const MyApp());
@@ -19,7 +19,9 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: Colors.white,
         useMaterial3: false,
       ),
-      home: const WelcomeScreen(), // Sử dụng WelcomeScreen từ file welcome.dart
+       // Sử dụng WelcomeScreen từ file welcome.dart
+    home: const WelcomeView(),
+    
     );
   }
 }
