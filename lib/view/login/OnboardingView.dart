@@ -24,39 +24,76 @@ class _OnboardingViewState extends State<OnboardingView> {
         children: [
           // Background Image
           Image.asset(
-            "assets/images/Intro screen-login/Onboarding.png",
+            "assets/images/Intro screen-login/Onboardingg.png",
             width: media.width,
             height: media.height,
             fit: BoxFit.cover,
           ),
           
-          // Content overlay (nếu cần thêm nội dung)
-          SafeArea(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
+          // Nút Get Started - Positioned chính xác
+          Positioned(
+            bottom: 80, // Khoảng cách từ đáy màn hình
+            left: 30,    // Khoảng cách từ bên trái
+            right: 30,   // Khoảng cách từ bên phải
+            child: ElevatedButton(
+              onPressed: () {
+                // TODO: Navigate to Sign Up screen
+                print("Get Started pressed");
+                // Navigator.push(
+                //   context,
+                //   MaterialPageRoute(builder: (context) => const SignUpView()),
+                // );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4DD0E1),
+                minimumSize: const Size(double.infinity, 55),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                elevation: 5,
+              ),
+              child: const Text(
+                'Get Started',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          
+          // Text "Already Have Account? Log in" - Clickable
+          Positioned(
+            bottom: 40, // Khoảng cách từ đáy
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Nút Get Started (nếu cần)
-                Padding(
-                  padding: const EdgeInsets.all(40.0),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // TODO: Navigate to next screen (Sign up/Login)
-                      print("Get Started pressed");
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4DD0E1),
-                      minimumSize: Size(media.width * 0.8, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                    ),
-                    child: const Text(
-                      'Get Started',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                Text(
+                  'Already Have Account? ',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    // TODO: Navigate to Login page
+                    print("Login link clicked!");
+                    // Navigator.push(
+                    //   context,
+                    //   MaterialPageRoute(builder: (context) => const LoginView()),
+                    // );
+                  },
+                  child: const Text(
+                    'Log in',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF4DD0E1),
+                      fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.underline,
                     ),
                   ),
                 ),
