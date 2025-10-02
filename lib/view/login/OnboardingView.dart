@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:project1/view/login/LoginView.dart';
+import '../sign-up/SignUpView.dart'; // ← Thêm dòng này
+
 
 class OnboardingView extends StatefulWidget {
   const OnboardingView({super.key});
@@ -39,10 +42,10 @@ class _OnboardingViewState extends State<OnboardingView> {
               onPressed: () {
                 // TODO: Navigate to Sign Up screen
                 print("Get Started pressed");
-                // Navigator.push(
-                //   context,
-                //   MaterialPageRoute(builder: (context) => const SignUpView()),
-                // );
+                 Navigator.push(
+                   context,
+                   MaterialPageRoute(builder: (context) => const SignUpView()),
+                 );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF4DD0E1),
@@ -82,15 +85,15 @@ class _OnboardingViewState extends State<OnboardingView> {
                   onTap: () {
                     // TODO: Navigate to Login page
                     print("Login link clicked!");
-                    // Navigator.push(
-                    //   context,
-                    //   MaterialPageRoute(builder: (context) => const LoginView()),
-                    // );
+                     Navigator.push(
+                       context,
+                       MaterialPageRoute(builder: (context) => const LoginView()),
+                     );
                   },
                   child: const Text(
                     'Log in',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 14, 
                       color: Color(0xFF4DD0E1),
                       fontWeight: FontWeight.bold,
                       decoration: TextDecoration.underline,
