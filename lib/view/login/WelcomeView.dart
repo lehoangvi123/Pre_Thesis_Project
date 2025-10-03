@@ -40,7 +40,7 @@ class _WelcomeViewState extends State<WelcomeView> {
         children: [
           // Splash Screen Image (BuddyBudget)
           Image.asset(
-            "assets/images/Intro screen-login/Splash Screen.png", 
+            "assets/images/Intro_screen-login/Splash_Screen.png", 
             width: media.width, 
             height: media.height, 
             fit: BoxFit.cover,

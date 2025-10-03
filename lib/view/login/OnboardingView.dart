@@ -27,7 +27,7 @@ class _OnboardingViewState extends State<OnboardingView> {
         children: [
           // Background Image
           Image.asset(
-            "assets/images/Intro screen-login/Onboardingg.png",
+           "assets/images/Intro_screen-login/Onboardingg.png",
             width: media.width,
             height: media.height,
             fit: BoxFit.cover,

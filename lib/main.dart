@@ -1,19 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:project1/view/login/WelcomeView.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  try {
-    await Firebase.initializeApp();
-    print('Firebase initialized successfully');
-  } catch (e) {
-    print('Error initializing Firebase: $e');
-  }
-  
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
-}          
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -34,7 +30,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// Class TColor để fix lỗi màu sắc (dựa trên code bạn đã có trước đó)
 class TColor {
   static const Color primary = Color(0xFF2E7D32);
   static const Color gray80 = Color(0xFFF5F5F5);
