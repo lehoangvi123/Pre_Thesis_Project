@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:project1/view/login/LoginView.dart'; 
+import '../home/HomeView.dart';
 
 class SignUpView extends StatefulWidget {
   const SignUpView({super.key});
@@ -128,7 +130,10 @@ class _SignUpViewState extends State<SignUpView> {
             onPressed: () {
               Navigator.pop(context);
               // Chuyển sang màn hình login
-              Navigator.pop(context); // Quay về login
+               Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeView()),
+            );
             },
             child: const Text('OK'),
           ),
@@ -306,12 +311,16 @@ class _SignUpViewState extends State<SignUpView> {
                   children: [
                     const Text('Already have an account? '),
                     TextButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => Navigator.push(
+                        context, 
+                        MaterialPageRoute(builder: (context) => const LoginView())
+
+                      ),
                       child: const Text(
                         'Log in',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                        ),
+                        ), 
                       ),
                     ),
                   ],

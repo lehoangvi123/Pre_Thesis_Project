@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../sign-up/SignUpView.dart'; 
-import './ForgotPasswordView.dart';
+import './ForgotPasswordView.dart'; 
+import '../home/HomeView.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -46,7 +47,11 @@ class _LoginViewState extends State<LoginView> {
       // Đăng nhập thành công - chuyển sang màn hình chính
       if (mounted) {
         _showSuccessSnackBar('Đăng nhập thành công!');
-        // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomeView()));
+        // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomeView())); 
+          Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (context) => const HomeView()),
+  );
       }
 
     } on FirebaseAuthException catch (e) {
@@ -177,7 +182,7 @@ class _LoginViewState extends State<LoginView> {
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.lock_outline),
-                    labelText: 'Password',
+                    labelText: 'Password',      
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -209,14 +214,14 @@ class _LoginViewState extends State<LoginView> {
                           MaterialPageRoute(builder: (context) => const ForgotPasswordView()),
                         ); 
 
-                    },
+                    }, 
                     child: const Text('Forgot Password?'),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 20),  
                 
-                // Login Button
-                SizedBox(
+                // Login Button   
+                SizedBox(  
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
