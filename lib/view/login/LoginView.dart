@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../sign-up/SignUpView.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -240,8 +241,12 @@ class _LoginViewState extends State<LoginView> {
                     ),
                     GestureDetector(
                       onTap: () {
-                        print('Sign up clicked');
-                        // TODO: Navigate to sign up page
+                         Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const SignUpView(), // Navigate to SignUpView
+                              ),
+                            );
                       },
                       child: const Text(
                         'Sign Up',

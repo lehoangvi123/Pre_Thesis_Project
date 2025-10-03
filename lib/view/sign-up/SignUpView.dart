@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import './EmailSignUpView.dart'; 
+// import '../login/LoginView.dart';
 
 class SignUpView extends StatefulWidget {
   const SignUpView({super.key});
@@ -79,8 +81,12 @@ class _SignUpViewState extends State<SignUpView> {
                   height: 55,
                   child: ElevatedButton(
                     onPressed: () {
-                      print('Continue with email pressed');
-                      // TODO: Navigate to email sign up form
+                        Navigator.push(
+                          context,  
+                          MaterialPageRoute( 
+                            builder: (context) => const EmailSignUpView(),
+                          ),
+                          );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF00BCD4),

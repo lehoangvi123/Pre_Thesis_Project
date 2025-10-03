@@ -1,7 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:project1/view/login/WelcomeView.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  try {
+    await Firebase.initializeApp();
+    print('Firebase initialized successfully');
+  } catch (e) {
+    print('Error initializing Firebase: $e');
+  }
+  
   runApp(const MyApp());
 }          
 
@@ -19,9 +29,7 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: Colors.white,
         useMaterial3: false,
       ),
-       // Sử dụng WelcomeScreen từ file welcome.dart
-    home: const WelcomeView(),
-    
+      home: const WelcomeView(),
     );
   }
 }
