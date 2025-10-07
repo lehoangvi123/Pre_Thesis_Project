@@ -23,23 +23,27 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.example.project1"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        versionName = flutter.versionName 
+        multiDexEnabled = true  // ← SỬA: thêm dấu = và true
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+} 
+
+dependencies {
+    // Thêm Google Sign-In (KOTLIN DSL dùng ngoặc kép)
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
+    
+    // Thêm MultiDex nếu cần
+    implementation("androidx.multidex:multidex:2.0.1")
 }
 
 flutter {

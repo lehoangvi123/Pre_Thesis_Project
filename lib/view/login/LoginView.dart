@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import '../sign-up/SignUpView.dart'; 
 import './ForgotPasswordView.dart'; 
 import '../home/HomeView.dart';
@@ -14,6 +16,7 @@ class LoginView extends StatefulWidget {
 class _LoginViewState extends State<LoginView> {
   final _formKey = GlobalKey<FormState>();
   final _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
   
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -28,6 +31,7 @@ class _LoginViewState extends State<LoginView> {
     super.dispose();
   }
 
+  // Đăng nhập bằng Email/Password
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -38,20 +42,17 @@ class _LoginViewState extends State<LoginView> {
     });
 
     try {
-      // Đăng nhập với Firebase Authentication
       await _auth.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // Đăng nhập thành công - chuyển sang màn hình chính
       if (mounted) {
         _showSuccessSnackBar('Đăng nhập thành công!');
-        // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomeView())); 
-          Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(builder: (context) => const HomeView()),
-  );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeView()),
+        );
       }
 
     } on FirebaseAuthException catch (e) {
@@ -90,16 +91,110 @@ class _LoginViewState extends State<LoginView> {
     }
   }
 
+  // Đăng nhập bằng Google
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Trigger the authentication flow
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      
+      if (googleUser == null) {
+        // User canceled the sign-in
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      // Create a new credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase with the Google credential
+      final userCredential = await _auth.signInWithCredential(credential);
+
+      if (userCredential.user != null && mounted) {
+        _showSuccessSnackBar('Đăng nhập Google thành công!');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeView()),
+        );
+      }
+
+    } catch (e) {
+      _showErrorDialog('Lỗi đăng nhập Google: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  // Đăng nhập bằng Facebook
+  Future<void> _signInWithFacebook() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Trigger the sign-in flow
+      final LoginResult result = await FacebookAuth.instance.login();
+
+      if (result.status == LoginStatus.success) {
+        // Create a credential from the access token
+        final OAuthCredential credential = 
+            FacebookAuthProvider.credential(result.accessToken!.token);
+
+        // Sign in to Firebase with the Facebook credential
+        final userCredential = await _auth.signInWithCredential(credential);
+
+        if (userCredential.user != null && mounted) {
+          _showSuccessSnackBar('Đăng nhập Facebook thành công!');
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeView()),
+          );
+        }
+      } else if (result.status == LoginStatus.cancelled) {
+        _showErrorDialog('Đăng nhập Facebook đã bị hủy');
+      } else {
+        _showErrorDialog('Lỗi đăng nhập Facebook: ${result.message}');
+      }
+
+    } catch (e) {
+      _showErrorDialog('Lỗi đăng nhập Facebook: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
         title: const Text('Lỗi đăng nhập'),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Thử lại'),
+            child: const Text('Đóng'),
           ),
         ],
       ),
@@ -209,11 +304,10 @@ class _LoginViewState extends State<LoginView> {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () {
-                        Navigator.push(
-                          context, 
-                          MaterialPageRoute(builder: (context) => const ForgotPasswordView()),
-                        ); 
-
+                      Navigator.push(
+                        context, 
+                        MaterialPageRoute(builder: (context) => const ForgotPasswordView()),
+                      ); 
                     }, 
                     child: const Text('Forgot Password?'),
                   ),
@@ -233,17 +327,122 @@ class _LoginViewState extends State<LoginView> {
                       ),
                     ),
                     child: _isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
                         : const Text(
                             'Log In',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
                           ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
+
+                // Divider với text "Or continue with"
+                Row(
+                  children: [
+                    Expanded(
+                      child: Divider(
+                        color: Colors.grey[400],
+                        thickness: 1,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Or continue with',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Divider(
+                        color: Colors.grey[400],
+                        thickness: 1,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Social Login Buttons (Google & Facebook)
+                Row(
+                  children: [
+                    // Google Button
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isLoading ? null : _signInWithGoogle,
+                        icon: Image.asset(
+                          'assets/images/google_icon.png',
+                          height: 24,
+                          width: 24,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(
+                              Icons.g_mobiledata,
+                              color: Color(0xFFDB4437),
+                              size: 28,
+                            );
+                          },
+                        ),
+                        label: const Text(
+                          'Google',
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(color: Colors.grey[300]!),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    
+                    // Facebook Button
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isLoading ? null : _signInWithFacebook,
+                        icon: const Icon(
+                          Icons.facebook,
+                          color: Color(0xFF1877F2),
+                          size: 24,
+                        ),
+                        label: const Text(
+                          'Facebook',
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(color: Colors.grey[300]!),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
                 
                 // Sign Up Link
                 Row(
@@ -252,7 +451,10 @@ class _LoginViewState extends State<LoginView> {
                     const Text('Don\'t have an account? '),
                     TextButton(
                       onPressed: () {
-                         Navigator.push(context, MaterialPageRoute(builder: (context) => SignUpView()));
+                        Navigator.push(
+                          context, 
+                          MaterialPageRoute(builder: (context) => const SignUpView()),
+                        );
                       },
                       child: const Text(
                         'Sign Up',
@@ -270,4 +472,4 @@ class _LoginViewState extends State<LoginView> {
       ),
     );
   }
-} 
+}
