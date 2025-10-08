@@ -168,11 +168,11 @@ class _LoginViewState extends State<LoginView> {
       } else if (result.status == LoginStatus.cancelled) {
         _showErrorDialog('Đăng nhập Facebook đã bị hủy');
       } else {
-        _showErrorDialog('Lỗi đăng nhập Facebook: ${result.message}');
+        _showErrorDialog('Tính năng đăng nhập Facebook đang được cập nhật. Vui lòng sử dụng Email hoặc Google để tiếp tục!');
       }
 
     } catch (e) {
-      _showErrorDialog('Lỗi đăng nhập Facebook: $e');
+      _showErrorDialog('Tính năng đăng nhập Facebook đang được cập nhật. Vui lòng sử dụng Email hoặc Google để tiếp tục!');
     } finally {
       if (mounted) {
         setState(() {
@@ -189,7 +189,7 @@ class _LoginViewState extends State<LoginView> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        title: const Text('Lỗi đăng nhập'),
+        title: const Text('Thông báo'),
         content: Text(message),
         actions: [
           TextButton(
