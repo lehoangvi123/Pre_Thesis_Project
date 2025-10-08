@@ -15,7 +15,8 @@ dependencies:
   firebase_auth: ^4.20.0
   google_sign_in: ^6.1.5  
   flutter_facebook_auth: ^6.0.3
-  cloud_firestore: ^4.13.0  # Thêm dòng này
+  cloud_firestore: ^4.13.0  # Thêm dòng này 
+  fl_chart: ^0.66.0
 
 
 dev_dependencies:
