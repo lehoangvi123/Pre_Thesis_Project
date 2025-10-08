@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart'; 
 import '../login/LoginView.dart'; 
 import '../notification/NotificationView.dart';
+import './AnalysisView.dart'; 
+import './Transaction.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({Key? key}) : super(key: key);
@@ -27,20 +29,16 @@ class _HomeViewState extends State<HomeView> {
                 _buildHeader(),
                 const SizedBox(height: 24),
 
-                // Balance Cards Row
+                // Balance Cards
                 _buildBalanceCards(),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
 
-                // Progress Indicator
-                _buildProgressIndicator(),
-                const SizedBox(height: 12),
-
-                // Progress Text
-                _buildProgressText(),
+                // Progress Bar
+                _buildProgressBar(),
                 const SizedBox(height: 20),
 
-                // Green Card with Goals and Spending
-                _buildGreenCard(),
+                // Spending Summary Cards
+                _buildSpendingCards(),
                 const SizedBox(height: 20),
 
                 // Period Selector
@@ -49,12 +47,12 @@ class _HomeViewState extends State<HomeView> {
 
                 // Transaction List
                 _buildTransactionList(),
-                const SizedBox(height: 20),
               ],
             ),
           ),
         ),
       ),
+      bottomNavigationBar: _buildBottomNavBar(),
     );
   }
 
@@ -68,8 +66,8 @@ class _HomeViewState extends State<HomeView> {
             Text(
               'Hi, Welcome Back',
               style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
                 color: Colors.grey[800],
               ),
             ),
@@ -77,8 +75,8 @@ class _HomeViewState extends State<HomeView> {
             Text(
               'Lehoangvi',
               style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey[500],
+                fontSize: 14,
+                color: Colors.grey[600],
               ),
             ),
           ],
@@ -97,10 +95,10 @@ class _HomeViewState extends State<HomeView> {
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[300]!),
-                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.notifications_outlined, color: Colors.grey[700], size: 20),
+                child: Icon(Icons.notifications_outlined, color: Colors.grey[700]),
               ),
             ),
             const SizedBox(width: 8),
@@ -110,9 +108,9 @@ class _HomeViewState extends State<HomeView> {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: Colors.red[50],
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.logout, color: Colors.red[600], size: 18),
+                child: Icon(Icons.logout, color: Colors.red[600], size: 20),
               ),
             ),
           ],
@@ -167,6 +165,10 @@ class _HomeViewState extends State<HomeView> {
   }
 
   void _logout() {
+    // Xóa dữ liệu đăng nhập (nếu có SharedPreferences hoặc local storage)
+    // await SharedPreferences.getInstance().then((prefs) => prefs.clear());
+    
+    // Navigate về trang Login
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const LoginView()),
       (Route<dynamic> route) => false,
@@ -177,173 +179,155 @@ class _HomeViewState extends State<HomeView> {
     return Row(
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.circle, size: 8, color: Colors.grey[400]),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Total Balance',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                '7,783,000 VND',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.circle, size: 8, color: Colors.grey[400]),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Total Expense',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                '-1,455,444 VND',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProgressIndicator() {
-    return Row(
-      children: [
-        Expanded(
-          flex: 40,
           child: Container(
-            height: 8,
-            decoration: BoxDecoration(
-              color: Colors.black,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Expanded(
-          flex: 60,
-          child: Container(
-            height: 8,
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProgressText() {
-    return Row(
-      children: [
-        Icon(Icons.check_circle, size: 16, color: Colors.green[600]),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            '35% Of Your Expenses, Looks Good.',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-          ),
-        ),
-        Text(
-          '\$20,000.00',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey[700],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGreenCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF7FFFD4),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          // Left Side - On Goals Icon
-          Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.3),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey[300]!),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
-                  Icons.track_changes,
-                  color: Colors.white,
-                  size: 32,
+                Row(
+                  children: [
+                    Icon(Icons.account_balance_wallet_outlined, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Total Balance',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'On Goals',
+                const Text(
+                  '7,783,000 VND',
                   style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey[700],
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 16),
-          
-          // Right Side - Spending Details
-          Expanded(
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Groceries Last Week
                 Row(
                   children: [
-                    Icon(Icons.shopping_bag_outlined, size: 18, color: Colors.grey[700]),
-                    const SizedBox(width: 8),
+                    Icon(Icons.trending_down, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Total Expenses',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '-1,455,444 VND',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgressBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle, size: 20, color: Colors.green[600]),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '30% Of Your Expenses, Looks Good',
+              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+            ),
+          ),
+          Text(
+            '\$20,000.00',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[800],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpendingCards() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF7FFFD4),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.track_changes, color: Colors.white, size: 28),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'On Goals',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF7FFFD4),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.shopping_bag_outlined, size: 16, color: Colors.grey[700]),
+                    const SizedBox(width: 6),
                     Text(
                       'Groceries Last Week',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[700],
-                      ),
+                      style: TextStyle(fontSize: 11, color: Colors.grey[700]),
                     ),
                   ],
                 ),
@@ -351,24 +335,18 @@ class _HomeViewState extends State<HomeView> {
                 const Text(
                   '4,000,000 VND',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
                   ),
                 ),
-                const SizedBox(height: 12),
-                
-                // Food Last Week
+                const SizedBox(height: 8),
                 Row(
                   children: [
-                    Icon(Icons.restaurant_outlined, size: 18, color: Colors.grey[700]),
-                    const SizedBox(width: 8),
+                    Icon(Icons.restaurant, size: 16, color: Colors.grey[700]),
+                    const SizedBox(width: 6),
                     Text(
                       'Food Last Week',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[700],
-                      ),
+                      style: TextStyle(fontSize: 11, color: Colors.grey[700]),
                     ),
                   ],
                 ),
@@ -376,16 +354,15 @@ class _HomeViewState extends State<HomeView> {
                 const Text(
                   '100,000 VND',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
                   ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -413,17 +390,14 @@ class _HomeViewState extends State<HomeView> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF00D09E) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isSelected ? const Color(0xFF00D09E) : Colors.grey[300]!,
-            ),
+            color: isSelected ? const Color(0xFF00CED1) : Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Center(
             child: Text(
               period,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                 color: isSelected ? Colors.white : Colors.grey[700],
               ),
@@ -438,31 +412,28 @@ class _HomeViewState extends State<HomeView> {
     return Column(
       children: [
         _buildTransactionItem(
-          icon: Icons.attach_money_rounded,
-          iconColor: const Color(0xFF4A90E2),
-          iconBg: const Color(0xFFE3F2FD),
+          icon: Icons.attach_money,
+          iconColor: Colors.blue[400]!,
           title: 'Salary',
-          date: '16-27 - April 30',
+          date: '8-27 - April 30',
           category: 'Monthly',
           amount: '5,000,000 VND',
-          isPositive: false,
+          isPositive: true,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         _buildTransactionItem(
-          icon: Icons.shopping_cart_outlined,
-          iconColor: const Color(0xFF5C9FD6),
-          iconBg: const Color(0xFFE1F5FE),
+          icon: Icons.shopping_cart,
+          iconColor: Colors.blue[600]!,
           title: 'Groceries',
           date: '17-30 - April 24',
           category: 'Pantry',
           amount: '-10,000,000 VND',
           isPositive: false,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         _buildTransactionItem(
-          icon: Icons.home_outlined,
-          iconColor: const Color(0xFF64B5F6),
-          iconBg: const Color(0xFFE3F2FD),
+          icon: Icons.home,
+          iconColor: Colors.blue[400]!,
           title: 'Rent',
           date: '8-30 - April 18',
           category: 'Rent',
@@ -476,7 +447,6 @@ class _HomeViewState extends State<HomeView> {
   Widget _buildTransactionItem({
     required IconData icon,
     required Color iconColor,
-    required Color iconBg,
     required String title,
     required String date,
     required String category,
@@ -484,20 +454,20 @@ class _HomeViewState extends State<HomeView> {
     required bool isPositive,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: iconBg,
-              borderRadius: BorderRadius.circular(10),
+              color: iconColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: iconColor, size: 22),
+            child: Icon(icon, color: iconColor, size: 24),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -507,18 +477,14 @@ class _HomeViewState extends State<HomeView> {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black,
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 4),
                 Text(
                   date,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
             ),
@@ -527,25 +493,21 @@ class _HomeViewState extends State<HomeView> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   category,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey[700],
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(fontSize: 11, color: Colors.grey[700]),
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 amount,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: isPositive ? Colors.green[600] : Colors.red[600],
                 ),
@@ -556,4 +518,64 @@ class _HomeViewState extends State<HomeView> {
       ),
     );
   }
+
+  Widget _buildBottomNavBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(Icons.home, false, Colors.grey[400]!, onTap: () {
+                 Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const HomeView()),
+                    );
+              }),
+              _buildNavItem(Icons.search, false, Colors.grey[400]!, onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AnalysisView()),
+                    );
+                  }),
+              // Trong _buildBottomNavBar()
+              _buildNavItem(Icons.swap_horiz, false, Colors.grey[400]!, onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const TransactionView()),
+                );
+              }),
+              _buildNavItem(Icons.layers, false, Colors.grey[400]!),
+              _buildNavItem(Icons.person_outline, false, Colors.grey[400]!),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+ Widget _buildNavItem(IconData icon, bool isActive, Color color, {VoidCallback? onTap}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isActive ? color.withOpacity(0.1) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, color: color, size: 26),
+    ),
+  );
+}
 }

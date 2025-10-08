@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:project1/view/login/LoginView.dart'; 
-import '../home/HomeView.dart';
+import '../Function/HomeView.dart';
 
 class SignUpView extends StatefulWidget {
   const SignUpView({super.key});

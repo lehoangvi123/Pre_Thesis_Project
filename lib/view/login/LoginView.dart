@@ -4,7 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import '../sign-up/SignUpView.dart'; 
 import './ForgotPasswordView.dart'; 
-import '../home/HomeView.dart';
+import '../Function/HomeView.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
