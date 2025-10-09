@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../login/LoginView.dart'; 
 import '../notification/NotificationView.dart';
 import './AnalysisView.dart'; 
-import './Transaction.dart';
+import './Transaction.dart'; 
+import './CategorizeContent.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({Key? key}) : super(key: key);
@@ -556,7 +557,12 @@ class _HomeViewState extends State<HomeView> {
                   MaterialPageRoute(builder: (context) => const TransactionView()),
                 );
               }),
-              _buildNavItem(Icons.layers, false, Colors.grey[400]!),
+              _buildNavItem(Icons.layers, false, Colors.grey[400]!, onTap:() {
+                 Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CategoriesView()),
+                );
+              }),
               _buildNavItem(Icons.person_outline, false, Colors.grey[400]!),
             ],
           ),

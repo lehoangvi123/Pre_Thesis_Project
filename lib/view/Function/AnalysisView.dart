@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart'; 
 import './Transaction.dart'; 
-import './HomeView.dart';
+import './HomeView.dart'; 
+import './CategorizeContent.dart'; 
 
 class AnalysisView extends StatefulWidget {
   const AnalysisView({Key? key}) : super(key: key);
@@ -801,7 +802,12 @@ class _AnalysisViewState extends State<AnalysisView> {
                   MaterialPageRoute(builder: (context) => const TransactionView()),
                 );
               }),
-              _buildNavItem(Icons.layers, false, Colors.grey[400]!),
+              _buildNavItem(Icons.layers, false, Colors.grey[400]!, onTap:() {
+                 Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CategoriesView()),
+                );
+              }),
               _buildNavItem(Icons.person_outline, false, Colors.grey[400]!),
             ],
           ),
