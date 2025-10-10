@@ -3,7 +3,8 @@ import '../login/LoginView.dart';
 import '../notification/NotificationView.dart';
 import './AnalysisView.dart'; 
 import './Transaction.dart'; 
-import './CategorizeContent.dart';
+import './CategorizeContent.dart'; 
+import './ProfileView.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({Key? key}) : super(key: key);
@@ -538,32 +539,33 @@ class _HomeViewState extends State<HomeView> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(Icons.home, false, Colors.grey[400]!, onTap: () {
-                 Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const HomeView()),
-                    );
+              _buildNavItem(Icons.home, true, const Color(0xFF00CED1), onTap: () {
+                // Already on Home page
               }),
               _buildNavItem(Icons.search, false, Colors.grey[400]!, onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const AnalysisView()),
-                    );
-                  }),
-              // Trong _buildBottomNavBar()
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AnalysisView()),
+                );
+              }),
               _buildNavItem(Icons.swap_horiz, false, Colors.grey[400]!, onTap: () {
-                Navigator.push(
+                Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const TransactionView()),
                 );
               }),
-              _buildNavItem(Icons.layers, false, Colors.grey[400]!, onTap:() {
-                 Navigator.pushReplacement(
+              _buildNavItem(Icons.layers, false, Colors.grey[400]!, onTap: () {
+                Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const CategoriesView()),
                 );
               }),
-              _buildNavItem(Icons.person_outline, false, Colors.grey[400]!),
+             _buildNavItem(Icons.person_outline, false, Colors.grey[400]!, onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfileView()),
+                );
+              }),
             ],
           ),
         ),
@@ -571,17 +573,17 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
- Widget _buildNavItem(IconData icon, bool isActive, Color color, {VoidCallback? onTap}) {
-  return GestureDetector(
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isActive ? color.withOpacity(0.1) : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
+  Widget _buildNavItem(IconData icon, bool isActive, Color color, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isActive ? color.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, color: color, size: 26),
       ),
-      child: Icon(icon, color: color, size: 26),
-    ),
-  );
-}
+    );
+  }
 }

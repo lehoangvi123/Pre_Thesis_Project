@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart'; 
 import './Transaction.dart'; 
 import './HomeView.dart'; 
-import './CategorizeContent.dart'; 
+import './CategorizeContent.dart';  
+import './ProfileView.dart';
 
 class AnalysisView extends StatefulWidget {
   const AnalysisView({Key? key}) : super(key: key);
@@ -765,56 +766,59 @@ class _AnalysisViewState extends State<AnalysisView> {
     );
   }
 
-  Widget _buildBottomNavBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(Icons.home, false, Colors.grey[400]!, onTap: () {
-                 Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const HomeView()),
-                    );
-              }),
-              _buildNavItem(Icons.search, false, Colors.grey[400]!, onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const AnalysisView()),
-                    );
-                  }),
-              // Trong _buildBottomNavBar()
-              _buildNavItem(Icons.swap_horiz, false, Colors.grey[400]!, onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const TransactionView()),
-                );
-              }),
-              _buildNavItem(Icons.layers, false, Colors.grey[400]!, onTap:() {
-                 Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CategoriesView()),
-                );
-              }),
-              _buildNavItem(Icons.person_outline, false, Colors.grey[400]!),
-            ],
-          ),
+  // In the _buildBottomNavBar() method of AnalysisView, replace with this:
+
+Widget _buildBottomNavBar() {
+  return Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.withOpacity(0.1),
+          blurRadius: 10,
+          offset: const Offset(0, -5),
+        ),
+      ],
+    ),
+    child: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItem(Icons.home, false, Colors.grey[400]!, onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const HomeView()),
+              );
+            }),
+            _buildNavItem(Icons.search, true, const Color(0xFF00CED1), onTap: () {
+              // Already on Analysis page
+            }),
+            _buildNavItem(Icons.swap_horiz, false, Colors.grey[400]!, onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const TransactionView()),
+              );
+            }),
+            _buildNavItem(Icons.layers, false, Colors.grey[400]!, onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const CategoriesView()),
+              );
+            }),
+           _buildNavItem(Icons.person_outline, false, Colors.grey[400]!, onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileView()),
+              );
+            }),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildNavItem(IconData icon, bool isActive, Color color, {VoidCallback? onTap}) {
     return GestureDetector(

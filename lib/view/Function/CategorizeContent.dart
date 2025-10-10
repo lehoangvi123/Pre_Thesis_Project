@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import './HomeView.dart';
 import './AnalysisView.dart';
 import './Transaction.dart';
-import '../notification/NotificationView.dart';
+import '../notification/NotificationView.dart'; 
+import './ProfileView.dart'; 
 
 class CategoriesView extends StatefulWidget {
   const CategoriesView({Key? key}) : super(key: key);
@@ -334,7 +335,12 @@ class _CategoriesViewState extends State<CategoriesView> {
               _buildNavItem(Icons.layers, true, const Color(0xFF00CED1), onTap: () {
                 // Already on Categories page
               }),
-              _buildNavItem(Icons.person_outline, false, Colors.grey[400]!),
+              _buildNavItem(Icons.person_outline, false, Colors.grey[400]!, onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfileView()),
+                );
+              }),
             ],
           ),
         ),

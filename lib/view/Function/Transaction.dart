@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart'; 
 import 'AnalysisView.dart';
 import 'HomeView.dart'; 
-import './CategorizeContent.dart';
+import './CategorizeContent.dart'; 
+import './ProfileView.dart';
 
 class TransactionView extends StatefulWidget {
   const TransactionView({Key? key}) : super(key: key);
@@ -389,19 +390,21 @@ class _TransactionViewState extends State<TransactionView> {
                     );
                   }),
               // Trong _buildBottomNavBar()
-              _buildNavItem(Icons.swap_horiz, false, Colors.grey[400]!, onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const TransactionView()),
-                );
-              }),
+             _buildNavItem(Icons.swap_horiz, true, const Color(0xFF00CED1), onTap: () {
+  // Already on Transaction page
+}),
               _buildNavItem(Icons.layers, false, Colors.grey[400]!, onTap:() {
                  Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const CategoriesView()),
                 );
               }),
-              _buildNavItem(Icons.person_outline, false, Colors.grey[400]!),
+             _buildNavItem(Icons.person_outline, false, Colors.grey[400]!, onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfileView()),
+                );
+              }),
             ],
           ),
         ),
