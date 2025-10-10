@@ -1,3 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart'; 
+import 'package:cloud_firestore/cloud_firestore.dart'; 
+import 'package:shared_preferences/shared_preferences.dart'; 
 import 'package:flutter/material.dart'; 
 import '../login/LoginView.dart'; 
 import '../notification/NotificationView.dart';
@@ -14,7 +17,64 @@ class HomeView extends StatefulWidget {
 }
 
 class _HomeViewState extends State<HomeView> {
-  String selectedPeriod = 'Monthly';
+  String selectedPeriod = 'Monthly'; 
+  String userName = 'User'; 
+  bool isLoadingUserName = true; 
+
+
+  // Add this method in _HomeViewState class
+@override
+void initState() {
+  super.initState();
+  _loadUserName();
+}
+
+Future<void> _loadUserName() async {
+  try {
+    // Get current Firebase user
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    
+    if (currentUser != null) {
+      // Try to fetch from Firestore first
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      if (userDoc.exists) {
+        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+        setState(() {
+          userName = userData['name'] ?? currentUser.displayName ?? 'User';
+          isLoadingUserName = false;
+        });
+      } else {
+        // Fallback to Firebase Auth displayName
+        setState(() {
+          userName = currentUser.displayName ?? currentUser.email?.split('@')[0] ?? 'User';
+          isLoadingUserName = false;
+        });
+      }
+      
+      // Save to SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_name', userName);
+      
+    } else {
+      // No Firebase user, use SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        userName = prefs.getString('user_name') ?? 'User';
+        isLoadingUserName = false;
+      });
+    }
+  } catch (e) {
+    print('Error loading user name: $e');
+    setState(() {
+      isLoadingUserName = false;
+    });
+  }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +135,7 @@ class _HomeViewState extends State<HomeView> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Lehoangvi',
+              userName,
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey[600],

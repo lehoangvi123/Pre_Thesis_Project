@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart'; 
+import 'package:shared_preferences/shared_preferences.dart'; 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../sign-up/SignUpView.dart'; 
 import './ForgotPasswordView.dart'; 
-import '../Function/HomeView.dart';
+import '../Function/HomeView.dart'; 
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -471,5 +473,38 @@ class _LoginViewState extends State<LoginView> {
         ),
       ),
     );
+  } 
+
+
+  // OR if you're using Firebase Authentication with a name field:
+Future<void> _handleLoginWithFirebase(String email, String password) async {
+  try {
+    UserCredential userCredential = await FirebaseAuth.instance
+        .signInWithEmailAndPassword(email: email, password: password);
+    
+    // Get user data from Firestore (if you store additional user info there)
+    DocumentSnapshot userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userCredential.user!.uid)
+        .get();
+    
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Save user data
+    await prefs.setString('user_name', userDoc['name'] ?? email.split('@')[0]);
+    await prefs.setString('user_email', email);
+    await prefs.setString('user_id', userCredential.user!.uid);
+    await prefs.setBool('is_logged_in', true);
+    
+    // Navigate to HomeView
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const HomeView()),
+      (Route<dynamic> route) => false,
+    );
+    
+  } catch (e) {
+    print('Login error: $e');
+    // Show error to user
   }
+}
 }
