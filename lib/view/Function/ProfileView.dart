@@ -8,6 +8,7 @@ import './Transaction.dart';
 import './CategorizeContent.dart';
 import '../notification/NotificationView.dart';
 import '../login/LoginView.dart';
+import '../FunctionProfileView/Help.dart'; // Add this import for Help
 
 class ProfileView extends StatefulWidget {
   const ProfileView({Key? key}) : super(key: key);
@@ -182,9 +183,12 @@ class _ProfileViewState extends State<ProfileView> {
                                 iconBackground: Colors.blue[50]!,
                                 title: 'Help',
                                 onTap: () {
-                                  // Navigate to Help
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Help page coming soon')),
+                                  // Navigate to Help - UPDATED HERE
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const HelpView(),
+                                    ),
                                   );
                                 },
                               ),

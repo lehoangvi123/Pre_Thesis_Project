@@ -57,7 +57,7 @@ Future<void> _loadUserName() async {
       
       // Save to SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_name', userName);
+      await prefs.setString('user_name', userName); 
       
     } else {
       // No Firebase user, use SharedPreferences
