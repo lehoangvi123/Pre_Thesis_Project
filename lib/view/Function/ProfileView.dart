@@ -9,6 +9,9 @@ import './CategorizeContent.dart';
 import '../notification/NotificationView.dart';
 import '../login/LoginView.dart';
 import '../FunctionProfileView/Help.dart'; // Add this import for Help
+import '../FunctionProfileView/converting_currency_view.dart'; // ADD THIS I
+import '../FunctionProfileView//security_view.dart';
+import '../FunctionProfileView/settings_view.dart';
 
 class ProfileView extends StatefulWidget {
   const ProfileView({Key? key}) : super(key: key);
@@ -32,7 +35,7 @@ class _ProfileViewState extends State<ProfileView> {
     try {
       // Get current Firebase user
       User? currentUser = FirebaseAuth.instance.currentUser;
-      
+
       if (currentUser != null) {
         // Fetch user data from Firestore
         DocumentSnapshot userDoc = await FirebaseFirestore.instance
@@ -41,11 +44,13 @@ class _ProfileViewState extends State<ProfileView> {
             .get();
 
         if (userDoc.exists) {
-          Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
-          
+          Map<String, dynamic> userData =
+              userDoc.data() as Map<String, dynamic>;
+
           setState(() {
             userName = userData['name'] ?? currentUser.displayName ?? 'User';
-            userEmail = userData['email'] ?? currentUser.email ?? 'user@example.com';
+            userEmail =
+                userData['email'] ?? currentUser.email ?? 'user@example.com';
             isLoading = false;
           });
 
@@ -56,7 +61,10 @@ class _ProfileViewState extends State<ProfileView> {
         } else {
           // If Firestore doc doesn't exist, use Firebase Auth data
           setState(() {
-            userName = currentUser.displayName ?? currentUser.email?.split('@')[0] ?? 'User';
+            userName =
+                currentUser.displayName ??
+                currentUser.email?.split('@')[0] ??
+                'User';
             userEmail = currentUser.email ?? 'user@example.com';
             isLoading = false;
           });
@@ -96,10 +104,7 @@ class _ProfileViewState extends State<ProfileView> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              const Color(0xFFE8F5E9),
-              Colors.white,
-            ],
+            colors: [const Color(0xFFE8F5E9), Colors.white],
           ),
         ),
         child: SafeArea(
@@ -107,7 +112,7 @@ class _ProfileViewState extends State<ProfileView> {
             children: [
               // App Bar
               _buildAppBar(),
-              
+
               // Scrollable Content
               Expanded(
                 child: isLoading
@@ -122,11 +127,11 @@ class _ProfileViewState extends State<ProfileView> {
                           child: Column(
                             children: [
                               const SizedBox(height: 20),
-                              
+
                               // Profile Picture and Info
                               _buildProfileHeader(),
                               const SizedBox(height: 32),
-                              
+
                               // Menu Items
                               _buildMenuItem(
                                 icon: Icons.person_outline,
@@ -144,9 +149,12 @@ class _ProfileViewState extends State<ProfileView> {
                                 iconBackground: Colors.blue[50]!,
                                 title: 'Security',
                                 onTap: () {
-                                  // Navigate to Security
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Security page coming soon')),
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const SecurityView(),
+                                    ),
                                   );
                                 },
                               ),
@@ -158,24 +166,30 @@ class _ProfileViewState extends State<ProfileView> {
                                 title: 'Converting Currency',
                                 onTap: () {
                                   // Navigate to Currency Converter
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Currency converter coming soon')),
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const ConvertingCurrencyView(),
+                                    ),
                                   );
                                 },
                               ),
                               const SizedBox(height: 12),
-                              _buildMenuItem(
-                                icon: Icons.settings,
-                                iconColor: Colors.blue[400]!,
-                                iconBackground: Colors.blue[50]!,
-                                title: 'Setting',
-                                onTap: () {
-                                  // Navigate to Settings
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Settings page coming soon')),
-                                  );
-                                },
-                              ),
+                             _buildMenuItem(
+  icon: Icons.settings,
+  iconColor: Colors.blue[400]!,
+  iconBackground: Colors.blue[50]!,
+  title: 'Setting',
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SettingsView(),
+      ),
+    );
+  },
+),
                               const SizedBox(height: 12),
                               _buildMenuItem(
                                 icon: Icons.help_outline,
@@ -202,7 +216,7 @@ class _ProfileViewState extends State<ProfileView> {
                                   _showLogoutDialog();
                                 },
                               ),
-                              
+
                               // Extra space for bottom navigation
                               const SizedBox(height: 80),
                             ],
@@ -263,7 +277,10 @@ class _ProfileViewState extends State<ProfileView> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(Icons.notifications_outlined, color: Colors.grey[700]),
+              child: Icon(
+                Icons.notifications_outlined,
+                color: Colors.grey[700],
+              ),
             ),
           ),
         ],
@@ -292,11 +309,7 @@ class _ProfileViewState extends State<ProfileView> {
                   ),
                 ],
               ),
-              child: Icon(
-                Icons.person,
-                size: 50,
-                color: Colors.grey[600],
-              ),
+              child: Icon(Icons.person, size: 50, color: Colors.grey[600]),
             ),
             Positioned(
               bottom: 0,
@@ -304,7 +317,9 @@ class _ProfileViewState extends State<ProfileView> {
               child: GestureDetector(
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Change profile picture coming soon')),
+                    const SnackBar(
+                      content: Text('Change profile picture coming soon'),
+                    ),
                   );
                 },
                 child: Container(
@@ -325,7 +340,7 @@ class _ProfileViewState extends State<ProfileView> {
           ],
         ),
         const SizedBox(height: 16),
-        
+
         // Name (from Firebase)
         Text(
           userName,
@@ -336,14 +351,11 @@ class _ProfileViewState extends State<ProfileView> {
           ),
         ),
         const SizedBox(height: 4),
-        
+
         // Email (from Firebase)
         Text(
           userEmail,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[600],
-          ),
+          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
         ),
       ],
     );
@@ -392,11 +404,7 @@ class _ProfileViewState extends State<ProfileView> {
                 ),
               ),
             ),
-            Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
           ],
         ),
       ),
@@ -404,8 +412,10 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   void _showEditProfileDialog() {
-    final TextEditingController nameController = TextEditingController(text: userName);
-    
+    final TextEditingController nameController = TextEditingController(
+      text: userName,
+    );
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -431,10 +441,7 @@ class _ProfileViewState extends State<ProfileView> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
+              child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -450,10 +457,7 @@ class _ProfileViewState extends State<ProfileView> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text(
-                'Save',
-                style: TextStyle(color: Colors.white),
-              ),
+              child: const Text('Save', style: TextStyle(color: Colors.white)),
             ),
           ],
         );
@@ -464,16 +468,16 @@ class _ProfileViewState extends State<ProfileView> {
   Future<void> _updateUserProfile(String newName) async {
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
-      
+
       if (currentUser != null) {
         // Update Firestore
         await FirebaseFirestore.instance
             .collection('users')
             .doc(currentUser.uid)
             .update({
-          'name': newName,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+              'name': newName,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
 
         // Update Firebase Auth display name
         await currentUser.updateDisplayName(newName);
@@ -522,10 +526,7 @@ class _ProfileViewState extends State<ProfileView> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text(
-                'Hủy',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
+              child: Text('Hủy', style: TextStyle(color: Colors.grey[600])),
             ),
             ElevatedButton(
               onPressed: () {
@@ -553,11 +554,11 @@ class _ProfileViewState extends State<ProfileView> {
     try {
       // Sign out from Firebase
       await FirebaseAuth.instance.signOut();
-      
+
       // Clear SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
-      
+
       // Navigate to login
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
@@ -594,33 +595,64 @@ class _ProfileViewState extends State<ProfileView> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(Icons.home, false, Colors.grey[400]!, onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const HomeView()),
-                );
-              }),
-              _buildNavItem(Icons.search, false, Colors.grey[400]!, onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AnalysisView()),
-                );
-              }),
-              _buildNavItem(Icons.swap_horiz, false, Colors.grey[400]!, onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const TransactionView()),
-                );
-              }),
-              _buildNavItem(Icons.layers, false, Colors.grey[400]!, onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CategoriesView()),
-                );
-              }),
-              _buildNavItem(Icons.person_outline, true, const Color(0xFF00CED1), onTap: () {
-                // Already on Profile page
-              }),
+              _buildNavItem(
+                Icons.home,
+                false,
+                Colors.grey[400]!,
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const HomeView()),
+                  );
+                },
+              ),
+              _buildNavItem(
+                Icons.search,
+                false,
+                Colors.grey[400]!,
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AnalysisView(),
+                    ),
+                  );
+                },
+              ),
+              _buildNavItem(
+                Icons.swap_horiz,
+                false,
+                Colors.grey[400]!,
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TransactionView(),
+                    ),
+                  );
+                },
+              ),
+              _buildNavItem(
+                Icons.layers,
+                false,
+                Colors.grey[400]!,
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CategoriesView(),
+                    ),
+                  );
+                },
+              ),
+              _buildNavItem(
+                Icons.person_outline,
+                true,
+                const Color(0xFF00CED1),
+                onTap: () {
+                  // Already on Profile page
+                },
+              ),
             ],
           ),
         ),
@@ -628,7 +660,12 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, bool isActive, Color color, {VoidCallback? onTap}) {
+  Widget _buildNavItem(
+    IconData icon,
+    bool isActive,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
