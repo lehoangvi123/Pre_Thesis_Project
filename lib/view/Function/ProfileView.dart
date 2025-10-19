@@ -8,8 +8,8 @@ import './Transaction.dart';
 import './CategorizeContent.dart';
 import '../notification/NotificationView.dart';
 import '../login/LoginView.dart';
-import '../FunctionProfileView/Help.dart'; // Add this import for Help
-import '../FunctionProfileView/converting_currency_view.dart'; // ADD THIS I
+import '../FunctionProfileView/Help.dart';
+import '../FunctionProfileView/converting_currency_view.dart';
 import '../FunctionProfileView//security_view.dart';
 import '../FunctionProfileView/settings_view.dart';
 
@@ -33,11 +33,9 @@ class _ProfileViewState extends State<ProfileView> {
 
   Future<void> _loadUserData() async {
     try {
-      // Get current Firebase user
       User? currentUser = FirebaseAuth.instance.currentUser;
 
       if (currentUser != null) {
-        // Fetch user data from Firestore
         DocumentSnapshot userDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(currentUser.uid)
@@ -54,12 +52,10 @@ class _ProfileViewState extends State<ProfileView> {
             isLoading = false;
           });
 
-          // Save to SharedPreferences for offline access
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('user_name', userName);
           await prefs.setString('user_email', userEmail);
         } else {
-          // If Firestore doc doesn't exist, use Firebase Auth data
           setState(() {
             userName =
                 currentUser.displayName ??
@@ -70,7 +66,6 @@ class _ProfileViewState extends State<ProfileView> {
           });
         }
       } else {
-        // No Firebase user, try SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         setState(() {
           userName = prefs.getString('user_name') ?? 'User';
@@ -80,7 +75,6 @@ class _ProfileViewState extends State<ProfileView> {
       }
     } catch (e) {
       print('Error loading user data: $e');
-      // Fallback to SharedPreferences
       try {
         final prefs = await SharedPreferences.getInstance();
         setState(() {
@@ -98,22 +92,24 @@ class _ProfileViewState extends State<ProfileView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [const Color(0xFFE8F5E9), Colors.white],
+            colors: isDark
+                ? [const Color(0xFF1A1A1A), const Color(0xFF0F0F0F)]
+                : [const Color(0xFFE8F5E9), Colors.white],
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              // App Bar
               _buildAppBar(),
-
-              // Scrollable Content
               Expanded(
                 child: isLoading
                     ? Center(
@@ -127,12 +123,8 @@ class _ProfileViewState extends State<ProfileView> {
                           child: Column(
                             children: [
                               const SizedBox(height: 20),
-
-                              // Profile Picture and Info
                               _buildProfileHeader(),
                               const SizedBox(height: 32),
-
-                              // Menu Items
                               _buildMenuItem(
                                 icon: Icons.person_outline,
                                 iconColor: Colors.blue[400]!,
@@ -165,7 +157,6 @@ class _ProfileViewState extends State<ProfileView> {
                                 iconBackground: Colors.blue[50]!,
                                 title: 'Converting Currency',
                                 onTap: () {
-                                  // Navigate to Currency Converter
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -176,20 +167,20 @@ class _ProfileViewState extends State<ProfileView> {
                                 },
                               ),
                               const SizedBox(height: 12),
-                             _buildMenuItem(
-  icon: Icons.settings,
-  iconColor: Colors.blue[400]!,
-  iconBackground: Colors.blue[50]!,
-  title: 'Setting',
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const SettingsView(),
-      ),
-    );
-  },
-),
+                              _buildMenuItem(
+                                icon: Icons.settings,
+                                iconColor: Colors.blue[400]!,
+                                iconBackground: Colors.blue[50]!,
+                                title: 'Setting',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const SettingsView(),
+                                    ),
+                                  );
+                                },
+                              ),
                               const SizedBox(height: 12),
                               _buildMenuItem(
                                 icon: Icons.help_outline,
@@ -197,7 +188,6 @@ class _ProfileViewState extends State<ProfileView> {
                                 iconBackground: Colors.blue[50]!,
                                 title: 'Help',
                                 onTap: () {
-                                  // Navigate to Help - UPDATED HERE
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -216,8 +206,6 @@ class _ProfileViewState extends State<ProfileView> {
                                   _showLogoutDialog();
                                 },
                               ),
-
-                              // Extra space for bottom navigation
                               const SizedBox(height: 80),
                             ],
                           ),
@@ -233,6 +221,8 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   Widget _buildAppBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
@@ -244,20 +234,23 @@ class _ProfileViewState extends State<ProfileView> {
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(Icons.arrow_back, color: Colors.grey[700]),
+              child: Icon(
+                Icons.arrow_back,
+                color: isDark ? Colors.grey[300] : Colors.grey[700],
+              ),
             ),
           ),
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
                 'Profile',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  color: isDark ? Colors.white : Colors.black,
                 ),
               ),
             ),
@@ -274,12 +267,12 @@ class _ProfileViewState extends State<ProfileView> {
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 Icons.notifications_outlined,
-                color: Colors.grey[700],
+                color: isDark ? Colors.grey[300] : Colors.grey[700],
               ),
             ),
           ),
@@ -289,9 +282,10 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   Widget _buildProfileHeader() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Column(
       children: [
-        // Profile Picture with Edit Button
         Stack(
           children: [
             Container(
@@ -299,8 +293,11 @@ class _ProfileViewState extends State<ProfileView> {
               height: 100,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.grey[300],
-                border: Border.all(color: Colors.white, width: 4),
+                color: isDark ? Colors.grey[700] : Colors.grey[300],
+                border: Border.all(
+                  color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                  width: 4,
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.grey.withOpacity(0.2),
@@ -309,7 +306,11 @@ class _ProfileViewState extends State<ProfileView> {
                   ),
                 ],
               ),
-              child: Icon(Icons.person, size: 50, color: Colors.grey[600]),
+              child: Icon(
+                Icons.person,
+                size: 50,
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
             ),
             Positioned(
               bottom: 0,
@@ -327,7 +328,10 @@ class _ProfileViewState extends State<ProfileView> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF00CED1),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                      width: 2,
+                    ),
                   ),
                   child: const Icon(
                     Icons.camera_alt,
@@ -340,22 +344,21 @@ class _ProfileViewState extends State<ProfileView> {
           ],
         ),
         const SizedBox(height: 16),
-
-        // Name (from Firebase)
         Text(
           userName,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: Colors.black,
+            color: isDark ? Colors.white : Colors.black,
           ),
         ),
         const SizedBox(height: 4),
-
-        // Email (from Firebase)
         Text(
           userEmail,
-          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+          style: TextStyle(
+            fontSize: 14,
+            color: isDark ? Colors.grey[400] : Colors.grey[600],
+          ),
         ),
       ],
     );
@@ -368,12 +371,14 @@ class _ProfileViewState extends State<ProfileView> {
     required String title,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -388,7 +393,9 @@ class _ProfileViewState extends State<ProfileView> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: iconBackground,
+                color: isDark
+                    ? iconBackground.withOpacity(0.2)
+                    : iconBackground,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: iconColor, size: 22),
@@ -397,14 +404,18 @@ class _ProfileViewState extends State<ProfileView> {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
-                  color: Colors.black,
+                  color: isDark ? Colors.white : Colors.black,
                 ),
               ),
             ),
-            Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: isDark ? Colors.grey[600] : Colors.grey[400],
+            ),
           ],
         ),
       ),
@@ -412,6 +423,7 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   void _showEditProfileDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final TextEditingController nameController = TextEditingController(
       text: userName,
     );
@@ -420,17 +432,27 @@ class _ProfileViewState extends State<ProfileView> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
+          title: Text(
             'Edit Profile',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black,
+            ),
           ),
           content: TextField(
             controller: nameController,
+            style: TextStyle(
+              color: isDark ? Colors.white : Colors.black,
+            ),
             decoration: InputDecoration(
               labelText: 'Name',
+              labelStyle: TextStyle(
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -441,7 +463,12 @@ class _ProfileViewState extends State<ProfileView> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                ),
+              ),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -457,7 +484,10 @@ class _ProfileViewState extends State<ProfileView> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text('Save', style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'Save',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -470,7 +500,6 @@ class _ProfileViewState extends State<ProfileView> {
       User? currentUser = FirebaseAuth.instance.currentUser;
 
       if (currentUser != null) {
-        // Update Firestore
         await FirebaseFirestore.instance
             .collection('users')
             .doc(currentUser.uid)
@@ -479,14 +508,11 @@ class _ProfileViewState extends State<ProfileView> {
               'updatedAt': FieldValue.serverTimestamp(),
             });
 
-        // Update Firebase Auth display name
         await currentUser.updateDisplayName(newName);
 
-        // Update SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user_name', newName);
 
-        // Refresh UI
         setState(() {
           userName = newName;
         });
@@ -509,24 +535,40 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   void _showLogoutDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
+          title: Text(
             'Đăng xuất',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black,
+            ),
           ),
-          content: const Text('Bạn có chắc chắn muốn đăng xuất không?'),
+          content: Text(
+            'Bạn có chắc chắn muốn đăng xuất không?',
+            style: TextStyle(
+              color: isDark ? Colors.grey[300] : Colors.black,
+            ),
+          ),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text('Hủy', style: TextStyle(color: Colors.grey[600])),
+              child: Text(
+                'Hủy',
+                style: TextStyle(
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                ),
+              ),
             ),
             ElevatedButton(
               onPressed: () {
@@ -552,14 +594,11 @@ class _ProfileViewState extends State<ProfileView> {
 
   Future<void> _logout() async {
     try {
-      // Sign out from Firebase
       await FirebaseAuth.instance.signOut();
 
-      // Clear SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
 
-      // Navigate to login
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const LoginView()),
@@ -578,9 +617,11 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   Widget _buildBottomNavBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
@@ -649,9 +690,7 @@ class _ProfileViewState extends State<ProfileView> {
                 Icons.person_outline,
                 true,
                 const Color(0xFF00CED1),
-                onTap: () {
-                  // Already on Profile page
-                },
+                onTap: () {},
               ),
             ],
           ),

@@ -33,7 +33,6 @@ class _LoginViewState extends State<LoginView> {
     super.dispose();
   }
 
-  // Đăng nhập bằng Email/Password
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -93,34 +92,28 @@ class _LoginViewState extends State<LoginView> {
     }
   }
 
-  // Đăng nhập bằng Google
   Future<void> _signInWithGoogle() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       
       if (googleUser == null) {
-        // User canceled the sign-in
         setState(() {
           _isLoading = false;
         });
         return;
       }
 
-      // Obtain the auth details from the request
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
 
-      // Create a new credential
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // Sign in to Firebase with the Google credential
       final userCredential = await _auth.signInWithCredential(credential);
 
       if (userCredential.user != null && mounted) {
@@ -142,22 +135,18 @@ class _LoginViewState extends State<LoginView> {
     }
   }
 
-  // Đăng nhập bằng Facebook
   Future<void> _signInWithFacebook() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Trigger the sign-in flow
       final LoginResult result = await FacebookAuth.instance.login();
 
       if (result.status == LoginStatus.success) {
-        // Create a credential from the access token
         final OAuthCredential credential = 
             FacebookAuthProvider.credential(result.accessToken!.token);
 
-        // Sign in to Firebase with the Facebook credential
         final userCredential = await _auth.signInWithCredential(credential);
 
         if (userCredential.user != null && mounted) {
@@ -185,18 +174,36 @@ class _LoginViewState extends State<LoginView> {
   }
 
   void _showErrorDialog(String message) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        title: const Text('Thông báo'),
-        content: Text(message),
+        title: Text(
+          'Thông báo',
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black,
+          ),
+        ),
+        content: Text(
+          message,
+          style: TextStyle(
+            color: isDark ? Colors.grey[300] : Colors.black,
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Đóng'),
+            child: Text(
+              'Đóng',
+              style: TextStyle(
+                color: isDark ? Colors.grey[400] : Colors.blue,
+              ),
+            ),
           ),
         ],
       ),
@@ -215,13 +222,18 @@ class _LoginViewState extends State<LoginView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(
+            Icons.arrow_back,
+            color: isDark ? Colors.white : Colors.black,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -233,19 +245,20 @@ class _LoginViewState extends State<LoginView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Welcome Back',
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Login to your account',
                   style: TextStyle(
                     fontSize: 16,
-                    color: Colors.grey,
+                    color: isDark ? Colors.grey[400] : Colors.grey,
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -254,11 +267,32 @@ class _LoginViewState extends State<LoginView> {
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.email_outlined),
+                    prefixIcon: Icon(
+                      Icons.email_outlined,
+                      color: isDark ? Colors.grey[500] : null,
+                    ),
                     labelText: 'Email',
+                    labelStyle: TextStyle(
+                      color: isDark ? Colors.grey[400] : null,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDark ? Colors.grey[600]! : Colors.blue,
+                      ),
                     ),
                   ),
                   validator: (value) {
@@ -277,14 +311,38 @@ class _LoginViewState extends State<LoginView> {
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    labelText: 'Password',      
+                    prefixIcon: Icon(
+                      Icons.lock_outline,
+                      color: isDark ? Colors.grey[500] : null,
+                    ),
+                    labelText: 'Password',
+                    labelStyle: TextStyle(
+                      color: isDark ? Colors.grey[400] : null,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDark ? Colors.grey[600]! : Colors.blue,
+                      ),
+                    ),
                     suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        color: isDark ? Colors.grey[500] : null,
+                      ),
                       onPressed: () {
                         setState(() {
                           _obscurePassword = !_obscurePassword;
@@ -311,7 +369,12 @@ class _LoginViewState extends State<LoginView> {
                         MaterialPageRoute(builder: (context) => const ForgotPasswordView()),
                       ); 
                     }, 
-                    child: const Text('Forgot Password?'),
+                    child: Text(
+                      'Forgot Password?',
+                      style: TextStyle(
+                        color: isDark ? Colors.grey[400] : Colors.blue,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),  
@@ -354,7 +417,7 @@ class _LoginViewState extends State<LoginView> {
                   children: [
                     Expanded(
                       child: Divider(
-                        color: Colors.grey[400],
+                        color: isDark ? Colors.grey[700] : Colors.grey[400],
                         thickness: 1,
                       ),
                     ),
@@ -363,14 +426,14 @@ class _LoginViewState extends State<LoginView> {
                       child: Text(
                         'Or continue with',
                         style: TextStyle(
-                          color: Colors.grey[600],
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
                           fontSize: 14,
                         ),
                       ),
                     ),
                     Expanded(
                       child: Divider(
-                        color: Colors.grey[400],
+                        color: isDark ? Colors.grey[700] : Colors.grey[400],
                         thickness: 1,
                       ),
                     ),
@@ -378,7 +441,7 @@ class _LoginViewState extends State<LoginView> {
                 ),
                 const SizedBox(height: 24),
 
-                // Social Login Buttons (Google & Facebook)
+                // Social Login Buttons
                 Row(
                   children: [
                     // Google Button
@@ -397,17 +460,19 @@ class _LoginViewState extends State<LoginView> {
                             );
                           },
                         ),
-                        label: const Text(
+                        label: Text(
                           'Google',
                           style: TextStyle(
-                            color: Colors.black87,
+                            color: isDark ? Colors.white : Colors.black87,
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: BorderSide(color: Colors.grey[300]!),
+                          side: BorderSide(
+                            color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -425,17 +490,19 @@ class _LoginViewState extends State<LoginView> {
                           color: Color(0xFF1877F2),
                           size: 24,
                         ),
-                        label: const Text(
+                        label: Text(
                           'Facebook',
                           style: TextStyle(
-                            color: Colors.black87,
+                            color: isDark ? Colors.white : Colors.black87,
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: BorderSide(color: Colors.grey[300]!),
+                          side: BorderSide(
+                            color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -450,7 +517,12 @@ class _LoginViewState extends State<LoginView> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Don\'t have an account? '),
+                    Text(
+                      'Don\'t have an account? ',
+                      style: TextStyle(
+                        color: isDark ? Colors.grey[300] : Colors.black,
+                      ),
+                    ),
                     TextButton(
                       onPressed: () {
                         Navigator.push(
@@ -462,6 +534,7 @@ class _LoginViewState extends State<LoginView> {
                         'Sign Up',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
+                          color: Colors.blue,
                         ),
                       ),
                     ),
@@ -473,38 +546,32 @@ class _LoginViewState extends State<LoginView> {
         ),
       ),
     );
-  } 
-
-
-  // OR if you're using Firebase Authentication with a name field:
-Future<void> _handleLoginWithFirebase(String email, String password) async {
-  try {
-    UserCredential userCredential = await FirebaseAuth.instance
-        .signInWithEmailAndPassword(email: email, password: password);
-    
-    // Get user data from Firestore (if you store additional user info there)
-    DocumentSnapshot userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(userCredential.user!.uid)
-        .get();
-    
-    final prefs = await SharedPreferences.getInstance();
-    
-    // Save user data
-    await prefs.setString('user_name', userDoc['name'] ?? email.split('@')[0]);
-    await prefs.setString('user_email', email);
-    await prefs.setString('user_id', userCredential.user!.uid);
-    await prefs.setBool('is_logged_in', true);
-    
-    // Navigate to HomeView
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const HomeView()),
-      (Route<dynamic> route) => false,
-    );
-    
-  } catch (e) {
-    print('Login error: $e');
-    // Show error to user
   }
-}
+
+  Future<void> _handleLoginWithFirebase(String email, String password) async {
+    try {
+      UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
+      
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .get();
+      
+      final prefs = await SharedPreferences.getInstance();
+      
+      await prefs.setString('user_name', userDoc['name'] ?? email.split('@')[0]);
+      await prefs.setString('user_email', email);
+      await prefs.setString('user_id', userCredential.user!.uid);
+      await prefs.setBool('is_logged_in', true);
+      
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const HomeView()),
+        (Route<dynamic> route) => false,
+      );
+      
+    } catch (e) {
+      print('Login error: $e');
+    }
+  }
 }

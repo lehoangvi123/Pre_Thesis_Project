@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../ThemeProvider/ThemeProviderDark.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({Key? key}) : super(key: key);
@@ -13,10 +15,7 @@ class _SettingsViewState extends State<SettingsView> {
   bool emailNotifications = false;
   bool budgetAlerts = true;
   bool expenseReminders = true;
-  bool darkMode = false;
-  String selectedCurrency = 'VND';
   String selectedLanguage = 'English';
-  bool biometricLogin = false;
 
   @override
   void initState() {
@@ -31,10 +30,7 @@ class _SettingsViewState extends State<SettingsView> {
       emailNotifications = prefs.getBool('email_notifications') ?? false;
       budgetAlerts = prefs.getBool('budget_alerts') ?? true;
       expenseReminders = prefs.getBool('expense_reminders') ?? true;
-      darkMode = prefs.getBool('dark_mode') ?? false;
-      selectedCurrency = prefs.getString('selected_currency') ?? 'VND';
       selectedLanguage = prefs.getString('selected_language') ?? 'English';
-      biometricLogin = prefs.getBool('biometric_login') ?? false;
     });
   }
 
@@ -49,19 +45,17 @@ class _SettingsViewState extends State<SettingsView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: const Color(0xFFF0FFFE),
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.grey),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Settings',
           style: TextStyle(
-            color: Colors.black87,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
@@ -122,24 +116,16 @@ class _SettingsViewState extends State<SettingsView> {
               // Display Section
               _buildSectionTitle('Display'),
               const SizedBox(height: 12),
-              _buildToggleItem(
-                title: 'Dark Mode',
-                subtitle: 'Use dark theme',
-                value: darkMode,
-                onChanged: (value) {
-                  setState(() => darkMode = value);
-                  _saveSetting('dark_mode', value);
-                },
-              ),
-              const SizedBox(height: 12),
-              _buildSelectItem(
-                title: 'Currency',
-                subtitle: 'Default currency for display',
-                value: selectedCurrency,
-                options: ['VND', 'USD', 'EUR', 'GBP', 'JPY', 'CNY'],
-                onChanged: (value) {
-                  setState(() => selectedCurrency = value);
-                  _saveSetting('selected_currency', value);
+              Consumer<ThemeProvider>(
+                builder: (context, themeProvider, child) {
+                  return _buildToggleItem(
+                    title: 'Dark Mode',
+                    subtitle: 'Use dark theme',
+                    value: themeProvider.isDarkMode,
+                    onChanged: (value) async {
+                      await themeProvider.setDarkMode(value);
+                    },
+                  );
                 },
               ),
               const SizedBox(height: 12),
@@ -152,38 +138,6 @@ class _SettingsViewState extends State<SettingsView> {
                   setState(() => selectedLanguage = value);
                   _saveSetting('selected_language', value);
                 },
-              ),
-              const SizedBox(height: 24),
-
-              // Security Section
-              _buildSectionTitle('Security'),
-              const SizedBox(height: 12),
-              _buildToggleItem(
-                title: 'Biometric Login',
-                subtitle: 'Use fingerprint or face recognition',
-                value: biometricLogin,
-                onChanged: (value) {
-                  setState(() => biometricLogin = value);
-                  _saveSetting('biometric_login', value);
-                },
-              ),
-              const SizedBox(height: 24),
-
-              // Data Section
-              _buildSectionTitle('Data'),
-              const SizedBox(height: 12),
-              _buildActionItem(
-                icon: Icons.download,
-                title: 'Export Data',
-                subtitle: 'Download your data as CSV',
-                onTap: () => _showExportDialog(),
-              ),
-              const SizedBox(height: 12),
-              _buildActionItem(
-                icon: Icons.delete_outline,
-                title: 'Clear Cache',
-                subtitle: 'Remove temporary files',
-                onTap: () => _showClearCacheDialog(),
               ),
               const SizedBox(height: 24),
 
@@ -231,7 +185,6 @@ class _SettingsViewState extends State<SettingsView> {
         style: const TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.bold,
-          color: Colors.black87,
         ),
       ),
     );
@@ -243,10 +196,12 @@ class _SettingsViewState extends State<SettingsView> {
     required bool value,
     required Function(bool) onChanged,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -265,10 +220,10 @@ class _SettingsViewState extends State<SettingsView> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: isDark ? Colors.white : Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -276,7 +231,7 @@ class _SettingsViewState extends State<SettingsView> {
                   subtitle,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey.shade600,
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                   ),
                 ),
               ],
@@ -286,7 +241,6 @@ class _SettingsViewState extends State<SettingsView> {
             value: value,
             onChanged: onChanged,
             activeColor: Colors.teal.shade500,
-           
           ),
         ],
       ),
@@ -300,12 +254,14 @@ class _SettingsViewState extends State<SettingsView> {
     required List<String> options,
     required Function(String) onChanged,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return GestureDetector(
       onTap: () => _showSelectDialog(title, options, value, onChanged),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
@@ -324,10 +280,10 @@ class _SettingsViewState extends State<SettingsView> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                      color: isDark ? Colors.white : Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -345,7 +301,7 @@ class _SettingsViewState extends State<SettingsView> {
             Icon(
               Icons.arrow_forward_ios,
               size: 16,
-              color: Colors.grey.shade400,
+              color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
             ),
           ],
         ),
@@ -359,12 +315,14 @@ class _SettingsViewState extends State<SettingsView> {
     required String subtitle,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
@@ -379,10 +337,14 @@ class _SettingsViewState extends State<SettingsView> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: isDark ? Colors.blue.shade900 : Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: Colors.blue.shade400, size: 24),
+              child: Icon(
+                icon,
+                color: isDark ? Colors.blue.shade300 : Colors.blue.shade400,
+                size: 24,
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -391,10 +353,10 @@ class _SettingsViewState extends State<SettingsView> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                      color: isDark ? Colors.white : Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -402,7 +364,7 @@ class _SettingsViewState extends State<SettingsView> {
                     subtitle,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade600,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                     ),
                   ),
                 ],
@@ -411,7 +373,7 @@ class _SettingsViewState extends State<SettingsView> {
             Icon(
               Icons.arrow_forward_ios,
               size: 16,
-              color: Colors.grey.shade400,
+              color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
             ),
           ],
         ),
@@ -423,10 +385,12 @@ class _SettingsViewState extends State<SettingsView> {
     required String title,
     required String subtitle,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -444,10 +408,10 @@ class _SettingsViewState extends State<SettingsView> {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                  color: isDark ? Colors.white : Colors.black87,
                 ),
               ),
               const SizedBox(height: 4),
@@ -455,7 +419,7 @@ class _SettingsViewState extends State<SettingsView> {
                 subtitle,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade600,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                 ),
               ),
             ],
@@ -499,94 +463,6 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  void _showExportDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text('Export Data'),
-          content: const Text(
-            'Your expense data will be exported as CSV file. This includes all transactions and categories.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Data exported successfully'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00CED1),
-              ),
-              child: const Text(
-                'Export',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showClearCacheDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text('Clear Cache'),
-          content: const Text(
-            'This will remove temporary files and may improve app performance. Continue?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Cache cleared successfully'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-              ),
-              child: const Text(
-                'Clear',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   void _showAboutDialog() {
     showDialog(
       context: context,
@@ -600,7 +476,7 @@ class _SettingsViewState extends State<SettingsView> {
             'Smart Personal Expense Tracker with AI-Based Financial Insights\n\n'
             'Version 1.0.0\n\n'
             'This app helps you track expenses, analyze spending patterns, and get AI-powered financial recommendations.\n\n'
-            'Contact: support@expensetracker.com',
+            'Contact: lehoangvi.work@gmail.com',
           ),
           actions: [
             ElevatedButton(
