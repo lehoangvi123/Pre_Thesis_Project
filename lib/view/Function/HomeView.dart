@@ -21,65 +21,59 @@ class _HomeViewState extends State<HomeView> {
   String userName = 'User'; 
   bool isLoadingUserName = true; 
 
+  @override
+  void initState() {
+    super.initState();
+    _loadUserName();
+  }
 
-  // Add this method in _HomeViewState class
-@override
-void initState() {
-  super.initState();
-  _loadUserName();
-}
+  Future<void> _loadUserName() async {
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      
+      if (currentUser != null) {
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
 
-Future<void> _loadUserName() async {
-  try {
-    // Get current Firebase user
-    User? currentUser = FirebaseAuth.instance.currentUser;
-    
-    if (currentUser != null) {
-      // Try to fetch from Firestore first
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
-
-      if (userDoc.exists) {
-        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
-        setState(() {
-          userName = userData['name'] ?? currentUser.displayName ?? 'User';
-          isLoadingUserName = false;
-        });
+        if (userDoc.exists) {
+          Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+          setState(() {
+            userName = userData['name'] ?? currentUser.displayName ?? 'User';
+            isLoadingUserName = false;
+          });
+        } else {
+          setState(() {
+            userName = currentUser.displayName ?? currentUser.email?.split('@')[0] ?? 'User';
+            isLoadingUserName = false;
+          });
+        }
+        
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_name', userName); 
+        
       } else {
-        // Fallback to Firebase Auth displayName
+        final prefs = await SharedPreferences.getInstance();
         setState(() {
-          userName = currentUser.displayName ?? currentUser.email?.split('@')[0] ?? 'User';
+          userName = prefs.getString('user_name') ?? 'User';
           isLoadingUserName = false;
         });
       }
-      
-      // Save to SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_name', userName); 
-      
-    } else {
-      // No Firebase user, use SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
+    } catch (e) {
+      print('Error loading user name: $e');
       setState(() {
-        userName = prefs.getString('user_name') ?? 'User';
         isLoadingUserName = false;
       });
     }
-  } catch (e) {
-    print('Error loading user name: $e');
-    setState(() {
-      isLoadingUserName = false;
-    });
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -87,27 +81,16 @@ Future<void> _loadUserName() async {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
                 _buildHeader(),
                 const SizedBox(height: 24),
-
-                // Balance Cards
                 _buildBalanceCards(),
                 const SizedBox(height: 16),
-
-                // Progress Bar
                 _buildProgressBar(),
                 const SizedBox(height: 20),
-
-                // Spending Summary Cards
                 _buildSpendingCards(),
                 const SizedBox(height: 20),
-
-                // Period Selector
                 _buildPeriodSelector(),
                 const SizedBox(height: 16),
-
-                // Transaction List
                 _buildTransactionList(),
               ],
             ),
@@ -119,6 +102,8 @@ Future<void> _loadUserName() async {
   }
 
   Widget _buildHeader() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -130,7 +115,7 @@ Future<void> _loadUserName() async {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
+                color: isDark ? Colors.white : Colors.grey[800],
               ),
             ),
             const SizedBox(height: 4),
@@ -138,7 +123,7 @@ Future<void> _loadUserName() async {
               userName,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
               ),
             ),
           ],
@@ -157,10 +142,13 @@ Future<void> _loadUserName() async {
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: isDark ? Colors.grey[800] : Colors.grey[100],
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.notifications_outlined, color: Colors.grey[700]),
+                child: Icon(
+                  Icons.notifications_outlined,
+                  color: isDark ? Colors.grey[400] : Colors.grey[700],
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -169,10 +157,14 @@ Future<void> _loadUserName() async {
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.red[50],
+                  color: isDark ? Colors.red[900]?.withOpacity(0.3) : Colors.red[50],
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.logout, color: Colors.red[600], size: 20),
+                child: Icon(
+                  Icons.logout,
+                  color: isDark ? Colors.red[400] : Colors.red[600],
+                  size: 20,
+                ),
               ),
             ),
           ],
@@ -182,18 +174,29 @@ Future<void> _loadUserName() async {
   }
 
   void _showLogoutDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
+          title: Text(
             'Đăng xuất',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black,
+            ),
           ),
-          content: const Text('Bạn có chắc chắn muốn đăng xuất không?'),
+          content: Text(
+            'Bạn có chắc chắn muốn đăng xuất không?',
+            style: TextStyle(
+              color: isDark ? Colors.grey[300] : Colors.black,
+            ),
+          ),
           actions: [
             TextButton(
               onPressed: () {
@@ -201,7 +204,9 @@ Future<void> _loadUserName() async {
               },
               child: Text(
                 'Hủy',
-                style: TextStyle(color: Colors.grey[600]),
+                style: TextStyle(
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                ),
               ),
             ),
             ElevatedButton(
@@ -227,10 +232,6 @@ Future<void> _loadUserName() async {
   }
 
   void _logout() {
-    // Xóa dữ liệu đăng nhập (nếu có SharedPreferences hoặc local storage)
-    // await SharedPreferences.getInstance().then((prefs) => prefs.clear());
-    
-    // Navigate về trang Login
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const LoginView()),
       (Route<dynamic> route) => false,
@@ -238,35 +239,47 @@ Future<void> _loadUserName() async {
   }
 
   Widget _buildBalanceCards() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Row(
       children: [
         Expanded(
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[300]!),
+              border: Border.all(
+                color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.account_balance_wallet_outlined, size: 16, color: Colors.grey[600]),
+                    Icon(
+                      Icons.account_balance_wallet_outlined,
+                      size: 16,
+                      color: isDark ? Colors.grey[500] : Colors.grey[600],
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       'Total Balance',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   '7,783,000 VND',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black,
                   ),
                 ),
               ],
@@ -278,20 +291,29 @@ Future<void> _loadUserName() async {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[300]!),
+              border: Border.all(
+                color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.trending_down, size: 16, color: Colors.grey[600]),
+                    Icon(
+                      Icons.trending_down,
+                      size: 16,
+                      color: isDark ? Colors.grey[500] : Colors.grey[600],
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       'Total Expenses',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      ),
                     ),
                   ],
                 ),
@@ -313,10 +335,12 @@ Future<void> _loadUserName() async {
   }
 
   Widget _buildProgressBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: isDark ? Colors.grey[800] : Colors.grey[100],
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -326,7 +350,10 @@ Future<void> _loadUserName() async {
           Expanded(
             child: Text(
               '30% Of Your Expenses, Looks Good',
-              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.grey[300] : Colors.grey[700],
+              ),
             ),
           ),
           Text(
@@ -334,7 +361,7 @@ Future<void> _loadUserName() async {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Colors.grey[800],
+              color: isDark ? Colors.grey[300] : Colors.grey[800],
             ),
           ),
         ],
@@ -441,7 +468,9 @@ Future<void> _loadUserName() async {
   }
 
   Widget _buildPeriodButton(String period) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     bool isSelected = selectedPeriod == period;
+    
     return Expanded(
       child: GestureDetector(
         onTap: () {
@@ -452,7 +481,9 @@ Future<void> _loadUserName() async {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF00CED1) : Colors.grey[100],
+            color: isSelected
+                ? const Color(0xFF00CED1)
+                : (isDark ? Colors.grey[800] : Colors.grey[100]),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Center(
@@ -461,7 +492,9 @@ Future<void> _loadUserName() async {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? Colors.white : Colors.grey[700],
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? Colors.grey[400] : Colors.grey[700]),
               ),
             ),
           ),
@@ -515,10 +548,12 @@ Future<void> _loadUserName() async {
     required String amount,
     required bool isPositive,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: isDark ? Colors.grey[800] : Colors.grey[50],
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -538,15 +573,19 @@ Future<void> _loadUserName() async {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : Colors.black,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   date,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  ),
                 ),
               ],
             ),
@@ -557,12 +596,15 @@ Future<void> _loadUserName() async {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.grey[200],
+                  color: isDark ? Colors.grey[700] : Colors.grey[200],
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   category,
-                  style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.grey[300] : Colors.grey[700],
+                  ),
                 ),
               ),
               const SizedBox(height: 4),
@@ -582,9 +624,11 @@ Future<void> _loadUserName() async {
   }
 
   Widget _buildBottomNavBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
@@ -599,33 +643,51 @@ Future<void> _loadUserName() async {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(Icons.home, true, const Color(0xFF00CED1), onTap: () {
-                // Already on Home page
-              }),
-              _buildNavItem(Icons.search, false, Colors.grey[400]!, onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AnalysisView()),
-                );
-              }),
-              _buildNavItem(Icons.swap_horiz, false, Colors.grey[400]!, onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const TransactionView()),
-                );
-              }),
-              _buildNavItem(Icons.layers, false, Colors.grey[400]!, onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CategoriesView()),
-                );
-              }),
-             _buildNavItem(Icons.person_outline, false, Colors.grey[400]!, onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ProfileView()),
-                );
-              }),
+              _buildNavItem(Icons.home, true, const Color(0xFF00CED1), onTap: () {}),
+              _buildNavItem(
+                Icons.search,
+                false,
+                isDark ? Colors.grey[500]! : Colors.grey[400]!,
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AnalysisView()),
+                  );
+                },
+              ),
+              _buildNavItem(
+                Icons.swap_horiz,
+                false,
+                isDark ? Colors.grey[500]! : Colors.grey[400]!,
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const TransactionView()),
+                  );
+                },
+              ),
+              _buildNavItem(
+                Icons.layers,
+                false,
+                isDark ? Colors.grey[500]! : Colors.grey[400]!,
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CategoriesView()),
+                  );
+                },
+              ),
+              _buildNavItem(
+                Icons.person_outline,
+                false,
+                isDark ? Colors.grey[500]! : Colors.grey[400]!,
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfileView()),
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -633,7 +695,12 @@ Future<void> _loadUserName() async {
     );
   }
 
-  Widget _buildNavItem(IconData icon, bool isActive, Color color, {VoidCallback? onTap}) {
+  Widget _buildNavItem(
+    IconData icon,
+    bool isActive,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(

@@ -15,8 +15,10 @@ class CategoriesView extends StatefulWidget {
 class _CategoriesViewState extends State<CategoriesView> {
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -24,16 +26,12 @@ class _CategoriesViewState extends State<CategoriesView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
                 _buildHeader(),
                 const SizedBox(height: 24),
-
-                // Balance Card
                 _buildBalanceCard(),
                 const SizedBox(height: 24),
-
-                // Categories Grid
                 _buildCategoriesGrid(),
+                const SizedBox(height: 80),
               ],
             ),
           ),
@@ -44,32 +42,31 @@ class _CategoriesViewState extends State<CategoriesView> {
   }
 
   Widget _buildHeader() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        GestureDetector(
-          onTap: () {
-            Navigator.pop(context);
-          },
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.arrow_back, color: Colors.grey[700]),
-          ),
-        ),
-        const Expanded(
-          child: Center(
-            child: Text(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
               'Categories',
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
-                color: Colors.black,
+                color: isDark ? Colors.white : Colors.black,
               ),
             ),
-          ),
+            const SizedBox(height: 4),
+            Text(
+              'Manage your expense categories',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
+            ),
+          ],
         ),
         GestureDetector(
           onTap: () {
@@ -83,10 +80,13 @@ class _CategoriesViewState extends State<CategoriesView> {
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: isDark ? Colors.grey[800] : Colors.grey[100],
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(Icons.notifications_outlined, color: Colors.grey[700]),
+            child: Icon(
+              Icons.notifications_outlined,
+              color: isDark ? Colors.grey[400] : Colors.grey[700],
+            ),
           ),
         ),
       ],
@@ -94,12 +94,16 @@ class _CategoriesViewState extends State<CategoriesView> {
   }
 
   Widget _buildBalanceCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(
+          color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+        ),
       ),
       child: Column(
         children: [
@@ -111,25 +115,28 @@ class _CategoriesViewState extends State<CategoriesView> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.account_balance_wallet_outlined,
-                          size: 16, color: Colors.grey[600]),
+                      Icon(
+                        Icons.account_balance_wallet_outlined,
+                        size: 16,
+                        color: isDark ? Colors.grey[500] : Colors.grey[600],
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         'Total Balance',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     '\$7,783.00',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                      color: isDark ? Colors.white : Colors.black,
                     ),
                   ),
                 ],
@@ -139,14 +146,17 @@ class _CategoriesViewState extends State<CategoriesView> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.trending_down,
-                          size: 16, color: Colors.grey[600]),
+                      Icon(
+                        Icons.trending_down,
+                        size: 16,
+                        color: isDark ? Colors.grey[500] : Colors.grey[600],
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         'Total Expenses',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
                         ),
                       ),
                     ],
@@ -168,7 +178,7 @@ class _CategoriesViewState extends State<CategoriesView> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: isDark ? Colors.grey[800] : Colors.grey[100],
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -180,7 +190,7 @@ class _CategoriesViewState extends State<CategoriesView> {
                   '30% Of Your Expenses, Looks Good',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.grey[700],
+                    color: isDark ? Colors.grey[300] : Colors.grey[700],
                   ),
                 ),
                 const Spacer(),
@@ -189,7 +199,7 @@ class _CategoriesViewState extends State<CategoriesView> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey[800],
+                    color: isDark ? Colors.grey[300] : Colors.grey[800],
                   ),
                 ),
               ],
@@ -258,9 +268,10 @@ class _CategoriesViewState extends State<CategoriesView> {
   }
 
   Widget _buildCategoryCard(String title, IconData icon, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return GestureDetector(
       onTap: () {
-        // Add navigation to category details
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$title category clicked'),
@@ -270,8 +281,13 @@ class _CategoriesViewState extends State<CategoriesView> {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
+          color: isDark
+              ? color.withOpacity(0.15)
+              : color.withOpacity(0.15),
           borderRadius: BorderRadius.circular(20),
+          border: isDark
+              ? Border.all(color: color.withOpacity(0.3))
+              : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -287,7 +303,7 @@ class _CategoriesViewState extends State<CategoriesView> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: Colors.grey[800],
+                color: isDark ? Colors.grey[300] : Colors.grey[800],
               ),
             ),
           ],
@@ -297,9 +313,11 @@ class _CategoriesViewState extends State<CategoriesView> {
   }
 
   Widget _buildBottomNavBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
@@ -314,33 +332,56 @@ class _CategoriesViewState extends State<CategoriesView> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(Icons.home, false, Colors.grey[400]!, onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const HomeView()),
-                );
-              }),
-              _buildNavItem(Icons.search, false, Colors.grey[400]!, onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AnalysisView()),
-                );
-              }),
-              _buildNavItem(Icons.swap_horiz, false, Colors.grey[400]!, onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const TransactionView()),
-                );
-              }),
-              _buildNavItem(Icons.layers, true, const Color(0xFF00CED1), onTap: () {
-                // Already on Categories page
-              }),
-              _buildNavItem(Icons.person_outline, false, Colors.grey[400]!, onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ProfileView()),
-                );
-              }),
+              _buildNavItem(
+                Icons.home,
+                false,
+                isDark ? Colors.grey[500]! : Colors.grey[400]!,
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const HomeView()),
+                  );
+                },
+              ),
+              _buildNavItem(
+                Icons.search,
+                false,
+                isDark ? Colors.grey[500]! : Colors.grey[400]!,
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AnalysisView()),
+                  );
+                },
+              ),
+              _buildNavItem(
+                Icons.swap_horiz,
+                false,
+                isDark ? Colors.grey[500]! : Colors.grey[400]!,
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const TransactionView()),
+                  );
+                },
+              ),
+              _buildNavItem(
+                Icons.layers,
+                true,
+                const Color(0xFF00CED1),
+                onTap: () {},
+              ),
+              _buildNavItem(
+                Icons.person_outline,
+                false,
+                isDark ? Colors.grey[500]! : Colors.grey[400]!,
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfileView()),
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -348,7 +389,12 @@ class _CategoriesViewState extends State<CategoriesView> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, bool isActive, Color color, {VoidCallback? onTap}) {
+  Widget _buildNavItem(
+    IconData icon,
+    bool isActive,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(

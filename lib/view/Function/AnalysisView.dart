@@ -14,9 +14,8 @@ class AnalysisView extends StatefulWidget {
 
 class _AnalysisViewState extends State<AnalysisView> {
   String selectedPeriod = 'Weekly';
-  String chartType = 'bar'; // 'bar' hoặc 'pie'
+  String chartType = 'bar';
 
-  // Dữ liệu mẫu cho biểu đồ theo tuần
   final Map<String, List<double>> weeklyIncomeData = {
     'Mon': [400000, 300000],
     'Tue': [500000, 200000],
@@ -29,38 +28,42 @@ class _AnalysisViewState extends State<AnalysisView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // App Bar
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Title ở giữa
                     Center(
                       child: Text(
                         'Analysis',
                         style: TextStyle(
-                          color: Colors.grey[800],
+                          color: isDark ? Colors.white : Colors.grey[800],
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                    // Menu 3 chấm ở bên phải
                     Positioned(
                       right: 0,
                       child: PopupMenuButton<String>(
-                        icon: Icon(Icons.more_vert, color: Colors.grey[800], size: 24),
+                        icon: Icon(
+                          Icons.more_vert,
+                          color: isDark ? Colors.grey[400] : Colors.grey[800],
+                          size: 24,
+                        ),
                         offset: const Offset(0, 40),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
+                        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
                         onSelected: (value) {
                           if (value == 'bar' || value == 'pie') {
                             setState(() {
@@ -75,78 +78,51 @@ class _AnalysisViewState extends State<AnalysisView> {
                               children: [
                                 Icon(
                                   Icons.bar_chart,
-                                  color: chartType == 'bar' ? const Color(0xFF00CED1) : Colors.grey[600],
+                                  color: chartType == 'bar'
+                                      ? const Color(0xFF00CED1)
+                                      : (isDark ? Colors.grey[500] : Colors.grey[600]),
                                   size: 20,
                                 ),
                                 const SizedBox(width: 12),
                                 Text(
                                   'Bar Chart',
                                   style: TextStyle(
-                                    color: chartType == 'bar' ? const Color(0xFF00CED1) : Colors.grey[800],
-                                    fontWeight: chartType == 'bar' ? FontWeight.w600 : FontWeight.normal,
+                                    color: chartType == 'bar'
+                                        ? const Color(0xFF00CED1)
+                                        : (isDark ? Colors.grey[300] : Colors.grey[800]),
+                                    fontWeight: chartType == 'bar'
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
                                     fontSize: 14,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const PopupMenuDivider(),
+                          PopupMenuDivider(
+                            color: isDark ? Colors.grey[700] : null,
+                          ),
                           PopupMenuItem(
                             value: 'pie',
                             child: Row(
                               children: [
                                 Icon(
                                   Icons.pie_chart,
-                                  color: chartType == 'pie' ? const Color(0xFF00CED1) : Colors.grey[600],
+                                  color: chartType == 'pie'
+                                      ? const Color(0xFF00CED1)
+                                      : (isDark ? Colors.grey[500] : Colors.grey[600]),
                                   size: 20,
                                 ),
                                 const SizedBox(width: 12),
                                 Text(
                                   'Pie Chart',
                                   style: TextStyle(
-                                    color: chartType == 'pie' ? const Color(0xFF00CED1) : Colors.grey[800],
-                                    fontWeight: chartType == 'pie' ? FontWeight.w600 : FontWeight.normal,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuDivider(),
-                          PopupMenuItem(
-                            value: 'export',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.file_download,
-                                  color: Colors.grey[600],
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  'Export Data',
-                                  style: TextStyle(
-                                    color: Colors.grey[800],
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'settings',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.settings,
-                                  color: Colors.grey[600],
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  'Settings',
-                                  style: TextStyle(
-                                    color: Colors.grey[800],
+                                    color: chartType == 'pie'
+                                        ? const Color(0xFF00CED1)
+                                        : (isDark ? Colors.grey[300] : Colors.grey[800]),
+                                    fontWeight: chartType == 'pie'
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
                                     fontSize: 14,
                                   ),
                                 ),
@@ -165,26 +141,15 @@ class _AnalysisViewState extends State<AnalysisView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Balance Card
                   _buildBalanceCard(),
                   const SizedBox(height: 20),
-
-                  // Period Selector
                   _buildPeriodSelector(),
                   const SizedBox(height: 20),
-
-                  // Income & Expenses Chart
                   _buildChartCard(),
                   const SizedBox(height: 24),
-
-                  // Summary Cards
                   _buildSummaryCards(),
                   const SizedBox(height: 24),
-
-                  // My Targets Section
                   _buildMyTargetsSection(),
-                  
-                  // Thêm khoảng trống để không bị che bởi bottom nav
                   const SizedBox(height: 80),
                 ],
               ),
@@ -359,7 +324,9 @@ class _AnalysisViewState extends State<AnalysisView> {
   }
 
   Widget _buildPeriodButton(String period) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     bool isSelected = selectedPeriod == period;
+    
     return Expanded(
       child: GestureDetector(
         onTap: () {
@@ -370,7 +337,9 @@ class _AnalysisViewState extends State<AnalysisView> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF00CED1) : Colors.grey[100],
+            color: isSelected
+                ? const Color(0xFF00CED1)
+                : (isDark ? Colors.grey[800] : Colors.grey[100]),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Center(
@@ -379,7 +348,9 @@ class _AnalysisViewState extends State<AnalysisView> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? Colors.white : Colors.grey[700],
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? Colors.grey[400] : Colors.grey[700]),
               ),
             ),
           ),
@@ -389,12 +360,16 @@ class _AnalysisViewState extends State<AnalysisView> {
   }
 
   Widget _buildChartCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -407,7 +382,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey[800],
+                  color: isDark ? Colors.white : Colors.grey[800],
                 ),
               ),
               Row(
@@ -430,6 +405,8 @@ class _AnalysisViewState extends State<AnalysisView> {
   }
 
   Widget _buildBarChart() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return BarChart(
       BarChartData(
         alignment: BarChartAlignment.spaceAround,
@@ -448,7 +425,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                     child: Text(
                       days[value.toInt()],
                       style: TextStyle(
-                        color: Colors.grey[600],
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
                         fontSize: 11,
                       ),
                     ),
@@ -476,7 +453,6 @@ class _AnalysisViewState extends State<AnalysisView> {
   }
 
   Widget _buildPieChart() {
-    // Tính tổng Income và Expense
     double totalIncome = 0;
     double totalExpense = 0;
     
@@ -542,6 +518,8 @@ class _AnalysisViewState extends State<AnalysisView> {
   }
 
   Widget _buildLegend(Color color, String label) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Row(
       children: [
         Container(
@@ -557,7 +535,7 @@ class _AnalysisViewState extends State<AnalysisView> {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey[600],
+            color: isDark ? Colors.grey[400] : Colors.grey[600],
           ),
         ),
       ],
@@ -565,32 +543,40 @@ class _AnalysisViewState extends State<AnalysisView> {
   }
 
   Widget _buildSummaryCards() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Row(
       children: [
         Expanded(
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF00CED1).withOpacity(0.1),
+              color: const Color(0xFF00CED1).withOpacity(isDark ? 0.15 : 0.1),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF00CED1).withOpacity(0.3)),
+              border: Border.all(
+                color: const Color(0xFF00CED1).withOpacity(isDark ? 0.2 : 0.3),
+              ),
             ),
             child: Column(
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF00CED1).withOpacity(0.2),
+                    color: const Color(0xFF00CED1).withOpacity(isDark ? 0.3 : 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(Icons.account_balance_wallet, color: const Color(0xFF00CED1), size: 24),
+                  child: Icon(
+                    Icons.account_balance_wallet,
+                    color: const Color(0xFF00CED1),
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   'Income',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -611,26 +597,32 @@ class _AnalysisViewState extends State<AnalysisView> {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.1),
+              color: Colors.red.withOpacity(isDark ? 0.15 : 0.1),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.red.withOpacity(0.3)),
+              border: Border.all(
+                color: Colors.red.withOpacity(isDark ? 0.2 : 0.3),
+              ),
             ),
             child: Column(
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.2),
+                    color: Colors.red.withOpacity(isDark ? 0.3 : 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(Icons.trending_down, color: Colors.red[600], size: 24),
+                  child: Icon(
+                    Icons.trending_down,
+                    color: Colors.red[600],
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   'Expense',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -651,6 +643,8 @@ class _AnalysisViewState extends State<AnalysisView> {
   }
 
   Widget _buildMyTargetsSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -659,7 +653,7 @@ class _AnalysisViewState extends State<AnalysisView> {
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: Colors.grey[800],
+            color: isDark ? Colors.white : Colors.grey[800],
           ),
         ),
         const SizedBox(height: 16),
@@ -697,13 +691,17 @@ class _AnalysisViewState extends State<AnalysisView> {
     required double current,
     required double target,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     double progress = current / target;
+    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -725,9 +723,10 @@ class _AnalysisViewState extends State<AnalysisView> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : Colors.black,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -735,7 +734,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                       '${(current / 1000).toStringAsFixed(0)}k / ${(target / 1000).toStringAsFixed(0)}k VND',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey[600],
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
                       ),
                     ),
                   ],
@@ -746,7 +745,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
+                  color: isDark ? Colors.grey[300] : Colors.grey[800],
                 ),
               ),
             ],
@@ -756,7 +755,7 @@ class _AnalysisViewState extends State<AnalysisView> {
             borderRadius: BorderRadius.circular(10),
             child: LinearProgressIndicator(
               value: progress,
-              backgroundColor: Colors.grey[200],
+              backgroundColor: isDark ? Colors.grey[700] : Colors.grey[200],
               valueColor: AlwaysStoppedAnimation<Color>(iconColor),
               minHeight: 8,
             ),
@@ -766,61 +765,89 @@ class _AnalysisViewState extends State<AnalysisView> {
     );
   }
 
-  // In the _buildBottomNavBar() method of AnalysisView, replace with this:
-
-Widget _buildBottomNavBar() {
-  return Container(
-    decoration: BoxDecoration(
-      color: Colors.white,
-      boxShadow: [
-        BoxShadow(
-          color: Colors.grey.withOpacity(0.1),
-          blurRadius: 10,
-          offset: const Offset(0, -5),
-        ),
-      ],
-    ),
-    child: SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildNavItem(Icons.home, false, Colors.grey[400]!, onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HomeView()),
-              );
-            }),
-            _buildNavItem(Icons.search, true, const Color(0xFF00CED1), onTap: () {
-              // Already on Analysis page
-            }),
-            _buildNavItem(Icons.swap_horiz, false, Colors.grey[400]!, onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const TransactionView()),
-              );
-            }),
-            _buildNavItem(Icons.layers, false, Colors.grey[400]!, onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const CategoriesView()),
-              );
-            }),
-           _buildNavItem(Icons.person_outline, false, Colors.grey[400]!, onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfileView()),
-              );
-            }),
-          ],
+  Widget _buildBottomNavBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(
+                Icons.home,
+                false,
+                isDark ? Colors.grey[500]! : Colors.grey[400]!,
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const HomeView()),
+                  );
+                },
+              ),
+              _buildNavItem(
+                Icons.search,
+                true,
+                const Color(0xFF00CED1),
+                onTap: () {},
+              ),
+              _buildNavItem(
+                Icons.swap_horiz,
+                false,
+                isDark ? Colors.grey[500]! : Colors.grey[400]!,
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const TransactionView()),
+                  );
+                },
+              ),
+              _buildNavItem(
+                Icons.layers,
+                false,
+                isDark ? Colors.grey[500]! : Colors.grey[400]!,
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CategoriesView()),
+                  );
+                },
+              ),
+              _buildNavItem(
+                Icons.person_outline,
+                false,
+                isDark ? Colors.grey[500]! : Colors.grey[400]!,
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfileView()),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-  Widget _buildNavItem(IconData icon, bool isActive, Color color, {VoidCallback? onTap}) {
+  Widget _buildNavItem(
+    IconData icon,
+    bool isActive,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
