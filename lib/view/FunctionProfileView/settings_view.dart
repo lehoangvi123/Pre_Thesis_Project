@@ -15,7 +15,6 @@ class _SettingsViewState extends State<SettingsView> {
   bool emailNotifications = false;
   bool budgetAlerts = true;
   bool expenseReminders = true;
-  String selectedLanguage = 'English';
 
   @override
   void initState() {
@@ -30,7 +29,6 @@ class _SettingsViewState extends State<SettingsView> {
       emailNotifications = prefs.getBool('email_notifications') ?? false;
       budgetAlerts = prefs.getBool('budget_alerts') ?? true;
       expenseReminders = prefs.getBool('expense_reminders') ?? true;
-      selectedLanguage = prefs.getString('selected_language') ?? 'English';
     });
   }
 
@@ -46,7 +44,7 @@ class _SettingsViewState extends State<SettingsView> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -55,10 +53,7 @@ class _SettingsViewState extends State<SettingsView> {
         ),
         title: const Text(
           'Settings',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
       ),
@@ -128,26 +123,12 @@ class _SettingsViewState extends State<SettingsView> {
                   );
                 },
               ),
-              const SizedBox(height: 12),
-              _buildSelectItem(
-                title: 'Language',
-                subtitle: 'Choose your preferred language',
-                value: selectedLanguage,
-                options: ['English', 'Vietnamese', 'Spanish', 'French', 'Chinese'],
-                onChanged: (value) {
-                  setState(() => selectedLanguage = value);
-                  _saveSetting('selected_language', value);
-                },
-              ),
               const SizedBox(height: 24),
 
               // About Section
               _buildSectionTitle('About'),
               const SizedBox(height: 12),
-              _buildInfoItem(
-                title: 'App Version',
-                subtitle: '1.0.0',
-              ),
+              _buildInfoItem(title: 'App Version', subtitle: '1.0.0'),
               const SizedBox(height: 12),
               _buildActionItem(
                 icon: Icons.info_outline,
@@ -182,10 +163,7 @@ class _SettingsViewState extends State<SettingsView> {
       alignment: Alignment.centerLeft,
       child: Text(
         title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -197,7 +175,7 @@ class _SettingsViewState extends State<SettingsView> {
     required Function(bool) onChanged,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -247,68 +225,6 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  Widget _buildSelectItem({
-    required String title,
-    required String subtitle,
-    required String value,
-    required List<String> options,
-    required Function(String) onChanged,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    return GestureDetector(
-      onTap: () => _showSelectDialog(title, options, value, onChanged),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    value,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.teal.shade500,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildActionItem({
     required IconData icon,
     required String title,
@@ -316,7 +232,7 @@ class _SettingsViewState extends State<SettingsView> {
     required VoidCallback onTap,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -381,12 +297,9 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  Widget _buildInfoItem({
-    required String title,
-    required String subtitle,
-  }) {
+  Widget _buildInfoItem({required String title, required String subtitle}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -429,40 +342,6 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  void _showSelectDialog(String title, List<String> options, String currentValue,
-      Function(String) onChanged) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Text(title),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: options
-                  .map(
-                    (option) => RadioListTile(
-                      title: Text(option),
-                      value: option,
-                      groupValue: currentValue,
-                      onChanged: (value) {
-                        onChanged(value as String);
-                        Navigator.pop(context);
-                      },
-                      activeColor: Colors.teal,
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   void _showAboutDialog() {
     showDialog(
       context: context,
@@ -484,10 +363,7 @@ class _SettingsViewState extends State<SettingsView> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00CED1),
               ),
-              child: const Text(
-                'Close',
-                style: TextStyle(color: Colors.white),
-              ),
+              child: const Text('Close', style: TextStyle(color: Colors.white)),
             ),
           ],
         );
