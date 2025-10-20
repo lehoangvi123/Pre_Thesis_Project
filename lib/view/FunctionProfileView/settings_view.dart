@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../ThemeProvider/ThemeProviderDark.dart';
+import '../ThemeProvider/ThemeProviderDark.dart'; 
+import '../FunctionProfileView/AboutUs.dart'; 
+import './TermOfCondition.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({Key? key}) : super(key: key);
@@ -131,18 +133,28 @@ class _SettingsViewState extends State<SettingsView> {
               _buildInfoItem(title: 'App Version', subtitle: '1.0.0'),
               const SizedBox(height: 12),
               _buildActionItem(
-                icon: Icons.info_outline,
-                title: 'About Us',
-                subtitle: 'Learn more about the app',
-                onTap: () => _showAboutDialog(),
-              ),
+  icon: Icons.info_outline,
+  title: 'About Us',
+  subtitle: 'Learn more about the app',
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AboutUsView()),
+    );
+  },
+),
               const SizedBox(height: 12),
-              _buildActionItem(
-                icon: Icons.description_outlined,
-                title: 'Terms & Conditions',
-                subtitle: 'Read our terms of service',
-                onTap: () => _showTermsDialog(),
-              ),
+            _buildActionItem(
+  icon: Icons.description_outlined,
+  title: 'Terms & Conditions',
+  subtitle: 'Read our terms of service',
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const TermsConditionsView()),
+    );
+  },
+),
               const SizedBox(height: 12),
               _buildActionItem(
                 icon: Icons.privacy_tip_outlined,

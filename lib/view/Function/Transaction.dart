@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'AnalysisView.dart';
 import 'HomeView.dart'; 
 import './CategorizeContent.dart'; 
-import './ProfileView.dart';
+import './ProfileView.dart'; 
+import '../notification/NotificationView.dart';
 
 class TransactionView extends StatefulWidget {
   const TransactionView({Key? key}) : super(key: key);
 
   @override
   State<TransactionView> createState() => _TransactionViewState();
-}
+} 
 
 class _TransactionViewState extends State<TransactionView> {
   @override
@@ -110,35 +111,49 @@ class _TransactionViewState extends State<TransactionView> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Stack(
-        alignment: Alignment.center,
+      padding: const EdgeInsets.all(20.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Center(
-            child: Text(
-              'Transaction',
-              style: TextStyle(
-                color: isDark ? Colors.white : Colors.grey[800],
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Transaction',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black,
+                ),
               ),
-            ),
+              const SizedBox(height: 4),
+              Text(
+                'Track your spending',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                ),
+              ),
+            ],
           ),
-          Positioned(
-            right: 0,
-            child: IconButton(
-              icon: Icon(
-                Icons.notifications_outlined,
-                color: isDark ? Colors.grey[400] : Colors.grey[800],
+          IconButton(
+             icon: Icon(
+            Icons.notifications_outlined,
+            color: isDark ? Colors.grey[400] : Colors.grey[800],
+          ),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const NotificationView(),
               ),
-              onPressed: () {},
-            ),
+            );
+          },
           ),
         ],
       ),
     );
   }
-
   Widget _buildBalanceCard() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     

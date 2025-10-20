@@ -37,100 +37,108 @@ class _AnalysisViewState extends State<AnalysisView> {
           children: [
             SafeArea(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-                child: Stack(
-                  alignment: Alignment.center,
+                padding: const EdgeInsets.all(20.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Center(
-                      child: Text(
-                        'Analysis',
-                        style: TextStyle(
-                          color: isDark ? Colors.white : Colors.grey[800],
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Analysis',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'View your financial insights',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          ),
+                        ),
+                      ],
                     ),
-                    Positioned(
-                      right: 0,
-                      child: PopupMenuButton<String>(
-                        icon: Icon(
-                          Icons.more_vert,
-                          color: isDark ? Colors.grey[400] : Colors.grey[800],
-                          size: 24,
-                        ),
-                        offset: const Offset(0, 40),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-                        onSelected: (value) {
-                          if (value == 'bar' || value == 'pie') {
-                            setState(() {
-                              chartType = value;
-                            });
-                          }
-                        },
-                        itemBuilder: (BuildContext context) => [
-                          PopupMenuItem(
-                            value: 'bar',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.bar_chart,
+                    PopupMenuButton<String>(
+                      icon: Icon(
+                        Icons.more_vert,
+                        color: isDark ? Colors.grey[400] : Colors.grey[800],
+                        size: 24,
+                      ),
+                      offset: const Offset(0, 40),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                      onSelected: (value) {
+                        if (value == 'bar' || value == 'pie') {
+                          setState(() {
+                            chartType = value;
+                          });
+                        }
+                      },
+                      itemBuilder: (BuildContext context) => [
+                        PopupMenuItem(
+                          value: 'bar',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.bar_chart,
+                                color: chartType == 'bar'
+                                    ? const Color(0xFF00CED1)
+                                    : (isDark ? Colors.grey[500] : Colors.grey[600]),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Bar Chart',
+                                style: TextStyle(
                                   color: chartType == 'bar'
                                       ? const Color(0xFF00CED1)
-                                      : (isDark ? Colors.grey[500] : Colors.grey[600]),
-                                  size: 20,
+                                      : (isDark ? Colors.grey[300] : Colors.grey[800]),
+                                  fontWeight: chartType == 'bar'
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                  fontSize: 14,
                                 ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  'Bar Chart',
-                                  style: TextStyle(
-                                    color: chartType == 'bar'
-                                        ? const Color(0xFF00CED1)
-                                        : (isDark ? Colors.grey[300] : Colors.grey[800]),
-                                    fontWeight: chartType == 'bar'
-                                        ? FontWeight.w600
-                                        : FontWeight.normal,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          PopupMenuDivider(
-                            color: isDark ? Colors.grey[700] : null,
-                          ),
-                          PopupMenuItem(
-                            value: 'pie',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.pie_chart,
+                        ),
+                        PopupMenuDivider(
+                          color: isDark ? Colors.grey[700] : null,
+                        ),
+                        PopupMenuItem(
+                          value: 'pie',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.pie_chart,
+                                color: chartType == 'pie'
+                                    ? const Color(0xFF00CED1)
+                                    : (isDark ? Colors.grey[500] : Colors.grey[600]),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Pie Chart',
+                                style: TextStyle(
                                   color: chartType == 'pie'
                                       ? const Color(0xFF00CED1)
-                                      : (isDark ? Colors.grey[500] : Colors.grey[600]),
-                                  size: 20,
+                                      : (isDark ? Colors.grey[300] : Colors.grey[800]),
+                                  fontWeight: chartType == 'pie'
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                  fontSize: 14,
                                 ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  'Pie Chart',
-                                  style: TextStyle(
-                                    color: chartType == 'pie'
-                                        ? const Color(0xFF00CED1)
-                                        : (isDark ? Colors.grey[300] : Colors.grey[800]),
-                                    fontWeight: chartType == 'pie'
-                                        ? FontWeight.w600
-                                        : FontWeight.normal,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
