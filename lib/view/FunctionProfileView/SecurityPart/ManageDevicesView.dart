@@ -93,12 +93,26 @@ class DeviceService {
   // Register device on login (call this after successful login)
   static Future<void> registerDevice() async {
     try {
+      print('🔷 Starting device registration...');
+      
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
+      if (user == null) {
+        print('❌ No user logged in!');
+        return;
+      }
+      
+      print('✅ User ID: ${user.uid}');
+      print('📧 User Email: ${user.email}');
 
       final deviceInfo = await getCurrentDeviceInfo();
       final deviceId = deviceInfo['deviceId'];
+      
+      print('📱 Device Info:');
+      print('   - ID: $deviceId');
+      print('   - Name: ${deviceInfo['deviceName']}');
+      print('   - Type: ${deviceInfo['deviceType']}');
 
+      print('💾 Saving to Firestore...');
       await _firestore
           .collection('users')
           .doc(user.uid)
@@ -114,7 +128,10 @@ class DeviceService {
         'isCurrentDevice': true,
       }, SetOptions(merge: true));
 
+      print('✅ Device registered successfully!');
+
       // Update all other devices to not be current device
+      print('🔄 Updating other devices...');
       final devicesSnapshot = await _firestore
           .collection('users')
           .doc(user.uid)
@@ -122,11 +139,15 @@ class DeviceService {
           .where('deviceId', isNotEqualTo: deviceId)
           .get();
 
+      print('📋 Found ${devicesSnapshot.docs.length} other devices');
       for (var doc in devicesSnapshot.docs) {
         await doc.reference.update({'isCurrentDevice': false});
       }
+      
+      print('✅ Device registration completed!');
     } catch (e) {
-      print('Error registering device: $e');
+      print('❌ Error registering device: $e');
+      print('Stack trace: ${StackTrace.current}');
     }
   }
 
