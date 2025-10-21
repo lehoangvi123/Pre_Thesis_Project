@@ -8,6 +8,7 @@ import '../sign-up/SignUpView.dart';
 import './ForgotPasswordView.dart'; 
 import '../Function/HomeView.dart';  
 import '../FunctionProfileView/SecurityPart/ManageDevicesView.dart';
+import '../FunctionProfileView/SecurityPart/LoginHistoryView.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -51,6 +52,12 @@ class _LoginViewState extends State<LoginView> {
 
       // ✅ REGISTER DEVICE AFTER SUCCESSFUL LOGIN
       await DeviceService.registerDevice();
+      
+      // ✅ LOG SUCCESSFUL LOGIN
+      await LoginHistoryService.logLoginAttempt(
+        isSuccessful: true,
+        loginMethod: 'email',
+      );
 
       if (mounted) {
         _showSuccessSnackBar('Đăng nhập thành công!');
@@ -83,9 +90,23 @@ class _LoginViewState extends State<LoginView> {
           errorMessage = 'Đã xảy ra lỗi: ${e.message}';
       }
       
+      // ✅ LOG FAILED LOGIN
+      await LoginHistoryService.logLoginAttempt(
+        isSuccessful: false,
+        loginMethod: 'email',
+        failureReason: errorMessage,
+      );
+      
       _showErrorDialog(errorMessage);
       
     } catch (e) {
+      // ✅ LOG FAILED LOGIN FOR UNKNOWN ERRORS
+      await LoginHistoryService.logLoginAttempt(
+        isSuccessful: false,
+        loginMethod: 'email',
+        failureReason: 'Unknown error: $e',
+      );
+      
       _showErrorDialog('Đã xảy ra lỗi không xác định: $e');
     } finally {
       if (mounted) {
@@ -105,9 +126,17 @@ class _LoginViewState extends State<LoginView> {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       
       if (googleUser == null) {
+        // User cancelled the login
         setState(() {
           _isLoading = false;
         });
+        
+        // ✅ LOG CANCELLED LOGIN
+        await LoginHistoryService.logLoginAttempt(
+          isSuccessful: false,
+          loginMethod: 'google',
+          failureReason: 'Login cancelled by user',
+        );
         return;
       }
 
@@ -124,6 +153,12 @@ class _LoginViewState extends State<LoginView> {
       if (userCredential.user != null) {
         await DeviceService.registerDevice();
         
+        // ✅ LOG SUCCESSFUL LOGIN
+        await LoginHistoryService.logLoginAttempt(
+          isSuccessful: true,
+          loginMethod: 'google',
+        );
+        
         if (mounted) {
           _showSuccessSnackBar('Đăng nhập Google thành công!');
           Navigator.pushReplacement(
@@ -134,6 +169,13 @@ class _LoginViewState extends State<LoginView> {
       }
 
     } catch (e) {
+      // ✅ LOG FAILED LOGIN
+      await LoginHistoryService.logLoginAttempt(
+        isSuccessful: false,
+        loginMethod: 'google',
+        failureReason: 'Google login failed: $e',
+      );
+      
       _showErrorDialog('Lỗi đăng nhập Google: $e');
     } finally {
       if (mounted) {
@@ -162,6 +204,12 @@ class _LoginViewState extends State<LoginView> {
         if (userCredential.user != null) {
           await DeviceService.registerDevice();
           
+          // ✅ LOG SUCCESSFUL LOGIN
+          await LoginHistoryService.logLoginAttempt(
+            isSuccessful: true,
+            loginMethod: 'facebook',
+          );
+          
           if (mounted) {
             _showSuccessSnackBar('Đăng nhập Facebook thành công!');
             Navigator.pushReplacement(
@@ -171,12 +219,33 @@ class _LoginViewState extends State<LoginView> {
           }
         }
       } else if (result.status == LoginStatus.cancelled) {
+        // ✅ LOG CANCELLED LOGIN
+        await LoginHistoryService.logLoginAttempt(
+          isSuccessful: false,
+          loginMethod: 'facebook',
+          failureReason: 'Login cancelled by user',
+        );
+        
         _showErrorDialog('Đăng nhập Facebook đã bị hủy');
       } else {
+        // ✅ LOG FAILED LOGIN
+        await LoginHistoryService.logLoginAttempt(
+          isSuccessful: false,
+          loginMethod: 'facebook',
+          failureReason: 'Facebook login not available',
+        );
+        
         _showErrorDialog('Tính năng đăng nhập Facebook đang được cập nhật. Vui lòng sử dụng Email hoặc Google để tiếp tục!');
       }
 
     } catch (e) {
+      // ✅ LOG FAILED LOGIN
+      await LoginHistoryService.logLoginAttempt(
+        isSuccessful: false,
+        loginMethod: 'facebook',
+        failureReason: 'Facebook error: $e',
+      );
+      
       _showErrorDialog('Tính năng đăng nhập Facebook đang được cập nhật. Vui lòng sử dụng Email hoặc Google để tiếp tục!');
     } finally {
       if (mounted) {
@@ -570,6 +639,12 @@ class _LoginViewState extends State<LoginView> {
       // ✅ REGISTER DEVICE AFTER SUCCESSFUL LOGIN
       await DeviceService.registerDevice();
       
+      // ✅ LOG SUCCESSFUL LOGIN
+      await LoginHistoryService.logLoginAttempt(
+        isSuccessful: true,
+        loginMethod: 'email',
+      );
+      
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(userCredential.user!.uid)
@@ -588,6 +663,13 @@ class _LoginViewState extends State<LoginView> {
       );
       
     } catch (e) {
+      // ✅ LOG FAILED LOGIN
+      await LoginHistoryService.logLoginAttempt(
+        isSuccessful: false,
+        loginMethod: 'email',
+        failureReason: e.toString(),
+      );
+      
       print('Login error: $e');
     }
   }

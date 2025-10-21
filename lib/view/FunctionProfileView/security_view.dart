@@ -4,7 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'SecurityPart/TOPT_Service.dart';
 import 'package:flutter/services.dart';
-import 'SecurityPart/ManageDevicesView.dart'; // Import the new view
+import 'SecurityPart/ManageDevicesView.dart';
+import 'SecurityPart/LoginHistoryView.dart'; // Import the new view
 
 class SecurityView extends StatefulWidget {
   const SecurityView({Key? key}) : super(key: key);
@@ -91,12 +92,19 @@ class _SecurityViewState extends State<SecurityView> {
               // Login Activity Section
               _buildSectionTitle('Login Activity'),
               const SizedBox(height: 12),
-              _buildSecurityCard(
-                icon: Icons.history,
-                title: 'View Login History',
-                subtitle: 'See recent activity on your account',
-                onTap: () => _showLoginHistory(),
-              ),
+             _buildSecurityCard(
+  icon: Icons.history,
+  title: 'View Login History',
+  subtitle: 'See recent activity on your account',
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const LoginHistoryView(),
+      ),
+    );
+  },
+),
               const SizedBox(height: 24),
 
               // Connected Apps Section
