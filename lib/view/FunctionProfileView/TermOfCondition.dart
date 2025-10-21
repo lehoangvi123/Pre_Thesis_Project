@@ -87,17 +87,19 @@ class TermsConditionsView extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // 2. User Agreement
-              _buildSectionTitle('2. User Agreement and Eligibility', isDark),
+              // 2. User Eligibility and Responsibilities
+              _buildSectionTitle('2. User Eligibility and Responsibilities', isDark),
               const SizedBox(height: 12),
               _buildContentCard(
                 isDark,
-                'You must be at least 18 years old or have parental/guardian consent to use this App. By using the App, you represent and warrant that:\n\n'
-                '• You have the legal capacity to enter into a binding agreement\n'
-                '• You will use the App in compliance with all applicable laws and regulations\n'
-                '• All information you provide is accurate, current, and complete\n'
-                '• You will maintain the security of your account credentials\n'
-                '• You will not use the App for any illegal or unauthorized purpose\n\n'
+                'You must be at least 18 years old or have parental/guardian consent to use this App. By using the App, you agree to:\n\n'
+                '• Provide accurate and truthful financial information\n'
+                '• Maintain the security and confidentiality of your account\n'
+                '• Use the App only for lawful purposes\n'
+                '• Not attempt to gain unauthorized access to the App or its systems\n'
+                '• Not reverse engineer, decompile, or disassemble the App\n'
+                '• Not interfere with other users\' use and enjoyment of the App\n'
+                '• Comply with all applicable local, state, national, and international laws\n\n'
                 'You are responsible for maintaining the confidentiality of your account information and for all activities that occur under your account.',
               ),
               const SizedBox(height: 20),
@@ -119,35 +121,16 @@ class TermsConditionsView extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // 4. User Responsibilities
-              _buildSectionTitle('4. User Responsibilities', isDark),
-              const SizedBox(height: 12),
-              _buildContentCard(
-                isDark,
-                'As a user of the App, you agree to:\n\n'
-                '• Provide accurate and truthful financial information\n'
-                '• Maintain the security and confidentiality of your account\n'
-                '• Use the App only for lawful purposes\n'
-                '• Not attempt to gain unauthorized access to the App or its systems\n'
-                '• Not reverse engineer, decompile, or disassemble the App\n'
-                '• Not use the App to transmit harmful code, viruses, or malware\n'
-                '• Not interfere with other users\' use and enjoyment of the App\n'
-                '• Report any security vulnerabilities or bugs you discover\n'
-                '• Comply with all applicable local, state, national, and international laws\n\n'
-                'Failure to comply with these responsibilities may result in termination of your access to the App.',
-              ),
-              const SizedBox(height: 20),
-
-              // 5. Data Protection and Privacy
-              _buildSectionTitle('5. Data Protection and Privacy', isDark),
+              // 4. Privacy and Data Protection
+              _buildSectionTitle('4. Privacy and Data Protection', isDark),
               const SizedBox(height: 12),
               _buildContentCard(
                 isDark,
                 'Your privacy is important to us. Our data protection practices include:\n\n'
                 '• Collection of only necessary data for app functionality\n'
-                '• Encryption of sensitive financial information\n'
-                '• Secure storage using industry-standard protocols\n'
-                '• No selling or sharing of personal data with third parties for marketing\n'
+                '• Encryption of sensitive financial information using industry-standard protocols\n'
+                '• Secure storage with AES-256 encryption\n'
+                '• No selling or sharing of personal data with third parties for marketing purposes\n'
                 '• Transparent data usage policies\n'
                 '• User control over data export and deletion\n\n'
                 'For detailed information about how we collect, use, and protect your data, please refer to our Privacy Policy. '
@@ -155,20 +138,14 @@ class TermsConditionsView extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // 6. Intellectual Property Rights
-              _buildSectionTitle('6. Intellectual Property Rights', isDark),
+              // 5. Intellectual Property Rights
+              _buildSectionTitle('5. Intellectual Property Rights', isDark),
               const SizedBox(height: 12),
               _buildContentCard(
                 isDark,
-                'All intellectual property rights in the App, including but not limited to:\n\n'
-                '• Software code and algorithms\n'
-                '• Design, layout, and user interface\n'
-                '• Text, graphics, logos, and images\n'
-                '• AI models and machine learning technologies\n'
-                '• Trademarks and brand elements\n\n'
-                'are owned by or licensed to Smart Personal Expense Tracker. You are granted a limited, non-exclusive, '
-                'non-transferable license to use the App for personal, non-commercial purposes only.\n\n'
-                'You may not:\n'
+                'All intellectual property rights in the App, including software code, algorithms, design, user interface, graphics, logos, AI models, and trademarks, '
+                'are owned by or licensed to Smart Personal Expense Tracker.\n\n'
+                'You are granted a limited, non-exclusive, non-transferable license to use the App for personal, non-commercial purposes only. You may not:\n\n'
                 '• Copy, modify, or create derivative works of the App\n'
                 '• Distribute, sell, lease, or sublicense the App\n'
                 '• Remove or alter any proprietary notices\n'
@@ -176,8 +153,8 @@ class TermsConditionsView extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // 7. Financial Advice Disclaimer
-              _buildSectionTitle('7. Financial Advice Disclaimer', isDark),
+              // 6. Financial Advice Disclaimer
+              _buildSectionTitle('6. Financial Advice Disclaimer', isDark),
               const SizedBox(height: 12),
               _buildContentCard(
                 isDark,
@@ -194,8 +171,8 @@ class TermsConditionsView extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // 8. Limitation of Liability
-              _buildSectionTitle('8. Limitation of Liability', isDark),
+              // 7. Limitation of Liability
+              _buildSectionTitle('7. Limitation of Liability', isDark),
               const SizedBox(height: 12),
               _buildContentCard(
                 isDark,
@@ -207,192 +184,58 @@ class TermsConditionsView extends StatelessWidget {
                 '• Errors, bugs, or inaccuracies in the App\n'
                 '• Service interruptions or data loss\n'
                 '• Third-party actions or content\n\n'
+                'THE APP IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS WITHOUT WARRANTIES OF ANY KIND. '
                 'Our total liability to you for all claims arising from your use of the App shall not exceed the amount you paid for the App (if any) '
-                'in the twelve months preceding the claim.\n\n'
-                'Some jurisdictions do not allow the exclusion or limitation of certain warranties or liabilities. In such jurisdictions, '
-                'our liability will be limited to the maximum extent permitted by law.',
+                'in the twelve months preceding the claim.',
               ),
               const SizedBox(height: 20),
 
-              // 9. Warranty Disclaimer
-              _buildSectionTitle('9. Warranty Disclaimer', isDark),
+              // 8. Account Termination
+              _buildSectionTitle('8. Account Termination', isDark),
               const SizedBox(height: 12),
               _buildContentCard(
                 isDark,
-                'THE APP IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED.\n\n'
-                'We disclaim all warranties, including but not limited to:\n\n'
-                '• Merchantability and fitness for a particular purpose\n'
-                '• Non-infringement of third-party rights\n'
-                '• Accuracy, completeness, or reliability of content\n'
-                '• Uninterrupted, secure, or error-free operation\n'
-                '• Correction of defects or bugs\n'
-                '• Freedom from viruses or harmful components\n\n'
-                'You acknowledge that your use of the App is at your sole risk. We do not warrant that the App will meet your requirements '
-                'or that it will be compatible with all devices or operating systems.',
-              ),
-              const SizedBox(height: 20),
-
-              // 10. Indemnification
-              _buildSectionTitle('10. Indemnification', isDark),
-              const SizedBox(height: 12),
-              _buildContentCard(
-                isDark,
-                'You agree to indemnify, defend, and hold harmless Smart Personal Expense Tracker, its developers, officers, employees, and affiliates from any claims, damages, losses, liabilities, and expenses (including legal fees) arising from:\n\n'
-                '• Your use or misuse of the App\n'
-                '• Your violation of these Terms and Conditions\n'
-                '• Your violation of any rights of another party\n'
-                '• Your violation of any applicable laws or regulations\n'
-                '• Any content you submit through the App\n'
-                '• Any financial decisions or actions you take based on App insights\n\n'
-                'This indemnification obligation will survive the termination of your use of the App.',
-              ),
-              const SizedBox(height: 20),
-
-              // 11. Third-Party Services
-              _buildSectionTitle('11. Third-Party Services and Links', isDark),
-              const SizedBox(height: 12),
-              _buildContentCard(
-                isDark,
-                'The App may contain links to third-party websites, services, or resources that are not owned or controlled by us. '
-                'We do not endorse or assume responsibility for:\n\n'
-                '• The content, accuracy, or opinions expressed on third-party sites\n'
-                '• Privacy practices of external services\n'
-                '• Any damages or losses caused by third-party services\n\n'
-                'Your interactions with third-party services are solely between you and the third party. We encourage you to review '
-                'the terms and privacy policies of any third-party services you access through the App.',
-              ),
-              const SizedBox(height: 20),
-
-              // 12. Account Termination
-              _buildSectionTitle('12. Account Termination', isDark),
-              const SizedBox(height: 12),
-              _buildContentCard(
-                isDark,
-                'We reserve the right to:\n\n'
-                '• Suspend or terminate your account at any time for any reason\n'
-                '• Remove or refuse to post any content\n'
-                '• Limit or disable your access to certain features\n\n'
-                'Grounds for termination include, but are not limited to:\n\n'
+                'We reserve the right to suspend or terminate your account at any time for any reason, including:\n\n'
                 '• Violation of these Terms and Conditions\n'
                 '• Fraudulent, abusive, or illegal activity\n'
                 '• Extended periods of inactivity\n'
                 '• Requests from law enforcement or government agencies\n'
                 '• Technical or security reasons\n\n'
-                'You may also terminate your account at any time by:\n'
-                '• Deleting the App from your device\n'
-                '• Requesting account deletion through the settings\n'
-                '• Contacting our support team\n\n'
+                'You may also terminate your account at any time by deleting the App from your device or requesting account deletion through the settings. '
                 'Upon termination, your right to use the App will immediately cease. We may retain certain data as required by law or for legitimate business purposes.',
               ),
               const SizedBox(height: 20),
 
-              // 13. Updates and Modifications
-              _buildSectionTitle('13. App Updates and Modifications', isDark),
+              // 9. Governing Law and Dispute Resolution
+              _buildSectionTitle('9. Governing Law and Dispute Resolution', isDark),
               const SizedBox(height: 12),
               _buildContentCard(
                 isDark,
-                'We continually work to improve the App and may:\n\n'
-                '• Release updates, patches, and new versions\n'
-                '• Modify, suspend, or discontinue features\n'
-                '• Change the App\'s functionality or appearance\n\n'
-                'Updates may be automatic or require manual installation. Some updates may be necessary for security or legal compliance. '
-                'Failure to install required updates may limit your access to certain features or the entire App.\n\n'
-                'We are not obligated to provide any specific updates or maintain backward compatibility with older versions.',
+                'These Terms and Conditions shall be governed by and construed in accordance with applicable laws. '
+                'Any disputes arising from these terms or your use of the App shall be subject to the jurisdiction of competent courts.\n\n'
+                'In the event of any dispute, we encourage you to:\n\n'
+                '• Contact us first to seek an informal resolution\n'
+                '• Attempt good faith negotiation before pursuing formal legal action\n'
+                '• Consider mediation or arbitration as alternatives to litigation\n\n'
+                'Many disputes can be resolved quickly through direct communication.',
               ),
               const SizedBox(height: 20),
 
-              // 14. Data Backup
-              _buildSectionTitle('14. Data Backup and Recovery', isDark),
-              const SizedBox(height: 12),
-              _buildContentCard(
-                isDark,
-                'While we implement measures to protect your data, you acknowledge that:\n\n'
-                '• You are responsible for maintaining your own backup copies of important data\n'
-                '• We cannot guarantee the recovery of lost or corrupted data\n'
-                '• Data loss may occur due to technical failures, device issues, or other circumstances\n'
-                '• We are not liable for any data loss regardless of the cause\n\n'
-                'We recommend regularly exporting and backing up your financial data to prevent loss.',
-              ),
-              const SizedBox(height: 20),
-
-              // 15. Governing Law
-              _buildSectionTitle('15. Governing Law and Jurisdiction', isDark),
-              const SizedBox(height: 12),
-              _buildContentCard(
-                isDark,
-                'These Terms and Conditions shall be governed by and construed in accordance with the laws of [Your Jurisdiction], '
-                'without regard to its conflict of law provisions.\n\n'
-                'Any disputes arising from these terms or your use of the App shall be subject to the exclusive jurisdiction of the courts located in [Your Jurisdiction]. '
-                'However, we retain the right to seek injunctive relief in any jurisdiction.',
-              ),
-              const SizedBox(height: 20),
-
-              // 16. Dispute Resolution
-              _buildSectionTitle('16. Dispute Resolution', isDark),
-              const SizedBox(height: 12),
-              _buildContentCard(
-                isDark,
-                'In the event of any dispute, controversy, or claim arising from these Terms and Conditions:\n\n'
-                '• We encourage you to contact us first to seek an informal resolution\n'
-                '• Many disputes can be resolved quickly through direct communication\n'
-                '• Formal legal proceedings should be a last resort\n\n'
-                'If informal resolution is unsuccessful, disputes may be resolved through:\n\n'
-                '• Mediation by a mutually agreed-upon mediator\n'
-                '• Arbitration in accordance with applicable arbitration rules\n'
-                '• Court proceedings as specified in the Governing Law section\n\n'
-                'You agree to attempt good faith negotiation before pursuing formal legal action.',
-              ),
-              const SizedBox(height: 20),
-
-              // 17. Severability
-              _buildSectionTitle('17. Severability', isDark),
-              const SizedBox(height: 12),
-              _buildContentCard(
-                isDark,
-                'If any provision of these Terms and Conditions is found to be invalid, illegal, or unenforceable by a court of competent jurisdiction:\n\n'
-                '• That provision shall be modified to the minimum extent necessary to make it valid and enforceable\n'
-                '• If modification is not possible, the provision shall be severed from these terms\n'
-                '• All other provisions shall remain in full force and effect\n'
-                '• The invalidity of one provision shall not affect the validity of the remaining provisions',
-              ),
-              const SizedBox(height: 20),
-
-              // 18. Entire Agreement
-              _buildSectionTitle('18. Entire Agreement', isDark),
-              const SizedBox(height: 12),
-              _buildContentCard(
-                isDark,
-                'These Terms and Conditions, together with our Privacy Policy and any other legal notices published by us in the App, '
-                'constitute the entire agreement between you and Smart Personal Expense Tracker concerning your use of the App.\n\n'
-                'These terms supersede all prior agreements, understandings, and arrangements between us, whether written or oral, '
-                'regarding the subject matter.',
-              ),
-              const SizedBox(height: 20),
-
-              // 19. Contact Information
-              _buildSectionTitle('19. Contact Information', isDark),
-              const SizedBox(height: 12),
-              _buildContentCard(
-                isDark,
-                'If you have any questions, concerns, or feedback regarding these Terms and Conditions, please contact us at:\n\n'
-                'Email: lehoangvi.work@gmail.com\n'
-                'Website: www.smartexpensetracker.com\n\n'
-                'We aim to respond to all inquiries within 48 hours during business days.',
-              ),
-              const SizedBox(height: 20),
-
-              // 20. Changes to Terms
-              _buildSectionTitle('20. Changes to These Terms', isDark),
+              // 10. Changes to Terms and Contact Information
+              _buildSectionTitle('10. Changes to Terms and Contact Information', isDark),
               const SizedBox(height: 12),
               _buildContentCard(
                 isDark,
                 'We reserve the right to modify these Terms and Conditions at any time. When we make changes:\n\n'
                 '• We will update the "Last Updated" date at the top of this document\n'
                 '• We may notify you through the App or via email\n'
-                '• Significant changes will be prominently announced\n\n'
-                'Your continued use of the App after changes are posted constitutes your acceptance of the revised terms. '
-                'If you do not agree to the new terms, you must stop using the App.\n\n'
-                'We recommend reviewing these Terms and Conditions periodically to stay informed of any updates.',
+                '• Your continued use after changes constitutes acceptance of the revised terms\n\n'
+                'We recommend reviewing these Terms and Conditions periodically to stay informed of any updates.\n\n'
+                'Contact Information:\n'
+                'If you have any questions or concerns regarding these Terms and Conditions, please contact us at:\n\n'
+                'Email: lehoangvi.work@gmail.com\n'
+                'Website: www.smartexpensetracker.com\n\n'
+                'We aim to respond to all inquiries within 48 hours during business days.',
               ),
               const SizedBox(height: 24),
 

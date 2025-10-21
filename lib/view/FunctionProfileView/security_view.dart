@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import './ChangePassword/TOPT_Service.dart';
+import 'package:flutter/services.dart';
 
 class SecurityView extends StatefulWidget {
   const SecurityView({Key? key}) : super(key: key);
@@ -11,6 +15,19 @@ class SecurityView extends StatefulWidget {
 class _SecurityViewState extends State<SecurityView> {
   bool isTwoFactorEnabled = false;
   bool isLoadingTwoFactor = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load2FAStatus();
+  }
+
+  Future<void> _load2FAStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      isTwoFactorEnabled = prefs.getBool('two_factor_enabled') ?? false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,22 +67,6 @@ class _SecurityViewState extends State<SecurityView> {
                 onTap: () => _showChangePasswordDialog(),
               ),
               const SizedBox(height: 24),
-
-              // Two-Factor Authentication Section
-              _buildSectionTitle('Two-Factor Authentication'),
-              const SizedBox(height: 12),
-              _buildToggleCard(
-                icon: Icons.verified_user,
-                title: 'Enable Two-Factor Authentication',
-                subtitle: 'Add an extra layer of security to your account',
-                value: isTwoFactorEnabled,
-                onChanged: (value) {
-                  _handleTwoFactorToggle(value);
-                },
-                isLoading: isLoadingTwoFactor,
-              ),
-              const SizedBox(height: 24),
-
               // Active Sessions Section
               _buildSectionTitle('Active Sessions'),
               const SizedBox(height: 12),
@@ -265,18 +266,406 @@ class _SecurityViewState extends State<SecurityView> {
                   value: value,
                   onChanged: onChanged,
                   activeColor: Colors.teal.shade500,
-                  
                 ),
         ],
       ),
     );
   }
 
+  // TOTP Methods
+  void _handleTwoFactorToggle(bool value) {
+    if (value) {
+      // Enable 2FA
+      _showTOTPSetupDialog();
+    } else {
+      // Disable 2FA
+      _showDisableTOTPDialog();
+    }
+  }
+
+  void _showTOTPSetupDialog() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    String email = user?.email ?? 'user@email.com';
+
+    String secret = TOTPService.generateSecret();
+    String totpUri = TOTPService.generateTOTPUri(secret, email);
+    String currentCode = TOTPService.generateCurrentCode(secret);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Enable Two-Factor Authentication',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Scan this QR code with your authenticator app:',
+                  style: TextStyle(fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: QrImageView(
+                    data: totpUri,
+                    version: QrVersions.auto,
+                    size: 200.0,
+                    backgroundColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                const Text(
+                  'Or enter this code manually:',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 8),
+                
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          secret,
+                          style: const TextStyle(
+                            fontFamily: 'Courier',
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.copy, size: 20),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: secret));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Secret copied to clipboard'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Recommended Apps:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '• Google Authenticator\n• Microsoft Authenticator\n• Authy',
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        '🧪 Testing Mode',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Current code: $currentCode',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Courier',
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        '(Changes every 30 seconds)',
+                        style: TextStyle(fontSize: 10, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _showVerifyTOTPDialog(secret);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00CED1),
+              ),
+              child: const Text(
+                'Next',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showVerifyTOTPDialog(String secret) {
+    final codeController = TextEditingController();
+    bool isVerifying = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Text(
+                'Verify Setup',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Enter the 6-digit code from your authenticator app:',
+                    style: TextStyle(fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: codeController,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 8,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: '------',
+                      counterText: '',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isVerifying ? null : () => Navigator.pop(context),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isVerifying
+                      ? null
+                      : () async {
+                          if (codeController.text.length != 6) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please enter 6-digit code'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+
+                          setState(() => isVerifying = true);
+
+                          bool isValid = TOTPService.verifyCode(
+                            secret,
+                            codeController.text,
+                          );
+
+                          if (isValid) {
+                            await TOTPService.saveSecret(secret);
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setBool('two_factor_enabled', true);
+
+                            if (mounted) {
+                              this.setState(() {
+                                isTwoFactorEnabled = true;
+                                isLoadingTwoFactor = false;
+                              });
+
+                              Navigator.pop(context);
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Row(
+                                    children: [
+                                      Icon(Icons.check_circle, color: Colors.white),
+                                      SizedBox(width: 8),
+                                      Text('Two-factor authentication enabled!'),
+                                    ],
+                                  ),
+                                  backgroundColor: Colors.green,
+                                  duration: Duration(seconds: 3),
+                                ),
+                              );
+                            }
+                          } else {
+                            setState(() => isVerifying = false);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Invalid code. Please try again.'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00CED1),
+                  ),
+                  child: isVerifying
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation(Colors.white),
+                          ),
+                        )
+                      : const Text(
+                          'Verify',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showDisableTOTPDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Disable Two-Factor Authentication',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          content: const Text(
+            'Are you sure you want to disable two-factor authentication? '
+            'This will make your account less secure.',
+            style: TextStyle(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                
+                setState(() => isLoadingTwoFactor = true);
+
+                await TOTPService.deleteSecret();
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('two_factor_enabled', false);
+
+                setState(() {
+                  isTwoFactorEnabled = false;
+                  isLoadingTwoFactor = false;
+                });
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Two-factor authentication disabled'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+              ),
+              child: const Text(
+                'Disable',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Change Password Dialog
   void _showChangePasswordDialog() {
     final oldPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
     bool isLoading = false;
+    bool obscureOldPassword = true;
+    bool obscureNewPassword = true;
+    bool obscureConfirmPassword = true;
 
     showDialog(
       context: context,
@@ -297,33 +686,72 @@ class _SecurityViewState extends State<SecurityView> {
                   children: [
                     TextField(
                       controller: oldPasswordController,
-                      obscureText: true,
+                      obscureText: obscureOldPassword,
                       decoration: InputDecoration(
                         labelText: 'Current Password',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureOldPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              obscureOldPassword = !obscureOldPassword;
+                            });
+                          },
                         ),
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: newPasswordController,
-                      obscureText: true,
+                      obscureText: obscureNewPassword,
                       decoration: InputDecoration(
                         labelText: 'New Password',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureNewPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              obscureNewPassword = !obscureNewPassword;
+                            });
+                          },
                         ),
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: confirmPasswordController,
-                      obscureText: true,
+                      obscureText: obscureConfirmPassword,
                       decoration: InputDecoration(
                         labelText: 'Confirm Password',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureConfirmPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              obscureConfirmPassword = !obscureConfirmPassword;
+                            });
+                          },
                         ),
                       ),
                     ),
@@ -332,7 +760,7 @@ class _SecurityViewState extends State<SecurityView> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: isLoading ? null : () => Navigator.pop(context),
                   child: Text(
                     'Cancel',
                     style: TextStyle(color: Colors.grey.shade600),
@@ -342,6 +770,18 @@ class _SecurityViewState extends State<SecurityView> {
                   onPressed: isLoading
                       ? null
                       : () async {
+                          if (oldPasswordController.text.isEmpty ||
+                              newPasswordController.text.isEmpty ||
+                              confirmPasswordController.text.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please fill all fields'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+
                           if (newPasswordController.text !=
                               confirmPasswordController.text) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -371,7 +811,6 @@ class _SecurityViewState extends State<SecurityView> {
                                 FirebaseAuth.instance.currentUser;
                             if (currentUser != null &&
                                 currentUser.email != null) {
-                              // Reauthenticate user
                               await currentUser.reauthenticateWithCredential(
                                 EmailAuthProvider.credential(
                                   email: currentUser.email!,
@@ -379,7 +818,6 @@ class _SecurityViewState extends State<SecurityView> {
                                 ),
                               );
 
-                              // Update password
                               await currentUser
                                   .updatePassword(newPasswordController.text);
 
@@ -432,39 +870,7 @@ class _SecurityViewState extends State<SecurityView> {
     );
   }
 
-  void _handleTwoFactorToggle(bool value) async {
-    setState(() => isLoadingTwoFactor = true);
-
-    try {
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 2));
-
-      setState(() {
-        isTwoFactorEnabled = value;
-        isLoadingTwoFactor = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            value
-                ? 'Two-factor authentication enabled'
-                : 'Two-factor authentication disabled',
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      setState(() => isLoadingTwoFactor = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
+  // Other methods (kept from original)
   void _showActiveSessions() {
     showModalBottomSheet(
       context: context,
@@ -479,11 +885,11 @@ class _SecurityViewState extends State<SecurityView> {
           ),
           child: ListView(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(20.0),
+              const Padding(
+                padding: EdgeInsets.all(20.0),
                 child: Text(
                   'Active Devices',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -499,11 +905,6 @@ class _SecurityViewState extends State<SecurityView> {
                 'Samsung Galaxy A51',
                 'Android 11',
                 'Last active: Yesterday at 9:15 AM',
-              ),
-              _buildDeviceItem(
-                'Chrome Browser',
-                'Windows 10',
-                'Last active: 3 days ago',
               ),
               const SizedBox(height: 20),
             ],
@@ -598,7 +999,7 @@ class _SecurityViewState extends State<SecurityView> {
                 );
                 Navigator.pop(context);
               },
-              icon: Icon(Icons.close, color: Colors.red.shade400),
+                icon: Icon(Icons.close, color: Colors.red.shade400),
             ),
         ],
       ),
@@ -619,11 +1020,11 @@ class _SecurityViewState extends State<SecurityView> {
           ),
           child: ListView(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(20.0),
+              const Padding(
+                padding: EdgeInsets.all(20.0),
                 child: Text(
                   'Login History',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -649,13 +1050,6 @@ class _SecurityViewState extends State<SecurityView> {
                 'Successful',
                 Icons.check_circle,
                 Colors.green,
-              ),
-              _buildLoginItem(
-                '3 days ago at 3:20 PM',
-                'Unknown Device',
-                'Failed',
-                Icons.cancel,
-                Colors.red,
               ),
               const SizedBox(height: 20),
             ],
@@ -803,11 +1197,11 @@ class _SecurityViewState extends State<SecurityView> {
           ),
           child: ListView(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(20.0),
+              const Padding(
+                padding: EdgeInsets.all(20.0),
                 child: Text(
                   'Connected Apps',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -822,11 +1216,6 @@ class _SecurityViewState extends State<SecurityView> {
                 'Facebook',
                 'Connected on Dec 20, 2023',
                 'Read and write access to profile',
-              ),
-              _buildAppItem(
-                'Apple',
-                'Connected on Nov 10, 2023',
-                'Read access to email',
               ),
               const SizedBox(height: 20),
             ],

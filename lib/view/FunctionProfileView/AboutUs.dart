@@ -86,113 +86,68 @@ class AboutUsView extends StatelessWidget {
               ),
               const SizedBox(height: 32),
 
-              // Overview Section
-              _buildSectionTitle('Overview', isDark),
+              // 1. Overview & Mission
+              _buildSectionTitle('Overview & Mission', isDark),
               const SizedBox(height: 12),
               _buildContentCard(
                 isDark,
                 'The Smart Personal Expense Tracker is an innovative mobile application designed to revolutionize personal finance management. '
                 'By combining traditional expense tracking with cutting-edge artificial intelligence technology, this app empowers users to take control '
                 'of their financial lives through intelligent insights, predictive analytics, and personalized recommendations.\n\n'
-                'In today\'s fast-paced world, managing personal finances can be overwhelming. Our app simplifies this process by automatically '
-                'categorizing expenses, analyzing spending patterns, and providing actionable insights that help users make informed financial decisions. '
+                'Our mission is to democratize financial intelligence and make sophisticated financial management tools accessible to everyone. '
+                'We believe that everyone deserves to have clear, actionable insights into their spending habits without needing to be a financial expert. '
                 'Whether you\'re saving for a major purchase, trying to reduce unnecessary spending, or simply want better visibility into your '
                 'financial habits, our app is your trusted companion on the journey to financial wellness.',
               ),
               const SizedBox(height: 24),
 
-              // Mission Section
-              _buildSectionTitle('Our Mission', isDark),
-              const SizedBox(height: 12),
-              _buildContentCard(
-                isDark,
-                'Our mission is to democratize financial intelligence and make sophisticated financial management tools accessible to everyone. '
-                'We believe that everyone deserves to have clear, actionable insights into their spending habits without needing to be a financial expert.\n\n'
-                'We aim to:\n\n'
-                '• Empower users with AI-driven financial insights\n'
-                '• Simplify complex financial data into understandable visualizations\n'
-                '• Help users achieve their financial goals through smart recommendations\n'
-                '• Promote financial literacy and responsible spending habits\n'
-                '• Provide a secure and privacy-focused platform for managing personal finances',
-              ),
-              const SizedBox(height: 24),
-
-              // Key Features Section
+              // 2. Key Features
               _buildSectionTitle('Key Features', isDark),
               const SizedBox(height: 12),
               _buildFeatureCard(
                 isDark,
                 Icons.auto_awesome,
                 'AI-Powered Insights',
-                'Our advanced machine learning algorithms analyze your spending patterns to provide personalized financial insights. '
-                'The AI engine learns from your habits and offers tailored recommendations to help you save money and make better financial decisions.',
+                'Advanced machine learning algorithms analyze your spending patterns to provide personalized financial insights and recommendations.',
               ),
               const SizedBox(height: 12),
               _buildFeatureCard(
                 isDark,
                 Icons.category,
                 'Smart Categorization',
-                'Automatically categorizes your expenses into intuitive groups such as Food, Transport, Shopping, Bills, and more. '
-                'The system learns from your inputs and becomes more accurate over time, saving you valuable time on manual data entry.',
+                'Automatically categorizes expenses into intuitive groups, learning from your inputs to become more accurate over time.',
               ),
               const SizedBox(height: 12),
               _buildFeatureCard(
                 isDark,
                 Icons.analytics,
                 'Comprehensive Analytics',
-                'Visualize your spending through beautiful, interactive charts and graphs. Track your expenses by category, time period, '
-                'or custom filters. Identify trends, spot anomalies, and understand where your money goes with detailed analytical reports.',
+                'Visualize spending through beautiful charts and graphs, tracking expenses by category, time period, or custom filters.',
               ),
               const SizedBox(height: 12),
               _buildFeatureCard(
                 isDark,
                 Icons.account_balance_wallet,
                 'Budget Management',
-                'Set personalized budgets for different spending categories and receive intelligent alerts when you\'re approaching your limits. '
-                'The app helps you stay on track with your financial goals through proactive notifications and spending recommendations.',
-              ),
-              const SizedBox(height: 12),
-              _buildFeatureCard(
-                isDark,
-                Icons.trending_up,
-                'Financial Forecasting',
-                'Leverage AI to predict future spending patterns based on your historical data. Get early warnings about potential overspending '
-                'and receive suggestions for optimizing your budget allocation across different expense categories.',
+                'Set personalized budgets and receive intelligent alerts when approaching limits to stay on track with financial goals.',
               ),
               const SizedBox(height: 12),
               _buildFeatureCard(
                 isDark,
                 Icons.security,
                 'Bank-Level Security',
-                'Your financial data is protected with industry-standard encryption and security protocols. We implement multi-layer security '
-                'measures to ensure your sensitive information remains private and secure at all times.',
-              ),
-              const SizedBox(height: 12),
-              _buildFeatureCard(
-                isDark,
-                Icons.dark_mode,
-                'Customizable Experience',
-                'Personalize your app experience with light and dark mode themes, customizable categories, and flexible notification settings. '
-                'The app adapts to your preferences and workflow for maximum convenience.',
-              ),
-              const SizedBox(height: 12),
-              _buildFeatureCard(
-                isDark,
-                Icons.cloud_sync,
-                'Cross-Platform Sync',
-                'Access your financial data seamlessly across multiple devices. All your information is securely synced in real-time, '
-                'ensuring you always have the latest view of your finances wherever you are.',
+                'Financial data protected with industry-standard encryption and multi-layer security measures for complete privacy.',
               ),
               const SizedBox(height: 24),
 
-              // Technology Section
+              // 3. Technology & Innovation
               _buildSectionTitle('Technology & Innovation', isDark),
               const SizedBox(height: 12),
               _buildContentCard(
                 isDark,
                 'This application represents the culmination of advanced software engineering and artificial intelligence research. '
                 'Built using Flutter framework, it provides a native-like experience on both iOS and Android platforms.\n\n'
-                'The AI engine at the heart of the app utilizes:\n\n'
+                'The AI engine utilizes:\n\n'
                 '• Machine Learning models for expense classification and pattern recognition\n'
                 '• Natural Language Processing for intelligent transaction descriptions\n'
                 '• Predictive analytics for financial forecasting\n'
@@ -203,8 +158,8 @@ class AboutUsView extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // Development Team Section
-              _buildSectionTitle('Development Team', isDark),
+              // 4. Development & Team
+              _buildSectionTitle('Development & Team', isDark),
               const SizedBox(height: 12),
               _buildContentCard(
                 isDark,
@@ -217,51 +172,14 @@ class AboutUsView extends StatelessWidget {
                 '• User Experience and Interface Design\n'
                 '• Financial Technology and Analytics\n'
                 '• Data Security and Privacy Protection\n\n'
-                'We are passionate about creating technology that empowers users and improves their quality of life.',
+                'We are passionate about creating technology that empowers users and improves their quality of life. '
+                'We extend our heartfelt gratitude to our academic advisors, beta testers, the open-source community, '
+                'and all users who trust us with their financial data.',
               ),
               const SizedBox(height: 24),
 
-              // Privacy & Security Section
-              _buildSectionTitle('Privacy & Security Commitment', isDark),
-              const SizedBox(height: 12),
-              _buildContentCard(
-                isDark,
-                'We understand that financial data is deeply personal and sensitive. That\'s why we\'ve built this app with privacy '
-                'and security as foundational principles, not afterthoughts.\n\n'
-                'Our security measures include:\n\n'
-                '• End-to-end encryption for all data transmission\n'
-                '• Local data storage with AES-256 encryption\n'
-                '• No selling or sharing of personal data with third parties\n'
-                '• Optional biometric authentication (fingerprint/face ID)\n'
-                '• Regular security audits and updates\n'
-                '• Transparent data usage policies\n'
-                '• User control over data deletion and export\n\n'
-                'Your trust is our most valuable asset, and we work tirelessly to maintain it.',
-              ),
-              const SizedBox(height: 24),
-
-              // Future Roadmap Section
-              _buildSectionTitle('Future Roadmap', isDark),
-              const SizedBox(height: 12),
-              _buildContentCard(
-                isDark,
-                'We\'re constantly working to improve and expand the capabilities of this app. Here\'s what\'s on our roadmap:\n\n'
-                '• Integration with banking APIs for automatic transaction import\n'
-                '• Voice-activated expense logging\n'
-                '• Advanced investment tracking and portfolio management\n'
-                '• Bill payment reminders and recurring transaction management\n'
-                '• Multi-currency support for international users\n'
-                '• Family expense sharing and collaborative budgeting\n'
-                '• Enhanced AI recommendations based on financial goals\n'
-                '• Integration with popular payment platforms\n'
-                '• Expense receipt scanning and OCR\n'
-                '• Financial goal setting with milestone tracking\n\n'
-                'Stay tuned for exciting updates!',
-              ),
-              const SizedBox(height: 24),
-
-              // Contact Section
-              _buildSectionTitle('Get In Touch', isDark),
+              // 5. Contact & Privacy
+              _buildSectionTitle('Contact & Privacy', isDark),
               const SizedBox(height: 12),
               _buildContactCard(
                 isDark,
@@ -269,19 +187,17 @@ class AboutUsView extends StatelessWidget {
                 'Email',
                 'lehoangvi.work@gmail.com',
               ),
-              // Acknowledgments Section
-              _buildSectionTitle('Acknowledgments', isDark),
               const SizedBox(height: 12),
               _buildContentCard(
                 isDark,
-                'This project would not have been possible without the support and guidance of numerous individuals and organizations. '
-                'We extend our heartfelt gratitude to:\n\n'
-                '• Our academic advisors for their invaluable guidance and expertise\n'
-                '• Beta testers who provided crucial feedback during development\n'
-                '• The open-source community for the amazing tools and libraries\n'
-                '• Our families and friends for their unwavering support\n'
-                '• All users who trust us with their financial data\n\n'
-                'Thank you for being part of our journey toward better financial wellness for everyone.',
+                'We understand that financial data is deeply personal and sensitive. Our security measures include:\n\n'
+                '• End-to-end encryption for all data transmission\n'
+                '• Local data storage with AES-256 encryption\n'
+                '• No selling or sharing of personal data with third parties\n'
+                '• Optional biometric authentication (fingerprint/face ID)\n'
+                '• Transparent data usage policies\n'
+                '• User control over data deletion and export\n\n'
+                'Your trust is our most valuable asset, and we work tirelessly to maintain it.',
               ),
               const SizedBox(height: 24),
 
