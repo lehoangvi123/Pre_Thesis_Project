@@ -6,7 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../sign-up/SignUpView.dart'; 
 import './ForgotPasswordView.dart'; 
-import '../Function/HomeView.dart'; 
+import '../Function/HomeView.dart';  
+import '../FunctionProfileView/SecurityPart/ManageDevicesView.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -47,6 +48,9 @@ class _LoginViewState extends State<LoginView> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+
+      // ✅ REGISTER DEVICE AFTER SUCCESSFUL LOGIN
+      await DeviceService.registerDevice();
 
       if (mounted) {
         _showSuccessSnackBar('Đăng nhập thành công!');
@@ -116,12 +120,17 @@ class _LoginViewState extends State<LoginView> {
 
       final userCredential = await _auth.signInWithCredential(credential);
 
-      if (userCredential.user != null && mounted) {
-        _showSuccessSnackBar('Đăng nhập Google thành công!');
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeView()),
-        );
+      // ✅ REGISTER DEVICE AFTER SUCCESSFUL GOOGLE LOGIN
+      if (userCredential.user != null) {
+        await DeviceService.registerDevice();
+        
+        if (mounted) {
+          _showSuccessSnackBar('Đăng nhập Google thành công!');
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeView()),
+          );
+        }
       }
 
     } catch (e) {
@@ -149,12 +158,17 @@ class _LoginViewState extends State<LoginView> {
 
         final userCredential = await _auth.signInWithCredential(credential);
 
-        if (userCredential.user != null && mounted) {
-          _showSuccessSnackBar('Đăng nhập Facebook thành công!');
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeView()),
-          );
+        // ✅ REGISTER DEVICE AFTER SUCCESSFUL FACEBOOK LOGIN
+        if (userCredential.user != null) {
+          await DeviceService.registerDevice();
+          
+          if (mounted) {
+            _showSuccessSnackBar('Đăng nhập Facebook thành công!');
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeView()),
+            );
+          }
         }
       } else if (result.status == LoginStatus.cancelled) {
         _showErrorDialog('Đăng nhập Facebook đã bị hủy');
@@ -218,7 +232,7 @@ class _LoginViewState extends State<LoginView> {
         duration: const Duration(seconds: 2),
       ),
     );
-  }
+  } 
 
   @override
   Widget build(BuildContext context) {
@@ -552,6 +566,9 @@ class _LoginViewState extends State<LoginView> {
     try {
       UserCredential userCredential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
+      
+      // ✅ REGISTER DEVICE AFTER SUCCESSFUL LOGIN
+      await DeviceService.registerDevice();
       
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
           .collection('users')

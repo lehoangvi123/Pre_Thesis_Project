@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import './ChangePassword/TOPT_Service.dart';
+import 'SecurityPart/TOPT_Service.dart';
 import 'package:flutter/services.dart';
+import 'SecurityPart/ManageDevicesView.dart'; // Import the new view
 
 class SecurityView extends StatefulWidget {
   const SecurityView({Key? key}) : super(key: key);
@@ -67,6 +68,7 @@ class _SecurityViewState extends State<SecurityView> {
                 onTap: () => _showChangePasswordDialog(),
               ),
               const SizedBox(height: 24),
+              
               // Active Sessions Section
               _buildSectionTitle('Active Sessions'),
               const SizedBox(height: 12),
@@ -74,7 +76,15 @@ class _SecurityViewState extends State<SecurityView> {
                 icon: Icons.devices,
                 title: 'Manage Devices',
                 subtitle: 'View and manage your active sessions',
-                onTap: () => _showActiveSessions(),
+                onTap: () {
+                  // Navigate to the new ManageDevicesView
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ManageDevicesView(),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 24),
 
@@ -89,22 +99,11 @@ class _SecurityViewState extends State<SecurityView> {
               ),
               const SizedBox(height: 24),
 
-              // Recovery Email Section
-              _buildSectionTitle('Recovery Options'),
-              const SizedBox(height: 12),
-              _buildSecurityCard(
-                icon: Icons.email_outlined,
-                title: 'Recovery Email',
-                subtitle: 'Add or update recovery email address',
-                onTap: () => _showRecoveryEmailDialog(),
-              ),
-              const SizedBox(height: 24),
-
               // Connected Apps Section
               _buildSectionTitle('Connected Apps'),
               const SizedBox(height: 12),
               _buildSecurityCard(
-                icon: Icons.apps,
+                icon: Icons.apps, 
                 title: 'Manage Permissions',
                 subtitle: 'Review apps with access to your account',
                 onTap: () => _showConnectedApps(),
@@ -275,10 +274,8 @@ class _SecurityViewState extends State<SecurityView> {
   // TOTP Methods
   void _handleTwoFactorToggle(bool value) {
     if (value) {
-      // Enable 2FA
       _showTOTPSetupDialog();
     } else {
-      // Disable 2FA
       _showDisableTOTPDialog();
     }
   }
@@ -870,142 +867,6 @@ class _SecurityViewState extends State<SecurityView> {
     );
   }
 
-  // Other methods (kept from original)
-  void _showActiveSessions() {
-    showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: ListView(
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(20.0),
-                child: Text(
-                  'Active Devices',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              _buildDeviceItem(
-                'iPhone 13',
-                'iOS 15.0',
-                'Last active: Today at 2:30 PM',
-                isCurrentDevice: true,
-              ),
-              _buildDeviceItem(
-                'Samsung Galaxy A51',
-                'Android 11',
-                'Last active: Yesterday at 9:15 AM',
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDeviceItem(String name, String os, String lastActive,
-      {bool isCurrentDevice = false}) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isCurrentDevice ? Colors.teal.shade50 : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: isCurrentDevice
-            ? Border.all(color: Colors.teal.shade200)
-            : Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.devices,
-            color: isCurrentDevice ? Colors.teal : Colors.grey.shade600,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (isCurrentDevice)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8.0),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.teal,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            'Current',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  os,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                Text(
-                  lastActive,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (!isCurrentDevice)
-            IconButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Device removed'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-                Navigator.pop(context);
-              },
-                icon: Icon(Icons.close, color: Colors.red.shade400),
-            ),
-        ],
-      ),
-    );
-  }
-
   void _showLoginHistory() {
     showModalBottomSheet(
       context: context,
@@ -1114,72 +975,6 @@ class _SecurityViewState extends State<SecurityView> {
           ),
         ],
       ),
-    );
-  }
-
-  void _showRecoveryEmailDialog() {
-    final emailController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            'Recovery Email',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: TextField(
-            controller: emailController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: InputDecoration(
-              labelText: 'Enter recovery email',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (emailController.text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please enter an email address'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
-
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Recovery email updated successfully'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00CED1),
-              ),
-              child: const Text(
-                'Update',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 

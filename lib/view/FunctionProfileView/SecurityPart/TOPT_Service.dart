@@ -70,4 +70,4 @@ class TOTPService {
       isGoogle: true,
     );
   }
-} 
+}  
