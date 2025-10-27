@@ -6,7 +6,7 @@ import './AnalysisView.dart';
 import './Transaction.dart';
 import '../notification/NotificationView.dart';
 import './ProfileView.dart';
-import '../FunctionCategorize/CategorizeDetailsView.dart';
+import '../FunctionCategorize//CategorizeDetailsView.dart';
 import '../FunctionCategorize/AddCategorizeDialog.dart';
 
 class CategoriesView extends StatefulWidget {
@@ -20,7 +20,6 @@ class _CategoriesViewState extends State<CategoriesView> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Default categories
   final List<Map<String, dynamic>> _defaultCategories = [
     {'name': 'Food', 'icon': Icons.restaurant, 'color': Color(0xFF00CED1)},
     {'name': 'Transport', 'icon': Icons.directions_bus, 'color': Color(0xFF00CED1)},
@@ -31,6 +30,23 @@ class _CategoriesViewState extends State<CategoriesView> {
     {'name': 'Savings', 'icon': Icons.savings, 'color': Color(0xFF90CAF9)},
     {'name': 'Entertainment', 'icon': Icons.movie, 'color': Color(0xFF90CAF9)},
   ];
+
+  // Calculate grid item count to keep "More" button at the end of a row
+  int _calculateGridItemCount(int categoriesCount) {
+    const columnsPerRow = 3;
+    final totalItems = categoriesCount + 1; // +1 for More button
+    
+    // Calculate how many items needed to fill the last row
+    final remainder = totalItems % columnsPerRow;
+    
+    if (remainder == 0) {
+      // Already balanced
+      return totalItems;
+    } else {
+      // Add empty spaces to complete the row
+      return totalItems + (columnsPerRow - remainder);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -186,8 +202,8 @@ class _CategoriesViewState extends State<CategoriesView> {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue,
-                    ),
+                      color: Colors.blue, 
+                    ), 
                   ),
                 ],
               ),
@@ -252,35 +268,57 @@ class _CategoriesViewState extends State<CategoriesView> {
               'name': data['name'],
               'icon': IconData(data['icon'], fontFamily: 'MaterialIcons'),
               'color': Color(data['color']),
+              'isCustom': true, // Mark as custom
             };
           }).toList();
         }
 
-        // Combine default and custom categories
-        final allCategories = [..._defaultCategories, ...customCategories];
+        // Mark default categories
+        final defaultCategoriesMarked = _defaultCategories.map((cat) {
+          return {
+            ...cat,
+            'isCustom': false,
+          };
+        }).toList();
 
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-          ),
-          itemCount: allCategories.length + 1, // +1 for "More" button
-          itemBuilder: (context, index) {
-            if (index < allCategories.length) {
-              final category = allCategories[index];
-              return _buildCategoryCard(
-                category['name'] as String,
-                category['icon'] as IconData,
-                category['color'] as Color,
-              );
-            } else {
-              // "More" button to add new category
-              return _buildMoreButton();
-            }
-          },
+        // Combine default and custom categories
+        final allCategories = [...defaultCategoriesMarked, ...customCategories];
+
+        return Column(
+          children: [
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 20,
+                crossAxisSpacing: 20,
+              ),
+              itemCount: _calculateGridItemCount(allCategories.length),
+              itemBuilder: (context, index) {
+                // Check if this is the More button position
+                final moreButtonIndex = _calculateGridItemCount(allCategories.length) - 1;
+                
+                if (index == moreButtonIndex) {
+                  return _buildMoreButton();
+                }
+                
+                // Check if this is an empty space
+                if (index >= allCategories.length) {
+                  return const SizedBox(); // Empty space
+                }
+                
+                // Regular category
+                final category = allCategories[index];
+                return _buildCategoryCard(
+                  category['name'] as String,
+                  category['icon'] as IconData,
+                  category['color'] as Color,
+                  isCustom: category['isCustom'] as bool,
+                );
+              },
+            ),
+          ],
         );
       },
     );
@@ -311,7 +349,7 @@ class _CategoriesViewState extends State<CategoriesView> {
     );
   }
 
-  Widget _buildCategoryCard(String title, IconData icon, Color color) {
+  Widget _buildCategoryCard(String title, IconData icon, Color color, {bool isCustom = false}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
@@ -327,36 +365,163 @@ class _CategoriesViewState extends State<CategoriesView> {
           ),
         );
       },
+      onLongPress: isCustom ? () => _showDeleteDialog(title) : null,
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? color.withOpacity(0.15) : color.withOpacity(0.15),
           borderRadius: BorderRadius.circular(20),
           border: isDark ? Border.all(color: color.withOpacity(0.3)) : null,
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
           children: [
-            Icon(
-              icon,
-              size: 36,
-              color: color,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: isDark ? Colors.grey[300] : Colors.grey[800],
+            // Category content
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    icon,
+                    size: 38,
+                    color: color,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.grey[300] : Colors.grey[800],
+                      height: 1.1,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
+            // Delete icon indicator (only for custom categories)
+            if (isCustom)
+              Positioned(
+                top: 4,
+                right: 4,
+                child: Icon(
+                  Icons.close,
+                  size: 16,
+                  color: color.withOpacity(0.5),
+                ),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  void _showDeleteDialog(String categoryName) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          'Delete Category',
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to delete "$categoryName"?\n\nThis will also delete all expenses in this category.',
+          style: TextStyle(
+            color: isDark ? Colors.grey[300] : Colors.grey[700],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _deleteCategory(categoryName);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteCategory(String categoryName) async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) return;
+
+      // Find and delete the category document
+      final categoriesSnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('categories')
+          .where('name', isEqualTo: categoryName)
+          .get();
+
+      // Delete all expenses with this category
+      final expensesSnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('expenses')
+          .where('category', isEqualTo: categoryName)
+          .get();
+
+      // Delete category document
+      for (var doc in categoriesSnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      // Delete all expenses
+      for (var doc in expensesSnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Category "$categoryName" deleted'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        setState(() {}); // Refresh the grid
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete category: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildMoreButton() {
