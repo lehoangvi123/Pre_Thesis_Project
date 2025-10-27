@@ -147,7 +147,7 @@ class _TransactionViewState extends State<TransactionView> {
               MaterialPageRoute(
                 builder: (context) => const NotificationView(),
               ),
-            );
+            ); 
           },
           ),
         ],

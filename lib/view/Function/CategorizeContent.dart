@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import './HomeView.dart';
 import './AnalysisView.dart';
 import './Transaction.dart';
-import '../notification/NotificationView.dart'; 
-import './ProfileView.dart'; 
+import '../notification/NotificationView.dart';
+import './ProfileView.dart';
+import '../FunctionCategorize/CategorizeDetailsView.dart';
+import '../FunctionCategorize/AddCategorizeDialog.dart';
 
 class CategoriesView extends StatefulWidget {
   const CategoriesView({Key? key}) : super(key: key);
@@ -13,10 +17,25 @@ class CategoriesView extends StatefulWidget {
 }
 
 class _CategoriesViewState extends State<CategoriesView> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // Default categories
+  final List<Map<String, dynamic>> _defaultCategories = [
+    {'name': 'Food', 'icon': Icons.restaurant, 'color': Color(0xFF00CED1)},
+    {'name': 'Transport', 'icon': Icons.directions_bus, 'color': Color(0xFF00CED1)},
+    {'name': 'Medicine', 'icon': Icons.medical_services, 'color': Color(0xFF00CED1)},
+    {'name': 'Groceries', 'icon': Icons.shopping_bag, 'color': Color(0xFF64B5F6)},
+    {'name': 'Rent', 'icon': Icons.home, 'color': Color(0xFF64B5F6)},
+    {'name': 'Gifts', 'icon': Icons.card_giftcard, 'color': Color(0xFF64B5F6)},
+    {'name': 'Savings', 'icon': Icons.savings, 'color': Color(0xFF90CAF9)},
+    {'name': 'Entertainment', 'icon': Icons.movie, 'color': Color(0xFF90CAF9)},
+  ];
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -30,7 +49,7 @@ class _CategoriesViewState extends State<CategoriesView> {
                 const SizedBox(height: 24),
                 _buildBalanceCard(),
                 const SizedBox(height: 24),
-                _buildCategoriesGrid(),
+                _buildCategoriesSection(),
                 const SizedBox(height: 80),
               ],
             ),
@@ -43,7 +62,7 @@ class _CategoriesViewState extends State<CategoriesView> {
 
   Widget _buildHeader() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -95,7 +114,7 @@ class _CategoriesViewState extends State<CategoriesView> {
 
   Widget _buildBalanceCard() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -210,84 +229,109 @@ class _CategoriesViewState extends State<CategoriesView> {
     );
   }
 
-  Widget _buildCategoriesGrid() {
-    return GridView.count(
+  Widget _buildCategoriesSection() {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      return _buildDefaultCategoriesGrid();
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('categories')
+          .orderBy('createdAt', descending: false)
+          .snapshots(),
+      builder: (context, snapshot) {
+        List<Map<String, dynamic>> customCategories = [];
+
+        if (snapshot.hasData) {
+          customCategories = snapshot.data!.docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return {
+              'name': data['name'],
+              'icon': IconData(data['icon'], fontFamily: 'MaterialIcons'),
+              'color': Color(data['color']),
+            };
+          }).toList();
+        }
+
+        // Combine default and custom categories
+        final allCategories = [..._defaultCategories, ...customCategories];
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+          ),
+          itemCount: allCategories.length + 1, // +1 for "More" button
+          itemBuilder: (context, index) {
+            if (index < allCategories.length) {
+              final category = allCategories[index];
+              return _buildCategoryCard(
+                category['name'] as String,
+                category['icon'] as IconData,
+                category['color'] as Color,
+              );
+            } else {
+              // "More" button to add new category
+              return _buildMoreButton();
+            }
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildDefaultCategoriesGrid() {
+    return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 3,
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 16,
-      children: [
-        _buildCategoryCard(
-          'Food',
-          Icons.restaurant,
-          const Color(0xFF00CED1),
-        ),
-        _buildCategoryCard(
-          'Transport',
-          Icons.directions_bus,
-          const Color(0xFF00CED1),
-        ),
-        _buildCategoryCard(
-          'Medicine',
-          Icons.medical_services,
-          const Color(0xFF00CED1),
-        ),
-        _buildCategoryCard(
-          'Groceries',
-          Icons.shopping_bag,
-          const Color(0xFF64B5F6),
-        ),
-        _buildCategoryCard(
-          'Rent',
-          Icons.home,
-          const Color(0xFF64B5F6),
-        ),
-        _buildCategoryCard(
-          'Gifts',
-          Icons.card_giftcard,
-          const Color(0xFF64B5F6),
-        ),
-        _buildCategoryCard(
-          'Savings',
-          Icons.savings,
-          const Color(0xFF90CAF9),
-        ),
-        _buildCategoryCard(
-          'Entertainment',
-          Icons.movie,
-          const Color(0xFF90CAF9),
-        ),
-        _buildCategoryCard(
-          'More',
-          Icons.add,
-          const Color(0xFF90CAF9),
-        ),
-      ],
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+      ),
+      itemCount: _defaultCategories.length + 1,
+      itemBuilder: (context, index) {
+        if (index < _defaultCategories.length) {
+          final category = _defaultCategories[index];
+          return _buildCategoryCard(
+            category['name'] as String,
+            category['icon'] as IconData,
+            category['color'] as Color,
+          );
+        } else {
+          return _buildMoreButton();
+        }
+      },
     );
   }
 
   Widget _buildCategoryCard(String title, IconData icon, Color color) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return GestureDetector(
       onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$title category clicked'),
-            duration: const Duration(seconds: 1),
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CategoryDetailView(
+              categoryName: title,
+              categoryIcon: icon,
+              categoryColor: color,
+            ),
           ),
         );
       },
       child: Container(
         decoration: BoxDecoration(
-          color: isDark
-              ? color.withOpacity(0.15)
-              : color.withOpacity(0.15),
+          color: isDark ? color.withOpacity(0.15) : color.withOpacity(0.15),
           borderRadius: BorderRadius.circular(20),
-          border: isDark
-              ? Border.all(color: color.withOpacity(0.3))
-              : null,
+          border: isDark ? Border.all(color: color.withOpacity(0.3)) : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -305,6 +349,56 @@ class _CategoriesViewState extends State<CategoriesView> {
                 fontWeight: FontWeight.w500,
                 color: isDark ? Colors.grey[300] : Colors.grey[800],
               ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMoreButton() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const color = Color(0xFF90CAF9);
+
+    return GestureDetector(
+      onTap: () async {
+        final result = await showDialog<bool>(
+          context: context,
+          builder: (context) => const AddCategoryDialog(),
+        );
+
+        if (result == true) {
+          // Category added successfully, grid will refresh automatically via StreamBuilder
+          setState(() {});
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? color.withOpacity(0.15) : color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(20),
+          border: isDark
+              ? Border.all(color: color.withOpacity(0.3), width: 2)
+              : Border.all(color: color, width: 2, style: BorderStyle.solid),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.add,
+              size: 36,
+              color: color,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'More',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.grey[300] : Colors.grey[800],
+              ),
             ),
           ],
         ),
@@ -314,7 +408,7 @@ class _CategoriesViewState extends State<CategoriesView> {
 
   Widget _buildBottomNavBar() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
@@ -350,7 +444,8 @@ class _CategoriesViewState extends State<CategoriesView> {
                 onTap: () {
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (context) => const AnalysisView()),
+                    MaterialPageRoute(
+                        builder: (context) => const AnalysisView()),
                   );
                 },
               ),
@@ -361,7 +456,8 @@ class _CategoriesViewState extends State<CategoriesView> {
                 onTap: () {
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (context) => const TransactionView()),
+                    MaterialPageRoute(
+                        builder: (context) => const TransactionView()),
                   );
                 },
               ),
@@ -378,7 +474,8 @@ class _CategoriesViewState extends State<CategoriesView> {
                 onTap: () {
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (context) => const ProfileView()),
+                    MaterialPageRoute(
+                        builder: (context) => const ProfileView()),
                   );
                 },
               ),
