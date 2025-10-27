@@ -229,8 +229,11 @@ class _ProfileViewState extends State<ProfileView> {
         children: [
           GestureDetector(
             onTap: () {
-              Navigator.pop(context);
-            },
+               Navigator.pushReplacement(  // ✅ Now explicitly goes to HomeView
+                 context,
+                 MaterialPageRoute(builder: (context) => const HomeView()),
+               );
+             },
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
