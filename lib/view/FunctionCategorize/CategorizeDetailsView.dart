@@ -3,7 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart'; 
 import './AddExpenseView.dart';
-import './AddIncomeView.dart'; // ✅ ADDED: Import AddIncomeView
+import './AddIncomeView.dart'; // ✅ Import VND version
+import './CurrencyFormatter.dart'; // ✅ Import currency formatter
 
 class CategoryDetailView extends StatefulWidget {
   final String categoryName;
@@ -25,19 +26,20 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  double totalBalance = 7783.00;
-  double totalExpenses = 1187.40;
-  
-  // ✅ ADDED: Variable to track if this is an income category
+  // ✅ UPDATED: Will be calculated from Firestore
+  double totalBalance = 0.0;
+  double categoryTotal = 0.0; // Total for this category
   bool isIncomeCategory = false;
+  bool isLoadingTotals = true;
 
   @override
   void initState() {
     super.initState();
     _checkCategoryType();
+    _calculateTotals(); // ✅ Calculate totals on init
   }
 
-  // ✅ ADDED: Check if this category is income or expense
+  // ✅ Check if this category is income or expense
   Future<void> _checkCategoryType() async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
@@ -65,6 +67,57 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
       }
     } catch (e) {
       print('Error checking category type: $e');
+    }
+  }
+
+  // ✅ NEW: Calculate totals from Firestore
+  Future<void> _calculateTotals() async {
+    setState(() => isLoadingTotals = true);
+
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      setState(() => isLoadingTotals = false);
+      return;
+    }
+
+    try {
+      // Get all transactions
+      final allSnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('expenses')
+          .get();
+
+      double income = 0.0;
+      double expenses = 0.0;
+      double categoryAmount = 0.0;
+
+      for (var doc in allSnapshot.docs) {
+        final data = doc.data();
+        final amount = (data['amount'] ?? 0).toDouble();
+        final type = data['type'] ?? 'expense';
+        final category = data['category'] ?? '';
+
+        if (type == 'income') {
+          income += amount;
+        } else {
+          expenses += amount;
+        }
+
+        // Calculate this category's total
+        if (category == widget.categoryName) {
+          categoryAmount += amount;
+        }
+      }
+
+      setState(() {
+        totalBalance = income - expenses;
+        categoryTotal = categoryAmount;
+        isLoadingTotals = false;
+      });
+    } catch (e) {
+      print('Error calculating totals: $e');
+      setState(() => isLoadingTotals = false);
     }
   }
 
@@ -124,8 +177,11 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                           ],
                         ),
                         const SizedBox(height: 4),
+                        // ✅ UPDATED: Show in VND
                         Text(
-                          '\$${totalBalance.toStringAsFixed(2)}',
+                          isLoadingTotals 
+                              ? 'Loading...' 
+                              : CurrencyFormatter.formatVND(totalBalance),
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -139,7 +195,6 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                       children: [
                         Row(
                           children: [
-                            // ✅ FIXED: Show different icon for income vs expense
                             Icon(
                               isIncomeCategory 
                                   ? Icons.trending_up 
@@ -149,7 +204,6 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              // ✅ FIXED: Show different label for income vs expense
                               isIncomeCategory ? 'Total Income' : 'Total Expenses',
                               style: const TextStyle(
                                 fontSize: 12,
@@ -159,9 +213,14 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                           ],
                         ),
                         const SizedBox(height: 4),
+                        // ✅ UPDATED: Show in VND with sign
                         Text(
-                          // ✅ FIXED: Show + for income, - for expense
-                          '${isIncomeCategory ? '+' : '-'}\$${totalExpenses.toStringAsFixed(2)}',
+                          isLoadingTotals
+                              ? 'Loading...'
+                              : CurrencyFormatter.formatVNDWithSign(
+                                  categoryTotal, 
+                                  isIncomeCategory
+                                ),
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -211,9 +270,10 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Text(
-                        '\$20,000.00',
-                        style: TextStyle(
+                      // ✅ UPDATED: Show in VND
+                      Text(
+                        CurrencyFormatter.formatVND(20000000),
+                        style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -224,7 +284,6 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  // ✅ FIXED: Show different message for income vs expense
                   isIncomeCategory 
                       ? '30% Of Your Income, Looks Good'
                       : '30% Of Your Expenses, Looks Good',
@@ -265,7 +324,6 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                             color: Colors.grey[400],
                           ),
                           const SizedBox(height: 16),
-                          // ✅ FIXED: Show appropriate message for income vs expense
                           Text(
                             isIncomeCategory 
                                 ? 'No income in ${widget.categoryName}'
@@ -276,7 +334,6 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          // ✅ FIXED: Show appropriate message for income vs expense
                           Text(
                             isIncomeCategory 
                                 ? 'Add your first income below'
@@ -317,8 +374,12 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showAddDialog(); // ✅ UPDATED: Use new method name
+        onPressed: () async {
+          // ✅ UPDATED: Wait for result and refresh
+          final result = await _showAddDialog();
+          if (result == true) {
+            _calculateTotals(); // ✅ Refresh totals after adding
+          }
         },
         backgroundColor: widget.categoryColor,
         child: const Icon(Icons.add, color: Colors.white),
@@ -401,9 +462,9 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
               ],
             ),
           ),
-          // ✅ FIXED: Show + for income, - for expense
+          // ✅ UPDATED: Show in VND with sign
           Text(
-            '${isIncomeCategory ? '+' : '-'}\$${amount.toStringAsFixed(2)}',
+            CurrencyFormatter.formatVNDWithSign(amount, isIncomeCategory),
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -430,11 +491,11 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
         .snapshots();
   }
 
-  // ✅ UPDATED: New method that opens the correct view based on category type
-  void _showAddDialog() {
+  // ✅ UPDATED: Returns Future<bool?> to check if something was added
+  Future<bool?> _showAddDialog() async {
     if (isIncomeCategory) {
       // Open AddIncomeView for income categories
-      Navigator.push(
+      return await Navigator.push<bool>(
         context,
         MaterialPageRoute(
           builder: (context) => AddIncomeView(
@@ -446,7 +507,7 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
       );
     } else {
       // Open AddExpenseView for expense categories
-      Navigator.push(
+      return await Navigator.push<bool>(
         context,
         MaterialPageRoute(
           builder: (context) => AddExpenseView(

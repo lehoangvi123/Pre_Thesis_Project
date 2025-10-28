@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import './CurrencyFormatter.dart';
 
 class AddIncomeView extends StatefulWidget {
   final String categoryName;
@@ -65,11 +67,13 @@ class _AddIncomeViewState extends State<AddIncomeView> {
   }
 
   Future<void> _saveIncome() async {
-    if (_amountController.text.isEmpty || _titleController.text.isEmpty) {
+    // Validate input
+    if (_amountController.text.trim().isEmpty || _titleController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please fill in amount and title'),
           backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
         ),
       );
       return;
@@ -79,17 +83,36 @@ class _AddIncomeViewState extends State<AddIncomeView> {
 
     try {
       final userId = _auth.currentUser?.uid;
-      if (userId == null) throw Exception('User not authenticated');
-
-      final amount = double.tryParse(_amountController.text);
-      if (amount == null || amount <= 0) {
-        throw Exception('Invalid amount');
+      if (userId == null) {
+        throw Exception('User not authenticated');
       }
 
+      // ✅ FIXED: Parse VND amount (removes commas and dots)
+      final amountText = _amountController.text.trim();
+      
+      // Remove all non-numeric characters (commas, dots, spaces, ₫)
+      final cleanedAmount = amountText.replaceAll(RegExp(r'[^\d]'), '');
+      
+      print('Original amount: $amountText'); // Debug
+      print('Cleaned amount: $cleanedAmount'); // Debug
+      
+      if (cleanedAmount.isEmpty) {
+        throw Exception('Please enter a valid amount');
+      }
+      
+      final amount = double.tryParse(cleanedAmount);
+      
+      print('Parsed amount: $amount'); // Debug
+      
+      if (amount == null || amount <= 0) {
+        throw Exception('Please enter a valid amount greater than 0');
+      }
+
+      // ✅ Save to Firestore
       await _firestore
           .collection('users')
           .doc(userId)
-          .collection('expenses') // Note: Using same collection for both income and expenses
+          .collection('expenses')
           .add({
         'title': _titleController.text.trim(),
         'amount': amount,
@@ -101,20 +124,27 @@ class _AddIncomeViewState extends State<AddIncomeView> {
       });
 
       if (mounted) {
+        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Income added to ${widget.categoryName}!'),
+            content: Text('Income ${CurrencyFormatter.formatVND(amount)} added to ${widget.categoryName}!'),
             backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
           ),
         );
-        Navigator.pop(context);
+        
+        // Return true to indicate success
+        Navigator.pop(context, true);
       }
     } catch (e) {
+      print('Error saving income: $e'); // Debug
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to add income: $e'),
+            content: Text('Failed to add income: ${e.toString()}'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -282,7 +312,7 @@ class _AddIncomeViewState extends State<AddIncomeView> {
 
                     const SizedBox(height: 20),
 
-                    // Amount Field
+                    // Amount Field - WITH VND FORMATTING
                     Text(
                       'Amount',
                       style: TextStyle(
@@ -295,14 +325,25 @@ class _AddIncomeViewState extends State<AddIncomeView> {
                     TextField(
                       controller: _amountController,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        VNDInputFormatter(), // Auto-format with commas
+                      ],
                       style: TextStyle(
-                        fontSize: 15,
-                        color: isDark ? Colors.white : Colors.black,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: widget.categoryColor,
                       ),
                       decoration: InputDecoration(
-                        hintText: '\$0.00',
+                        hintText: '0',
                         hintStyle: TextStyle(
                           color: isDark ? Colors.grey[600] : Colors.grey[400],
+                        ),
+                        suffixText: '₫', // VND symbol
+                        suffixStyle: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: widget.categoryColor,
                         ),
                         filled: true,
                         fillColor: isDark ? const Color(0xFF3C3C3C) : const Color(0xFFF5F5F5),

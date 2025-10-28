@@ -54,7 +54,7 @@ class _CategoriesViewState extends State<CategoriesView> {
               children: [
                 _buildHeader(),
                 const SizedBox(height: 28),
-                _buildBalanceCard(),
+                _buildBalanceCards(),
                 const SizedBox(height: 32),
                 
                 // Expense Categories Section
@@ -151,11 +151,116 @@ class _CategoriesViewState extends State<CategoriesView> {
     );
   }
 
-  Widget _buildBalanceCard() {
+// Replace your _buildBalanceCard() method with these two methods:
+
+  // ✅ NEW: Build three cards showing Balance, Income, and Expenses
+  Widget _buildBalanceCards() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    return Column(
+      children: [
+        // Row 1: Balance and Income
+        Row(
+          children: [
+            // Total Balance Card
+            Expanded(
+              child: _buildInfoCard(
+                title: 'Total Balance',
+                amount: '\$7,783.00',
+                icon: Icons.account_balance_wallet_rounded,
+                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Total Income Card
+            Expanded(
+              child: _buildInfoCard(
+                title: 'Total Income',
+                amount: '+\$2,500.00',
+                icon: Icons.trending_up_rounded,
+                color: const Color(0xFF4CAF50), // Green for income
+                isDark: isDark,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Row 2: Expenses (full width)
+        _buildInfoCard(
+          title: 'Total Expenses',
+          amount: '-\$1,187.40',
+          icon: Icons.trending_down_rounded,
+          color: const Color(0xFF2196F3), // Blue for expenses
+          isDark: isDark,
+          isFullWidth: true,
+        ),
+        const SizedBox(height: 16),
+        // Progress bar
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: isDark 
+                ? Colors.green.withOpacity(0.12) 
+                : Colors.green.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: Colors.green.withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.green[600],
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '30% Of Your Expenses, Looks Good',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.grey[300] : Colors.grey[800],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                '\$20,000.00',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ✅ NEW: Helper method to build individual info cards
+  Widget _buildInfoCard({
+    required String title,
+    required String amount,
+    required IconData icon,
+    required Color color,
+    required bool isDark,
+    bool isFullWidth = false,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isDark
@@ -164,143 +269,46 @@ class _CategoriesViewState extends State<CategoriesView> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.account_balance_wallet_rounded,
-                          size: 18,
-                          color: isDark ? Colors.grey[400] : Colors.grey[600],
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Total Balance',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: isDark ? Colors.grey[400] : Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      '\$7,783.00',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-                        letterSpacing: -1,
-                      ),
-                    ),
-                  ],
-                ),
+              Icon(
+                icon,
+                size: 16,
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 6),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Icon(
-                          Icons.trending_down_rounded,
-                          size: 18,
-                          color: isDark ? Colors.grey[400] : Colors.grey[600],
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Total Expenses',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: isDark ? Colors.grey[400] : Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      '-\$1,187.40',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF2196F3),
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: isDark 
-                  ? Colors.green.withOpacity(0.12) 
-                  : Colors.green.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: Colors.green.withOpacity(0.2),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.check_circle_rounded,
-                    color: Colors.green[600],
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '30% Of Your Expenses, Looks Good',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDark ? Colors.grey[300] : Colors.grey[800],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  '\$20,000.00',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-                  ),
-                ),
-              ],
+          const SizedBox(height: 12),
+          Text(
+            amount,
+            style: TextStyle(
+              fontSize: isFullWidth ? 28 : 24,
+              fontWeight: FontWeight.bold,
+              color: color,
+              letterSpacing: -0.5,
             ),
           ),
         ],
