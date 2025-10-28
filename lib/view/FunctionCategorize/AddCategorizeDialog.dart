@@ -96,14 +96,11 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
       if (userId == null) throw Exception('User not authenticated');
 
       // Save category to Firestore
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('categories')
-          .add({
+     await _firestore.collection('users').doc(userId).collection('categories').add({
         'name': _nameController.text.trim(),
         'icon': _selectedIcon.codePoint,
         'color': _selectedColor.value,
+        'type': 'expense',  // ✅ ADD THIS LINE
         'createdAt': FieldValue.serverTimestamp(),
       });
 
