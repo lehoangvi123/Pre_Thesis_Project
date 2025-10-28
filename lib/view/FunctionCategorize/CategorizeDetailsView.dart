@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart'; 
 import './AddExpenseView.dart';
+import './AddIncomeView.dart'; // ✅ ADDED: Import AddIncomeView
 
 class CategoryDetailView extends StatefulWidget {
   final String categoryName;
@@ -26,6 +27,46 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
 
   double totalBalance = 7783.00;
   double totalExpenses = 1187.40;
+  
+  // ✅ ADDED: Variable to track if this is an income category
+  bool isIncomeCategory = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkCategoryType();
+  }
+
+  // ✅ ADDED: Check if this category is income or expense
+  Future<void> _checkCategoryType() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      final categoryDoc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('categories')
+          .where('name', isEqualTo: widget.categoryName)
+          .limit(1)
+          .get();
+
+      if (categoryDoc.docs.isNotEmpty) {
+        final data = categoryDoc.docs.first.data();
+        setState(() {
+          isIncomeCategory = data['type'] == 'income';
+        });
+      } else {
+        // Check if it's one of the default income categories
+        final incomeCategories = ['Salary', 'Freelance', 'Investment'];
+        setState(() {
+          isIncomeCategory = incomeCategories.contains(widget.categoryName);
+        });
+      }
+    } catch (e) {
+      print('Error checking category type: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,13 +138,20 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Row(
-                          children: const [
-                            Icon(Icons.trending_down,
-                                size: 14, color: Colors.white70),
-                            SizedBox(width: 4),
+                          children: [
+                            // ✅ FIXED: Show different icon for income vs expense
+                            Icon(
+                              isIncomeCategory 
+                                  ? Icons.trending_up 
+                                  : Icons.trending_down,
+                              size: 14, 
+                              color: Colors.white70
+                            ),
+                            const SizedBox(width: 4),
                             Text(
-                              'Total Expenses',
-                              style: TextStyle(
+                              // ✅ FIXED: Show different label for income vs expense
+                              isIncomeCategory ? 'Total Income' : 'Total Expenses',
+                              style: const TextStyle(
                                 fontSize: 12,
                                 color: Colors.white70,
                               ),
@@ -112,7 +160,8 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '-\$${totalExpenses.toStringAsFixed(2)}',
+                          // ✅ FIXED: Show + for income, - for expense
+                          '${isIncomeCategory ? '+' : '-'}\$${totalExpenses.toStringAsFixed(2)}',
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -175,7 +224,10 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '30% Of Your Expenses, Looks Good',
+                  // ✅ FIXED: Show different message for income vs expense
+                  isIncomeCategory 
+                      ? '30% Of Your Income, Looks Good'
+                      : '30% Of Your Expenses, Looks Good',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.white.withOpacity(0.8),
@@ -185,7 +237,7 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
             ),
           ),
 
-          // Expenses List Section
+          // Expenses/Income List Section
           Expanded(
             child: Container(
               decoration: BoxDecoration(
@@ -213,16 +265,22 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                             color: Colors.grey[400],
                           ),
                           const SizedBox(height: 16),
+                          // ✅ FIXED: Show appropriate message for income vs expense
                           Text(
-                            'No expenses in ${widget.categoryName}',
+                            isIncomeCategory 
+                                ? 'No income in ${widget.categoryName}'
+                                : 'No expenses in ${widget.categoryName}',
                             style: TextStyle(
                               fontSize: 16,
                               color: Colors.grey[600],
                             ),
                           ),
                           const SizedBox(height: 8),
+                          // ✅ FIXED: Show appropriate message for income vs expense
                           Text(
-                            'Add your first expense below',
+                            isIncomeCategory 
+                                ? 'Add your first income below'
+                                : 'Add your first expense below',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[500],
@@ -260,7 +318,7 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          _showAddExpenseDialog();
+          _showAddDialog(); // ✅ UPDATED: Use new method name
         },
         backgroundColor: widget.categoryColor,
         child: const Icon(Icons.add, color: Colors.white),
@@ -343,8 +401,9 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
               ],
             ),
           ),
+          // ✅ FIXED: Show + for income, - for expense
           Text(
-            '-\$${amount.toStringAsFixed(2)}',
+            '${isIncomeCategory ? '+' : '-'}\$${amount.toStringAsFixed(2)}',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -371,16 +430,32 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
         .snapshots();
   }
 
-  void _showAddExpenseDialog() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddExpenseView(
-          categoryName: widget.categoryName,
-          categoryIcon: widget.categoryIcon,
-          categoryColor: widget.categoryColor,
+  // ✅ UPDATED: New method that opens the correct view based on category type
+  void _showAddDialog() {
+    if (isIncomeCategory) {
+      // Open AddIncomeView for income categories
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AddIncomeView(
+            categoryName: widget.categoryName,
+            categoryIcon: widget.categoryIcon,
+            categoryColor: widget.categoryColor,
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      // Open AddExpenseView for expense categories
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AddExpenseView(
+            categoryName: widget.categoryName,
+            categoryIcon: widget.categoryIcon,
+            categoryColor: widget.categoryColor,
+          ),
+        ),
+      );
+    }
   }
 }

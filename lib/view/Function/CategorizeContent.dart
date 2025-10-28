@@ -59,7 +59,7 @@ class _CategoriesViewState extends State<CategoriesView> {
                 
                 // Expense Categories Section
                 _buildCategoriesSection(
-                  title: 'Your Categories',
+                  title: 'Expense',
                   categories: _defaultExpenseCategories,
                   categoryType: 'expense',
                 ),
@@ -771,72 +771,75 @@ class _CategoriesViewState extends State<CategoriesView> {
 
   // Just replace the _buildMoreButton method in your CategoriesView.dart with this:
 
-  Widget _buildMoreButton(String categoryType) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = categoryType == 'income' 
-        ? const Color(0xFF4CAF50) 
-        : const Color(0xFF90CAF9);
+  
+Widget _buildMoreButton(String categoryType) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final color = categoryType == 'income' 
+      ? const Color(0xFF4CAF50) 
+      : const Color(0xFF90CAF9);
 
-    return GestureDetector(
-      onTap: () async {
-        // TEMPORARY: Using existing dialog without categoryType
-        final result = await showDialog<bool>(
-          context: context,
-          builder: (context) => const AddCategoryDialog(),
-        );
+  return GestureDetector(
+    onTap: () async {
+      // ✅ FIXED: Pass categoryType to dialog
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => AddCategoryDialog(
+          categoryType: categoryType, // ✅ This is the fix!
+        ),
+      );
 
-        if (result == true) {
-          setState(() {});
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark 
-              ? color.withOpacity(0.12) 
-              : color.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: color.withOpacity(isDark ? 0.35 : 0.25),
-            width: 2,
-            style: BorderStyle.solid,
+      if (result == true) {
+        setState(() {});
+      }
+    },
+    child: Container(
+      decoration: BoxDecoration(
+        color: isDark 
+            ? color.withOpacity(0.12) 
+            : color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: color.withOpacity(isDark ? 0.35 : 0.25),
+          width: 2,
+          style: BorderStyle.solid,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.15),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                Icons.add_rounded,
-                size: 32,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Add New',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.grey[200] : Colors.grey[800],
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
-    );
-  }
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              Icons.add_rounded,
+              size: 32,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Add New',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.grey[200] : Colors.grey[800],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   Widget _buildBottomNavBar() {
     final isDark = Theme.of(context).brightness == Brightness.dark;

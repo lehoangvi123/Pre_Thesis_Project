@@ -3,7 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AddCategoryDialog extends StatefulWidget {
-  const AddCategoryDialog({Key? key}) : super(key: key);
+  final String categoryType; // ✅ ADDED: Parameter to know if income or expense
+  
+  const AddCategoryDialog({
+    Key? key,
+    required this.categoryType, // ✅ ADDED: Required parameter
+  }) : super(key: key);
 
   @override
   State<AddCategoryDialog> createState() => _AddCategoryDialogState();
@@ -17,6 +22,15 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
   IconData _selectedIcon = Icons.category;
   Color _selectedColor = const Color(0xFF00CED1);
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ ADDED: Set default color based on category type
+    if (widget.categoryType == 'income') {
+      _selectedColor = const Color(0xFF4CAF50); // Green for income
+    }
+  }
 
   // Available icons to choose from
   final List<IconData> _availableIcons = [
@@ -70,6 +84,8 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
     const Color(0xFF4DB6AC), // Teal
     const Color(0xFF9575CD), // Deep Purple
     const Color(0xFFFF8A65), // Deep Orange
+    const Color(0xFF4CAF50), // Green for income
+    const Color(0xFF66BB6A), // Light green for income
   ];
 
   @override
@@ -95,19 +111,19 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
       final userId = _auth.currentUser?.uid;
       if (userId == null) throw Exception('User not authenticated');
 
-      // Save category to Firestore
-     await _firestore.collection('users').doc(userId).collection('categories').add({
+      // ✅ FIXED: Save category with the correct type
+      await _firestore.collection('users').doc(userId).collection('categories').add({
         'name': _nameController.text.trim(),
         'icon': _selectedIcon.codePoint,
         'color': _selectedColor.value,
-        'type': 'expense',  // ✅ ADD THIS LINE
+        'type': widget.categoryType, // ✅ FIXED: Use the passed categoryType
         'createdAt': FieldValue.serverTimestamp(),
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Category "${_nameController.text}" added!'),
+            content: Text('${widget.categoryType == 'income' ? 'Income' : 'Expense'} category "${_nameController.text}" added!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -250,8 +266,8 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
               ),
               const SizedBox(height: 20),
               Wrap(
-                spacing: 16,
-                runSpacing: 16,
+                spacing: 12,
+                runSpacing: 12,
                 children: _availableColors.map((color) {
                   final isSelected = _selectedColor == color;
                   return GestureDetector(
@@ -268,14 +284,23 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
                         color: color,
                         shape: BoxShape.circle,
                         border: isSelected
-                            ? Border.all(color: Colors.black, width: 3)
+                            ? Border.all(color: Colors.white, width: 3)
+                            : null,
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: color.withOpacity(0.5),
+                                  blurRadius: 8,
+                                  spreadRadius: 2,
+                                ),
+                              ]
                             : null,
                       ),
                       child: isSelected
                           ? const Icon(
                               Icons.check,
                               color: Colors.white,
-                              size: 28,
+                              size: 24,
                             )
                           : null,
                     ),
@@ -295,17 +320,18 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Dialog(
-      backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
       ),
+      backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // ✅ UPDATED: Show different title based on type
             Text(
-              'Add New Category',
+              'Add ${widget.categoryType == 'income' ? 'Income' : 'Expense'} Category',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -329,7 +355,9 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
                   color: isDark ? Colors.grey[400] : Colors.grey[600],
                   fontSize: 14,
                 ),
-                hintText: 'e.g., Shopping, Gym, Coffee',
+                hintText: widget.categoryType == 'income'
+                    ? 'e.g., Bonus, Rental Income'
+                    : 'e.g., Shopping, Gym, Coffee',
                 hintStyle: TextStyle(
                   color: isDark ? Colors.grey[600] : Colors.grey[400],
                   fontSize: 14,
