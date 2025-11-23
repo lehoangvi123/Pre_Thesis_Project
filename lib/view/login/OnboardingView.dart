@@ -35,7 +35,7 @@ class _OnboardingViewState extends State<OnboardingView> {
           
           // Nút Get Started - Positioned chính xác
           Positioned(
-            bottom: 80, // Khoảng cách từ đáy màn hình
+            bottom: 60, // Khoảng cách từ đáy màn hình
             left: 30,    // Khoảng cách từ bên trái
             right: 30,   // Khoảng cách từ bên phải
             child: ElevatedButton(
@@ -68,7 +68,7 @@ class _OnboardingViewState extends State<OnboardingView> {
           
           // Text "Already Have Account? Log in" - Clickable
           Positioned(
-            bottom: 40, // Khoảng cách từ đáy
+            bottom: 30, // Khoảng cách từ đáy
             left: 0,
             right: 0,
             child: Row(

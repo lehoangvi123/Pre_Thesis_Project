@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import '../Function/HomeView.dart';
-import '../sign-up/SignUpView.dart'; 
-
+import '../sign-up/SignUpView.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -14,6 +15,7 @@ class LoginView extends StatefulWidget {
 class _LoginViewState extends State<LoginView> {
   final _formKey = GlobalKey<FormState>();
   final _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -34,9 +36,10 @@ class _LoginViewState extends State<LoginView> {
     super.dispose();
   }
 
+  // Email/Password Login
   Future<void> _login() async {
     print('🔵 _login() called');
-    
+
     if (!_formKey.currentState!.validate()) {
       print('❌ Form validation failed');
       return;
@@ -48,7 +51,7 @@ class _LoginViewState extends State<LoginView> {
 
     try {
       print('🔵 Attempting login with: ${_emailController.text}');
-      
+
       await _auth.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
@@ -57,14 +60,7 @@ class _LoginViewState extends State<LoginView> {
       print('✅ Login successful!');
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Đăng nhập thành công!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
-        // Navigate to HomeView
+        _showSuccessSnackBar('Đăng nhập thành công!');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const HomeView()),
@@ -72,10 +68,10 @@ class _LoginViewState extends State<LoginView> {
       }
     } on FirebaseAuthException catch (e) {
       print('❌ FirebaseAuth error: ${e.code}');
-      
+
       String errorMessage = '';
       switch (e.code) {
-        case 'user-not-found': 
+        case 'user-not-found':
           errorMessage = 'Email không tồn tại. Vui lòng đăng ký trước.';
           break;
         case 'wrong-password':
@@ -104,11 +100,114 @@ class _LoginViewState extends State<LoginView> {
     }
   }
 
+  // Google Sign-In
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      print('🔵 Starting Google Sign-In...');
+
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        print('❌ Google Sign-In cancelled');
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      print('🔵 Google user: ${googleUser.email}');
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      await _auth.signInWithCredential(credential);
+
+      print('✅ Google Sign-In successful!');
+
+      if (mounted) {
+        _showSuccessSnackBar('Đăng nhập Google thành công!');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeView()),
+        );
+      }
+    } catch (e) {
+      print('❌ Google Sign-In error: $e');
+      _showErrorDialog('Lỗi đăng nhập Google: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  // Facebook Sign-In
+  Future<void> _signInWithFacebook() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      print('🔵 Starting Facebook Sign-In...');
+
+      final LoginResult result = await FacebookAuth.instance.login();
+
+      if (result.status == LoginStatus.success) {
+        print('🔵 Facebook login success');
+
+        // ✅ FIX: Dùng .token thay vì .tokenString
+        final OAuthCredential credential =
+            FacebookAuthProvider.credential(result.accessToken!.token);
+
+        await _auth.signInWithCredential(credential);
+
+        print('✅ Facebook Sign-In successful!');
+
+        if (mounted) {
+          _showSuccessSnackBar('Đăng nhập Facebook thành công!');
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeView()),
+          );
+        }
+      } else if (result.status == LoginStatus.cancelled) {
+        print('❌ Facebook Sign-In cancelled');
+        _showErrorDialog('Đăng nhập Facebook đã bị hủy');
+      } else {
+        print('❌ Facebook Sign-In failed');
+        _showErrorDialog('Đăng nhập Facebook thất bại');
+      }
+    } catch (e) {
+      print('❌ Facebook Sign-In error: $e');
+      _showErrorDialog('Facebook đang cập nhật tính năng mới. Xin các bạn đăng nhập bằng google!');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Lỗi đăng nhập'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text('Tính năng đang cập nhật'),
         content: Text(message),
         actions: [
           TextButton(
@@ -120,10 +219,20 @@ class _LoginViewState extends State<LoginView> {
     );
   }
 
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     print('🎨 LoginView building...');
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -217,19 +326,7 @@ class _LoginViewState extends State<LoginView> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 12),
-
-                // Forgot Password (Optional - Comment out nếu chưa có)
-                // Align(
-                //   alignment: Alignment.centerRight,
-                //   child: TextButton(
-                //     onPressed: () {
-                //       print('Forgot password clicked');
-                //     },
-                //     child: const Text('Forgot Password?'),
-                //   ),
-                // ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
                 // Login Button
                 SizedBox(
@@ -261,6 +358,103 @@ class _LoginViewState extends State<LoginView> {
                             ),
                           ),
                   ),
+                ),
+                const SizedBox(height: 32),
+
+                // Divider "Or continue with"
+                Row(
+                  children: [
+                    Expanded(
+                      child: Divider(
+                        color: Colors.grey[400],
+                        thickness: 1,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Or continue with',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Divider(
+                        color: Colors.grey[400],
+                        thickness: 1,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+
+                // Social Login Buttons
+                Row(
+                  children: [
+                    // Google Button
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isLoading ? null : _signInWithGoogle,
+                        icon: Image.asset(
+                          'assets/images/google_icon.png',
+                          height: 24,
+                          width: 24,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(
+                              Icons.g_mobiledata,
+                              color: Color(0xFFDB4437),
+                              size: 28,
+                            );
+                          },
+                        ),
+                        label: const Text(
+                          'Google',
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(color: Colors.grey[300]!),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+
+                    // Facebook Button
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isLoading ? null : _signInWithFacebook,
+                        icon: const Icon(
+                          Icons.facebook,
+                          color: Color(0xFF1877F2),
+                          size: 24,
+                        ),
+                        label: const Text(
+                          'Facebook',
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(color: Colors.grey[300]!),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 24),
 
