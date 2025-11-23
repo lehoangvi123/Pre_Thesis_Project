@@ -36,6 +36,6 @@ flutter:
 
   assets:
     - assets/   
-    - assets/fonts/
+    # - assets/fonts/
     - assets/images/
     - assets/images/Intro_screen-login/
