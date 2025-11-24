@@ -190,7 +190,7 @@ class _LoginViewState extends State<LoginView> {
       }
     } catch (e) {
       print('❌ Facebook Sign-In error: $e');
-      _showErrorDialog('Facebook đang cập nhật tính năng mới. Xin các bạn đăng nhập bằng google!');
+      _showErrorDialog('Lỗi đăng nhập Facebook: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -207,7 +207,7 @@ class _LoginViewState extends State<LoginView> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        title: const Text('Tính năng đang cập nhật'),
+        title: const Text('Lỗi đăng nhập'),
         content: Text(message),
         actions: [
           TextButton(

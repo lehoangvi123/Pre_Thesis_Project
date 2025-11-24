@@ -68,7 +68,7 @@ class _OnboardingViewState extends State<OnboardingView> {
           
           // Text "Already Have Account? Log in" - Clickable
           Positioned(
-            bottom: 20, // Khoảng cách từ đáy
+            bottom: 30, // Khoảng cách từ đáy
             left: 0,
             right: 0,
             child: Row(
