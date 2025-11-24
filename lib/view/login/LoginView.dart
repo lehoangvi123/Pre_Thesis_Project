@@ -36,38 +36,68 @@ class _LoginViewState extends State<LoginView> {
     super.dispose();
   }
 
-  // Email/Password Login
+  // Email/Password Login với Full Debug
   Future<void> _login() async {
-    print('🔵 _login() called');
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    print('🔵 [STEP 1] LOGIN BUTTON PRESSED');
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
+    // Validate form
     if (!_formKey.currentState!.validate()) {
-      print('❌ Form validation failed');
+      print('❌ [STEP 2] Form validation FAILED');
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    print('✅ [STEP 2] Form validation PASSED');
+    print('📧 Email: ${_emailController.text}');
+    print('🔑 Password length: ${_passwordController.text.length}');
+
+    // Set loading state
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+      print('⏳ [STEP 3] isLoading = true (spinner showing)');
+    }
 
     try {
-      print('🔵 Attempting login with: ${_emailController.text}');
+      print('🔵 [STEP 4] Calling Firebase.signInWithEmailAndPassword()...');
+      print('   - Email: ${_emailController.text.trim()}');
+      print('   - Waiting for Firebase response...');
 
-      await _auth.signInWithEmailAndPassword(
+      final userCredential = await _auth.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          print('❌ Firebase request TIMEOUT (15 seconds)');
+          throw Exception('Login timeout - please check your internet connection');
+        },
       );
 
-      print('✅ Login successful!');
+      print('✅ [STEP 5] Firebase authentication SUCCESS!');
+      print('   - User ID: ${userCredential.user?.uid}');
+      print('   - User Email: ${userCredential.user?.email}');
 
       if (mounted) {
+        print('✅ [STEP 6] Widget still mounted - showing success message');
         _showSuccessSnackBar('Đăng nhập thành công!');
+        
+        print('🔵 [STEP 7] Navigating to HomeView...');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const HomeView()),
         );
+        print('✅ Navigation initiated');
+      } else {
+        print('⚠️ [STEP 6] Widget not mounted - skipping navigation');
       }
     } on FirebaseAuthException catch (e) {
-      print('❌ FirebaseAuth error: ${e.code}');
+      print('❌ [STEP 5] FirebaseAuthException caught!');
+      print('   - Error Code: ${e.code}');
+      print('   - Error Message: ${e.message}');
+      print('   - Plugin: ${e.plugin}');
 
       String errorMessage = '';
       switch (e.code) {
@@ -83,28 +113,50 @@ class _LoginViewState extends State<LoginView> {
         case 'invalid-credential':
           errorMessage = 'Email hoặc mật khẩu không đúng.';
           break;
+        case 'network-request-failed':
+          errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra internet và thử lại.';
+          break;
+        case 'too-many-requests':
+          errorMessage = 'Quá nhiều lần thử. Vui lòng đợi và thử lại sau.';
+          break;
         default:
           errorMessage = 'Lỗi: ${e.message}';
       }
 
+      print('📱 Showing error dialog: $errorMessage');
       _showErrorDialog(errorMessage);
-    } catch (e) {
-      print('❌ Unknown error: $e');
+    } catch (e, stackTrace) {
+      print('❌ [STEP 5] Unknown Exception caught!');
+      print('   - Exception: $e');
+      print('   - Type: ${e.runtimeType}');
+      print('   - Stack trace:');
+      print(stackTrace);
+      
       _showErrorDialog('Lỗi không xác định: $e');
     } finally {
+      print('🔄 [STEP 8] Finally block - cleaning up');
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
+        print('✅ isLoading = false (spinner hidden)');
+      } else {
+        print('⚠️ Widget not mounted - skipping setState');
       }
+      
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('🏁 LOGIN FUNCTION COMPLETED');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
   }
 
   // Google Sign-In
   Future<void> _signInWithGoogle() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       print('🔵 Starting Google Sign-In...');
@@ -112,10 +164,12 @@ class _LoginViewState extends State<LoginView> {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (googleUser == null) {
-        print('❌ Google Sign-In cancelled');
-        setState(() {
-          _isLoading = false;
-        });
+        print('❌ Google Sign-In cancelled by user');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
         return;
       }
 
@@ -154,9 +208,11 @@ class _LoginViewState extends State<LoginView> {
 
   // Facebook Sign-In
   Future<void> _signInWithFacebook() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       print('🔵 Starting Facebook Sign-In...');
@@ -166,7 +222,6 @@ class _LoginViewState extends State<LoginView> {
       if (result.status == LoginStatus.success) {
         print('🔵 Facebook login success');
 
-        // ✅ FIX: Dùng .token thay vì .tokenString
         final OAuthCredential credential =
             FacebookAuthProvider.credential(result.accessToken!.token);
 
@@ -333,9 +388,15 @@ class _LoginViewState extends State<LoginView> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _login,
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            print('🔘 LOGIN BUTTON TAPPED');
+                            _login();
+                          },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
+                      disabledBackgroundColor: Colors.blue.withOpacity(0.6),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -361,7 +422,7 @@ class _LoginViewState extends State<LoginView> {
                 ),
                 const SizedBox(height: 32),
 
-                // Divider "Or continue with"
+                // Divider
                 Row(
                   children: [
                     Expanded(
