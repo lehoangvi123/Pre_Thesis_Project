@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:project1/view/login/LoginView.dart';
+import './LoginView.dart';
 import '../sign-up/SignUpView.dart'; // ← Thêm dòng này
 
 

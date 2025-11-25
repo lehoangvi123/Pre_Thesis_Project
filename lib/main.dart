@@ -8,15 +8,22 @@ import 'package:project1/view/Function/HomeView.dart';
 import './view/ThemeProvider/ThemeProviderDark.dart';
 import './view/Function/Language/MultiLanguage.dart';
 
-void main() async {
+void main() async { 
+  // Đảm bảo Flutter engine đã khởi tạo
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Khởi tạo Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  
+  // Load language (nếu cần)
   await AppLocalizations.loadLanguage();
+  
+  // Chạy app
   runApp(
     ChangeNotifierProvider(
-      create: (context) => ThemeProvider(),
+      create: (_) => ThemeProvider(),
       child: const MyApp(),
     ),
   );
