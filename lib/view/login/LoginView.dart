@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart'; 
-import 'package:shared_preferences/shared_preferences.dart'; 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../sign-up/SignUpView.dart'; 
-import './ForgotPasswordView.dart'; 
-import '../Function/HomeView.dart';  
-import '../FunctionProfileView/SecurityPart/ManageDevicesView.dart';
-import '../FunctionProfileView/SecurityPart/LoginHistoryView.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import '../Function/HomeView.dart';
+import '../sign-up/SignUpView.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -21,12 +16,18 @@ class _LoginViewState extends State<LoginView> {
   final _formKey = GlobalKey<FormState>();
   final _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
-  
+
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    print('✅ LoginView initialized');
+  }
 
   @override
   void dispose() {
@@ -35,41 +36,70 @@ class _LoginViewState extends State<LoginView> {
     super.dispose();
   }
 
+  // Email/Password Login với Full Debug
   Future<void> _login() async {
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    print('🔵 [STEP 1] LOGIN BUTTON PRESSED');
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    // Validate form
     if (!_formKey.currentState!.validate()) {
+      print('❌ [STEP 2] Form validation FAILED');
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    print('✅ [STEP 2] Form validation PASSED');
+    print('📧 Email: ${_emailController.text}');
+    print('🔑 Password length: ${_passwordController.text.length}');
+
+    // Set loading state
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+      print('⏳ [STEP 3] isLoading = true (spinner showing)');
+    }
 
     try {
-      await _auth.signInWithEmailAndPassword(
+      print('🔵 [STEP 4] Calling Firebase.signInWithEmailAndPassword()...');
+      print('   - Email: ${_emailController.text.trim()}');
+      print('   - Waiting for Firebase response...');
+
+      final userCredential = await _auth.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          print('❌ Firebase request TIMEOUT (15 seconds)');
+          throw Exception('Login timeout - please check your internet connection');
+        },
       );
 
-      // ✅ REGISTER DEVICE AFTER SUCCESSFUL LOGIN
-      await DeviceService.registerDevice();
-      
-      // ✅ LOG SUCCESSFUL LOGIN
-      await LoginHistoryService.logLoginAttempt(
-        isSuccessful: true,
-        loginMethod: 'email',
-      );
+      print('✅ [STEP 5] Firebase authentication SUCCESS!');
+      print('   - User ID: ${userCredential.user?.uid}');
+      print('   - User Email: ${userCredential.user?.email}');
 
       if (mounted) {
+        print('✅ [STEP 6] Widget still mounted - showing success message');
         _showSuccessSnackBar('Đăng nhập thành công!');
+        
+        print('🔵 [STEP 7] Navigating to HomeView...');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const HomeView()),
         );
+        print('✅ Navigation initiated');
+      } else {
+        print('⚠️ [STEP 6] Widget not mounted - skipping navigation');
       }
-
     } on FirebaseAuthException catch (e) {
+      print('❌ [STEP 5] FirebaseAuthException caught!');
+      print('   - Error Code: ${e.code}');
+      print('   - Error Message: ${e.message}');
+      print('   - Plugin: ${e.plugin}');
+
       String errorMessage = '';
-      
       switch (e.code) {
         case 'user-not-found':
           errorMessage = 'Email không tồn tại. Vui lòng đăng ký trước.';
@@ -80,102 +110,92 @@ class _LoginViewState extends State<LoginView> {
         case 'invalid-email':
           errorMessage = 'Email không hợp lệ.';
           break;
-        case 'user-disabled':
-          errorMessage = 'Tài khoản này đã bị vô hiệu hóa.';
-          break;
         case 'invalid-credential':
-          errorMessage = 'Email hoặc mật khẩu không đúng. Vui lòng thử lại.';
+          errorMessage = 'Email hoặc mật khẩu không đúng.';
+          break;
+        case 'network-request-failed':
+          errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra internet và thử lại.';
+          break;
+        case 'too-many-requests':
+          errorMessage = 'Quá nhiều lần thử. Vui lòng đợi và thử lại sau.';
           break;
         default:
-          errorMessage = 'Đã xảy ra lỗi: ${e.message}';
+          errorMessage = 'Lỗi: ${e.message}';
       }
-      
-      // ✅ LOG FAILED LOGIN
-      await LoginHistoryService.logLoginAttempt(
-        isSuccessful: false,
-        loginMethod: 'email',
-        failureReason: errorMessage,
-      );
-      
+
+      print('📱 Showing error dialog: $errorMessage');
       _showErrorDialog(errorMessage);
+    } catch (e, stackTrace) {
+      print('❌ [STEP 5] Unknown Exception caught!');
+      print('   - Exception: $e');
+      print('   - Type: ${e.runtimeType}');
+      print('   - Stack trace:');
+      print(stackTrace);
       
-    } catch (e) {
-      // ✅ LOG FAILED LOGIN FOR UNKNOWN ERRORS
-      await LoginHistoryService.logLoginAttempt(
-        isSuccessful: false,
-        loginMethod: 'email',
-        failureReason: 'Unknown error: $e',
-      );
-      
-      _showErrorDialog('Đã xảy ra lỗi không xác định: $e');
+      _showErrorDialog('Lỗi không xác định: $e');
     } finally {
+      print('🔄 [STEP 8] Finally block - cleaning up');
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
+        print('✅ isLoading = false (spinner hidden)');
+      } else {
+        print('⚠️ Widget not mounted - skipping setState');
       }
+      
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('🏁 LOGIN FUNCTION COMPLETED');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
   }
 
+  // Google Sign-In
   Future<void> _signInWithGoogle() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
+      print('🔵 Starting Google Sign-In...');
+
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      
+
       if (googleUser == null) {
-        // User cancelled the login
-        setState(() {
-          _isLoading = false;
-        });
-        
-        // ✅ LOG CANCELLED LOGIN
-        await LoginHistoryService.logLoginAttempt(
-          isSuccessful: false,
-          loginMethod: 'google',
-          failureReason: 'Login cancelled by user',
-        );
+        print('❌ Google Sign-In cancelled by user');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
         return;
       }
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      print('🔵 Google user: ${googleUser.email}');
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      final userCredential = await _auth.signInWithCredential(credential);
+      await _auth.signInWithCredential(credential);
 
-      // ✅ REGISTER DEVICE AFTER SUCCESSFUL GOOGLE LOGIN
-      if (userCredential.user != null) {
-        await DeviceService.registerDevice();
-        
-        // ✅ LOG SUCCESSFUL LOGIN
-        await LoginHistoryService.logLoginAttempt(
-          isSuccessful: true,
-          loginMethod: 'google',
+      print('✅ Google Sign-In successful!');
+
+      if (mounted) {
+        _showSuccessSnackBar('Đăng nhập Google thành công!');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeView()),
         );
-        
-        if (mounted) {
-          _showSuccessSnackBar('Đăng nhập Google thành công!');
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeView()),
-          );
-        }
       }
-
     } catch (e) {
-      // ✅ LOG FAILED LOGIN
-      await LoginHistoryService.logLoginAttempt(
-        isSuccessful: false,
-        loginMethod: 'google',
-        failureReason: 'Google login failed: $e',
-      );
-      
+      print('❌ Google Sign-In error: $e');
       _showErrorDialog('Lỗi đăng nhập Google: $e');
     } finally {
       if (mounted) {
@@ -186,67 +206,46 @@ class _LoginViewState extends State<LoginView> {
     }
   }
 
+  // Facebook Sign-In
   Future<void> _signInWithFacebook() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
+      print('🔵 Starting Facebook Sign-In...');
+
       final LoginResult result = await FacebookAuth.instance.login();
 
       if (result.status == LoginStatus.success) {
-        final OAuthCredential credential = 
+        print('🔵 Facebook login success');
+
+        final OAuthCredential credential =
             FacebookAuthProvider.credential(result.accessToken!.token);
 
-        final userCredential = await _auth.signInWithCredential(credential);
+        await _auth.signInWithCredential(credential);
 
-        // ✅ REGISTER DEVICE AFTER SUCCESSFUL FACEBOOK LOGIN
-        if (userCredential.user != null) {
-          await DeviceService.registerDevice();
-          
-          // ✅ LOG SUCCESSFUL LOGIN
-          await LoginHistoryService.logLoginAttempt(
-            isSuccessful: true,
-            loginMethod: 'facebook',
+        print('✅ Facebook Sign-In successful!');
+
+        if (mounted) {
+          _showSuccessSnackBar('Đăng nhập Facebook thành công!');
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeView()),
           );
-          
-          if (mounted) {
-            _showSuccessSnackBar('Đăng nhập Facebook thành công!');
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const HomeView()),
-            );
-          }
         }
       } else if (result.status == LoginStatus.cancelled) {
-        // ✅ LOG CANCELLED LOGIN
-        await LoginHistoryService.logLoginAttempt(
-          isSuccessful: false,
-          loginMethod: 'facebook',
-          failureReason: 'Login cancelled by user',
-        );
-        
+        print('❌ Facebook Sign-In cancelled');
         _showErrorDialog('Đăng nhập Facebook đã bị hủy');
       } else {
-        // ✅ LOG FAILED LOGIN
-        await LoginHistoryService.logLoginAttempt(
-          isSuccessful: false,
-          loginMethod: 'facebook',
-          failureReason: 'Facebook login not available',
-        );
-        
-        _showErrorDialog('Tính năng đăng nhập Facebook đang được cập nhật. Vui lòng sử dụng Email hoặc Google để tiếp tục!');
+        print('❌ Facebook Sign-In failed');
+        _showErrorDialog('Đăng nhập Facebook thất bại');
       }
-
     } catch (e) {
-      // ✅ LOG FAILED LOGIN
-      await LoginHistoryService.logLoginAttempt(
-        isSuccessful: false,
-        loginMethod: 'facebook',
-        failureReason: 'Facebook error: $e',
-      );
-      
-      _showErrorDialog('Tính năng đăng nhập Facebook đang được cập nhật. Vui lòng sử dụng Email hoặc Google để tiếp tục!');
+      print('❌ Facebook Sign-In error: $e');
+      _showErrorDialog('Lỗi đăng nhập Facebook: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -257,36 +256,18 @@ class _LoginViewState extends State<LoginView> {
   }
 
   void _showErrorDialog(String message) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        title: Text(
-          'Thông báo',
-          style: TextStyle(
-            color: isDark ? Colors.white : Colors.black,
-          ),
-        ),
-        content: Text(
-          message,
-          style: TextStyle(
-            color: isDark ? Colors.grey[300] : Colors.black,
-          ),
-        ),
+        title: const Text('Lỗi đăng nhập'),
+        content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Đóng',
-              style: TextStyle(
-                color: isDark ? Colors.grey[400] : Colors.blue,
-              ),
-            ),
+            child: const Text('Đóng'),
           ),
         ],
       ),
@@ -301,23 +282,23 @@ class _LoginViewState extends State<LoginView> {
         duration: const Duration(seconds: 2),
       ),
     );
-  } 
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    print('🎨 LoginView building...');
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: isDark ? Colors.white : Colors.black,
-          ),
-          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () {
+            print('🔙 Back button pressed');
+            Navigator.pop(context);
+          },
         ),
       ),
       body: SafeArea(
@@ -328,103 +309,63 @@ class _LoginViewState extends State<LoginView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Welcome Back',
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black,
+                    color: Colors.black,
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
+                const Text(
                   'Login to your account',
                   style: TextStyle(
                     fontSize: 16,
-                    color: isDark ? Colors.grey[400] : Colors.grey,
+                    color: Colors.grey,
                   ),
                 ),
                 const SizedBox(height: 40),
-                
+
                 // Email Field
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black,
-                  ),
                   decoration: InputDecoration(
-                    prefixIcon: Icon(
-                      Icons.email_outlined,
-                      color: isDark ? Colors.grey[500] : null,
-                    ),
+                    prefixIcon: const Icon(Icons.email_outlined),
                     labelText: 'Email',
-                    labelStyle: TextStyle(
-                      color: isDark ? Colors.grey[400] : null,
-                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: isDark ? Colors.grey[600]! : Colors.blue,
-                      ),
                     ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Vui lòng nhập email';
                     }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                        .hasMatch(value)) {
                       return 'Email không hợp lệ';
                     }
                     return null;
                   },
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Password Field
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black,
-                  ),
                   decoration: InputDecoration(
-                    prefixIcon: Icon(
-                      Icons.lock_outline,
-                      color: isDark ? Colors.grey[500] : null,
-                    ),
+                    prefixIcon: const Icon(Icons.lock_outline),
                     labelText: 'Password',
-                    labelStyle: TextStyle(
-                      color: isDark ? Colors.grey[400] : null,
-                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: isDark ? Colors.grey[600]! : Colors.blue,
-                      ),
-                    ),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                        color: isDark ? Colors.grey[500] : null,
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
                       ),
                       onPressed: () {
                         setState(() {
@@ -440,36 +381,22 @@ class _LoginViewState extends State<LoginView> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 12),
-                
-                // Forgot Password Link
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context, 
-                        MaterialPageRoute(builder: (context) => const ForgotPasswordView()),
-                      ); 
-                    }, 
-                    child: Text(
-                      'Forgot Password?',
-                      style: TextStyle(
-                        color: isDark ? Colors.grey[400] : Colors.blue,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),  
-                
-                // Login Button   
-                SizedBox(  
+                const SizedBox(height: 24),
+
+                // Login Button
+                SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _login,
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            print('🔘 LOGIN BUTTON TAPPED');
+                            _login();
+                          },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
+                      disabledBackgroundColor: Colors.blue.withOpacity(0.6),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -493,14 +420,14 @@ class _LoginViewState extends State<LoginView> {
                           ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
 
-                // Divider với text "Or continue with"
+                // Divider
                 Row(
                   children: [
                     Expanded(
                       child: Divider(
-                        color: isDark ? Colors.grey[700] : Colors.grey[400],
+                        color: Colors.grey[400],
                         thickness: 1,
                       ),
                     ),
@@ -509,20 +436,20 @@ class _LoginViewState extends State<LoginView> {
                       child: Text(
                         'Or continue with',
                         style: TextStyle(
-                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          color: Colors.grey[600],
                           fontSize: 14,
                         ),
                       ),
                     ),
                     Expanded(
                       child: Divider(
-                        color: isDark ? Colors.grey[700] : Colors.grey[400],
+                        color: Colors.grey[400],
                         thickness: 1,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
 
                 // Social Login Buttons
                 Row(
@@ -543,19 +470,17 @@ class _LoginViewState extends State<LoginView> {
                             );
                           },
                         ),
-                        label: Text(
+                        label: const Text(
                           'Google',
                           style: TextStyle(
-                            color: isDark ? Colors.white : Colors.black87,
+                            color: Colors.black87,
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: BorderSide(
-                            color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
-                          ),
+                          side: BorderSide(color: Colors.grey[300]!),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -563,7 +488,7 @@ class _LoginViewState extends State<LoginView> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    
+
                     // Facebook Button
                     Expanded(
                       child: OutlinedButton.icon(
@@ -573,19 +498,17 @@ class _LoginViewState extends State<LoginView> {
                           color: Color(0xFF1877F2),
                           size: 24,
                         ),
-                        label: Text(
+                        label: const Text(
                           'Facebook',
                           style: TextStyle(
-                            color: isDark ? Colors.white : Colors.black87,
+                            color: Colors.black87,
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: BorderSide(
-                            color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
-                          ),
+                          side: BorderSide(color: Colors.grey[300]!),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -595,22 +518,20 @@ class _LoginViewState extends State<LoginView> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Sign Up Link
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      'Don\'t have an account? ',
-                      style: TextStyle(
-                        color: isDark ? Colors.grey[300] : Colors.black,
-                      ),
-                    ),
+                    const Text('Don\'t have an account? '),
                     TextButton(
                       onPressed: () {
+                        print('🔵 Navigating to SignUpView');
                         Navigator.push(
-                          context, 
-                          MaterialPageRoute(builder: (context) => const SignUpView()),
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SignUpView(),
+                          ),
                         );
                       },
                       child: const Text(
@@ -629,48 +550,5 @@ class _LoginViewState extends State<LoginView> {
         ),
       ),
     );
-  }
-
-  Future<void> _handleLoginWithFirebase(String email, String password) async {
-    try {
-      UserCredential userCredential = await FirebaseAuth.instance
-          .signInWithEmailAndPassword(email: email, password: password);
-      
-      // ✅ REGISTER DEVICE AFTER SUCCESSFUL LOGIN
-      await DeviceService.registerDevice();
-      
-      // ✅ LOG SUCCESSFUL LOGIN
-      await LoginHistoryService.logLoginAttempt(
-        isSuccessful: true,
-        loginMethod: 'email',
-      );
-      
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userCredential.user!.uid)
-          .get();
-      
-      final prefs = await SharedPreferences.getInstance();
-      
-      await prefs.setString('user_name', userDoc['name'] ?? email.split('@')[0]);
-      await prefs.setString('user_email', email);
-      await prefs.setString('user_id', userCredential.user!.uid);
-      await prefs.setBool('is_logged_in', true);
-      
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const HomeView()),
-        (Route<dynamic> route) => false,
-      );
-      
-    } catch (e) {
-      // ✅ LOG FAILED LOGIN
-      await LoginHistoryService.logLoginAttempt(
-        isSuccessful: false,
-        loginMethod: 'email',
-        failureReason: e.toString(),
-      );
-      
-      print('Login error: $e');
-    }
   }
 }

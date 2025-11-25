@@ -27,7 +27,7 @@ class _HomeViewState extends State<HomeView> {
     _loadUserName();
   }
 
-  Future<void> _loadUserName() async {
+ Future<void> _loadUserName() async {
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
       
@@ -39,15 +39,22 @@ class _HomeViewState extends State<HomeView> {
 
         if (userDoc.exists) {
           Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
-          setState(() {
-            userName = userData['name'] ?? currentUser.displayName ?? 'User';
-            isLoadingUserName = false;
-          });
+          
+          // ⭐ CHECK mounted before setState
+          if (mounted) {
+            setState(() {
+              userName = userData['name'] ?? currentUser.displayName ?? 'User';
+              isLoadingUserName = false;
+            });
+          }
         } else {
-          setState(() {
-            userName = currentUser.displayName ?? currentUser.email?.split('@')[0] ?? 'User';
-            isLoadingUserName = false;
-          });
+          // ⭐ CHECK mounted before setState
+          if (mounted) {
+            setState(() {
+              userName = currentUser.displayName ?? currentUser.email?.split('@')[0] ?? 'User';
+              isLoadingUserName = false;
+            });
+          }
         }
         
         final prefs = await SharedPreferences.getInstance();
@@ -55,16 +62,24 @@ class _HomeViewState extends State<HomeView> {
         
       } else {
         final prefs = await SharedPreferences.getInstance();
-        setState(() {
-          userName = prefs.getString('user_name') ?? 'User';
-          isLoadingUserName = false;
-        });
+        
+        // ⭐ CHECK mounted before setState
+        if (mounted) {
+          setState(() {
+            userName = prefs.getString('user_name') ?? 'User';
+            isLoadingUserName = false;
+          });
+        }
       }
     } catch (e) {
       print('Error loading user name: $e');
-      setState(() {
-        isLoadingUserName = false;
-      });
+      
+      // ⭐ CHECK mounted before setState
+      if (mounted) {
+        setState(() {
+          isLoadingUserName = false;
+        });
+      }
     }
   }
 
