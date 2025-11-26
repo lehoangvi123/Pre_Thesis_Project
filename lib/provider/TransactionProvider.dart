@@ -1,10 +1,12 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/TransactionModel.dart';
-import '../models/category_model.dart';
 import '../service/TransactionService.dart';
 
 class TransactionProvider with ChangeNotifier {
   final TransactionService _transactionService = TransactionService();
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   List<TransactionModel> _transactions = [];
   Map<String, double> _balanceSummary = {
@@ -12,6 +14,7 @@ class TransactionProvider with ChangeNotifier {
     'totalExpense': 0,
     'balance': 0,
   };
+
   bool _isLoading = false;
   String? _error;
 
@@ -24,44 +27,85 @@ class TransactionProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  // Load all transactions
-  void loadTransactions() {
-    _transactionService.getUserTransactions().listen((transactions) {
-      _transactions = transactions;
-      _updateBalanceSummary();
+  /// 📌 Lắng nghe transactions realtime từ Firestore của user
+  void listenToTransactions(String userId) {
+    _isLoading = true;
+    notifyListeners();
+
+    _db.collection('users')
+        .doc(userId)
+        .collection('transactions')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .listen((snapshot) async {
+      
+      _transactions = snapshot.docs
+          .map((doc) => TransactionModel.fromMap(doc.data()))
+          .toList();
+
+      await _calculateBalance(userId);
+      _isLoading = false;
       notifyListeners();
     });
   }
 
-  // Load transactions by category
-  void loadTransactionsByCategory(String categoryId) {
-    _transactionService.getTransactionsByCategory(categoryId).listen((transactions) {
-      _transactions = transactions;
-      notifyListeners();
-    });
-  }
+  /// ⚡ Tính lại số dư và thống kê Total Income / Total Expense
+  Future<void> _calculateBalance(String userId) async {
+    double income = 0;
+    double expense = 0;
 
-  // Add transaction
-  Future<bool> addTransaction({
-    required CategoryModel category,
+    for (var tx in _transactions) {
+      if (tx.type == "income") {
+        income += tx.amount;
+      } else {
+        expense += tx.amount; // Lưu chi tiêu đã âm sẵn trong model
+      }
+    }
+
+    double newBalance = income + expense;
+
+    _balanceSummary = {
+      'totalIncome': income,
+      'totalExpense': expense.abs(),
+      'balance': newBalance,
+    };
+
+    await _transactionService.ensureUserBalance(userId);
+  } 
+
+  
+
+  /// ➕ Thêm Income
+  Future<bool> addIncome({
+    required String userId,
+    required String categoryId,
+    required String categoryName,
     required double amount,
     required String title,
     String? message,
-    required DateTime date,
+    DateTime? date,
   }) async {
     try {
       _isLoading = true;
       _error = null;
       notifyListeners();
 
-      await _transactionService.addTransaction(
-        category: category,
-        amount: amount,
+      final tx = TransactionModel(
+        id: _db.collection('tmp').doc().id,
+        userId: userId,
+        categoryId: categoryId,
+        categoryName: categoryName,
+        type: "income",
+        amount: amount.abs(),
         title: title,
         message: message,
-        date: date,
+        date: date ?? DateTime.now(),
+        createdAt: DateTime.now(),
+        isIncome: true,
       );
 
+      await _db.collection('users').doc(userId).collection('transactions').doc(tx.id).set(tx.toMap());
+
       _isLoading = false;
       notifyListeners();
       return true;
@@ -73,10 +117,52 @@ class TransactionProvider with ChangeNotifier {
     }
   }
 
-  // Update transaction
-  Future<bool> updateTransaction(TransactionModel transaction) async {
+  /// ➖ Thêm Expense
+  Future<bool> addExpense({
+    required String userId,
+    required String categoryId,
+    required String categoryName,
+    required double amount,
+    required String title,
+    String? message,
+    DateTime? date,
+  }) async {
     try {
-      await _transactionService.updateTransaction(transaction);
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final tx = TransactionModel(
+        id: _db.collection('tmp').doc().id,
+        userId: userId,
+        categoryId: categoryId,
+        categoryName: categoryName,
+        type: "expense",
+        amount: -amount.abs(),
+        title: title,
+        message: message,
+        date: date ?? DateTime.now(),
+        createdAt: DateTime.now(),
+        isIncome: false,
+      );
+
+      await _db.collection('users').doc(userId).collection('transactions').doc(tx.id).set(tx.toMap());
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // 🗑 Xóa transaction
+  Future<bool> deleteTransaction(String userId, String txId) async {
+    try {
+      await _db.collection('users').doc(userId).collection('transactions').doc(txId).delete();
       return true;
     } catch (e) {
       _error = e.toString();
@@ -85,10 +171,12 @@ class TransactionProvider with ChangeNotifier {
     }
   }
 
-  // Delete transaction
-  Future<bool> deleteTransaction(String transactionId) async {
+  // ✏ Update transaction
+  Future<bool> updateTransaction(String userId, TransactionModel transaction) async {
     try {
-      await _transactionService.deleteTransaction(transactionId);
+      await _db.collection('users').doc(userId).collection('transactions').doc(transaction.id).update(
+        transaction.toMap(),
+      );
       return true;
     } catch (e) {
       _error = e.toString();
@@ -97,19 +185,9 @@ class TransactionProvider with ChangeNotifier {
     }
   }
 
-  // Update balance summary
-  Future<void> _updateBalanceSummary() async {
-    _balanceSummary = await _transactionService.getBalanceSummary();
-    notifyListeners();
-  }
-
-  // Get category spending
-  Future<double> getCategorySpending(String categoryId) async {
-    return await _transactionService.getCategorySpending(categoryId);
-  }
-
-  // Get transactions for specific category
-  List<TransactionModel> getTransactionsForCategory(String categoryId) {
-    return _transactions.where((t) => t.categoryId == categoryId).toList();
+  // 💰 Load spending of 1 category nếu cần hiển thị riêng
+  Future<double> getCategorySpending(String categoryId) async { 
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    return await _transactionService.getCategoryExpenseTotal(uid, categoryId);
   }
 }

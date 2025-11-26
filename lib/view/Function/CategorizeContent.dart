@@ -166,7 +166,7 @@ class _CategoriesViewState extends State<CategoriesView> {
             Expanded(
               child: _buildInfoCard(
                 title: 'Total Balance',
-                amount: '7,783,000',
+                amount: '0',
                 icon: Icons.account_balance_wallet_rounded,
                 color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                 isDark: isDark,
@@ -177,10 +177,10 @@ class _CategoriesViewState extends State<CategoriesView> {
             Expanded(
               child: _buildInfoCard(
                 title: 'Total Income',
-                amount: '2,500.000',
+                amount: '0', 
                 icon: Icons.trending_up_rounded,
                 color: const Color(0xFF4CAF50), // Green for income
-                isDark: isDark,
+                isDark: isDark, 
               ),
             ),
           ],
@@ -189,7 +189,7 @@ class _CategoriesViewState extends State<CategoriesView> {
         // Row 2: Expenses (full width)
         _buildInfoCard(
           title: 'Total Expenses',
-          amount: '-\$1,187.40',
+          amount: '0',
           icon: Icons.trending_down_rounded,
           color: const Color(0xFF2196F3), // Blue for expenses
           isDark: isDark,

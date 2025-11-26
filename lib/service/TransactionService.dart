@@ -2,130 +2,137 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import '../models/TransactionModel.dart';
-import '../models/category_model.dart';
 
 class TransactionService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final Uuid _uuid = Uuid();
+  final Uuid _uuid = const Uuid();
 
-  String get _userId => _auth.currentUser!.uid;
+  User? get currentUser => _auth.currentUser;
+  String get userId => currentUser!.uid;
 
-  CollectionReference get _transactionsCollection =>
-      _firestore.collection('transactions');
+  /// 📌 Collection đúng nơi cho 1 user: users/{uid}/transactions
+  CollectionReference<Map<String, dynamic>> transactionsRef(String uid) =>
+      _firestore.collection('users').doc(uid).collection('transactions');
 
-  // Add new transaction
-  Future<void> addTransaction({
-    required CategoryModel category,
+  /// 💾 Đảm bảo user có document balance
+  Future<void> ensureUserBalance(String uid) async {
+    final ref = _firestore.collection('users').doc(uid);
+    final snap = await ref.get();
+    if (!snap.exists) {
+      await ref.set({'balance': 0.0});
+    }
+  }
+
+  /// ➕ Add Income
+  Future<void> addIncome({
+    required String userId,
     required double amount,
     required String title,
+    required String categoryId,
+    required String categoryName,
     String? message,
-    required DateTime date,
+    DateTime? date,
+    String? iconName,
+    String? colorHex,
   }) async {
-    final transaction = TransactionModel(
+    final uid = this.userId;
+    await ensureUserBalance(uid);
+
+    final tx = TransactionModel(
       id: _uuid.v4(),
-      userId: _userId,
-      categoryId: category.id,
-      categoryName: category.name,
-      type: category.type,
-      amount: amount,
+      userId: uid,
+      categoryId: categoryId,
+      categoryName: categoryName,
+      type: "income",
+      amount: amount.abs(),
       title: title,
       message: message,
-      date: date,
+      date: date ?? DateTime.now(),
       createdAt: DateTime.now(),
-      iconName: category.iconName,
-      colorHex: category.colorHex,
+      iconName: iconName,
+      colorHex: colorHex,
+      isIncome: true,
     );
 
-    await _transactionsCollection.doc(transaction.id).set(transaction.toMap());
+    await transactionsRef(uid).doc(tx.id).set(tx.toMap());
+    await _applyDeltaToBalance(uid, tx.amount);
   }
 
-  // Get all transactions for user
-  Stream<List<TransactionModel>> getUserTransactions() {
-    return _transactionsCollection
-        .where('userId', isEqualTo: _userId)
-        .orderBy('date', descending: true)
+  /// ➖ Add Expense
+  Future<void> addExpense({
+    required String userId,
+    required double amount,
+    required String title,
+    required String categoryId,
+    required String categoryName,
+    String? message,
+    DateTime? date,
+    String? iconName,
+    String? colorHex,
+  }) async {
+    final uid = this.userId;
+    await ensureUserBalance(uid);
+
+    final tx = TransactionModel(
+      id: _uuid.v4(),
+      userId: uid,
+      categoryId: categoryId,
+      categoryName: categoryName,
+      type: "expense",
+      amount: -amount.abs(),
+      title: title,
+      message: message,
+      date: date ?? DateTime.now(),
+      createdAt: DateTime.now(),
+      iconName: iconName,
+      colorHex: colorHex,
+      isIncome: false,
+    );
+
+    await transactionsRef(uid).doc(tx.id).set(tx.toMap());
+    await _applyDeltaToBalance(uid, tx.amount);
+  }
+
+  /// 💰 Cộng/trừ balance dựa trên delta âm/dương có sẵn
+  Future<void> _applyDeltaToBalance(String uid, double delta) async {
+    await ensureUserBalance(uid);
+    await _firestore.collection('users').doc(uid).update({
+      'balance': FieldValue.increment(delta),
+    });
+  }
+
+  /// 📊 Stream realtime của 1 user
+  Stream<List<TransactionModel>> streamUserTransactions(String uid) {
+    return transactionsRef(uid)
+        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => TransactionModel.fromMap(doc.data() as Map<String, dynamic>))
-            .toList());
+        .map((snap) =>
+            snap.docs.map((doc) => TransactionModel.fromMap(doc.data())).toList());
   }
 
-  // Get transactions by category
-  Stream<List<TransactionModel>> getTransactionsByCategory(String categoryId) {
-    return _transactionsCollection
-        .where('userId', isEqualTo: _userId)
-        .where('categoryId', isEqualTo: categoryId)
-        .orderBy('date', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => TransactionModel.fromMap(doc.data() as Map<String, dynamic>))
-            .toList());
+  /// ✏ Update
+  Future<void> updateTransaction(String uid, TransactionModel tx) async {
+    await transactionsRef(uid).doc(tx.id).update(tx.toMap());
   }
 
-  // Get transactions by type (income/expense)
-  Stream<List<TransactionModel>> getTransactionsByType(String type) {
-    return _transactionsCollection
-        .where('userId', isEqualTo: _userId)
-        .where('type', isEqualTo: type)
-        .orderBy('date', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => TransactionModel.fromMap(doc.data() as Map<String, dynamic>))
-            .toList());
+  /// 🗑 Delete
+  Future<void> deleteTransaction(String uid, String txId) async {
+    await transactionsRef(uid).doc(txId).delete();
   }
 
-  // Update transaction
-  Future<void> updateTransaction(TransactionModel transaction) async {
-    await _transactionsCollection.doc(transaction.id).update(transaction.toMap());
-  }
-
-  // Delete transaction
-  Future<void> deleteTransaction(String transactionId) async {
-    await _transactionsCollection.doc(transactionId).delete();
-  }
-
-  // Get balance summary
-  Future<Map<String, double>> getBalanceSummary() async {
-    final transactions = await _transactionsCollection
-        .where('userId', isEqualTo: _userId)
-        .get();
-
-    double totalIncome = 0;
-    double totalExpense = 0;
-
-    for (var doc in transactions.docs) {
-      final data = doc.data() as Map<String, dynamic>;
-      final type = data['type'] as String;
-      final amount = (data['amount'] as num).toDouble();
-
-      if (type == 'income') {
-        totalIncome += amount;
-      } else if (type == 'expense') {
-        totalExpense += amount;
-      }
-    }
-
-    return {
-      'totalIncome': totalIncome,
-      'totalExpense': totalExpense,
-      'balance': totalIncome - totalExpense,
-    };
-  }
-
-  // Get category spending
-  Future<double> getCategorySpending(String categoryId) async {
-    final transactions = await _transactionsCollection
-        .where('userId', isEqualTo: _userId)
+  /// 🥧 Total spent của 1 category expense
+  Future<double> getCategoryExpenseTotal(String uid, String categoryId) async {
+    final snap = await transactionsRef(uid)
         .where('categoryId', isEqualTo: categoryId)
         .where('type', isEqualTo: 'expense')
         .get();
 
     double total = 0;
-    for (var doc in transactions.docs) {
-      total += ((doc.data() as Map<String, dynamic>)['amount'] as num).toDouble();
+    for (var doc in snap.docs) {
+      total += (doc.data()['amount'] as num).toDouble();
     }
-
     return total;
   }
 }
+
