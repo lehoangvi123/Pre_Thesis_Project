@@ -518,5 +518,7 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
         ),
       );
     }
-  }
+  } 
+
+  
 }

@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:project1/models/Category_model.dart';
+import 'package:provider/provider.dart';
+import '../../provider/TransactionProvider.dart'; 
+
 
 class AddExpenseView extends StatefulWidget {
   final String categoryName;
@@ -56,72 +60,54 @@ class _AddExpenseViewState extends State<AddExpenseView> {
     super.dispose();
   }
 
-  Future<void> _saveExpense() async {
-    // Validate inputs
-    if (_amountController.text.isEmpty) {
-      _showErrorSnackBar('Please enter an amount');
-      return;
+ Future<void> _saveExpense() async {
+  if (_amountController.text.trim().isEmpty || _titleController.text.trim().isEmpty) {
+    _showErrorSnackBar("Vui lòng nhập số tiền và tiêu đề");
+    return;
+  }
+
+  final amount = double.tryParse(_amountController.text.replaceAll(RegExp(r"[^\d]"), ""));
+  if (amount == null || amount <= 0) {
+    _showErrorSnackBar("Số tiền không hợp lệ");
+    return;
+  }
+
+  setState(() => _isLoading = true);
+
+  try {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) throw Exception("User chưa đăng nhập");
+
+    final category = CategoryModel(
+      id: widget.categoryName.toLowerCase(), // demo id, nếu bạn có id thật từ Firestore thì dùng id đó
+      name: widget.categoryName,
+      type: "expense",
+      iconName: widget.categoryIcon.toString(),
+      colorHex: widget.categoryColor.value.toRadixString(16),
+    );
+
+    await context.read<TransactionProvider>().addExpense(
+      categoryId: category.id, 
+      amount: amount,
+      title: _titleController.text.trim(),
+      message: _messageController.text.trim(),
+      date: _selectedDate,
+    );
+
+    if (mounted) {
+      Navigator.pop(context);
     }
-
-    if (_titleController.text.isEmpty) {
-      _showErrorSnackBar('Please enter expense title');
-      return;
-    }
-
-    final amount = double.tryParse(_amountController.text);
-    if (amount == null || amount <= 0) {
-      _showErrorSnackBar('Please enter a valid amount');
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      final userId = _auth.currentUser?.uid;
-      if (userId == null) {
-        throw Exception('User not authenticated');
-      }
-
-      // Add expense to Firestore
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('expenses')
-          .add({
-        'category': _selectedCategory,
-        'amount': amount,
-        'title': _titleController.text,
-        'message': _messageController.text,
-        'date': Timestamp.fromDate(_selectedDate),
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      // Update user's total expense and balance
-      await _firestore.collection('users').doc(userId).update({
-        'totalExpense': FieldValue.increment(amount),
-        'totalBalance': FieldValue.increment(-amount),
-      });
-
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Expense added successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // Go back
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      _showErrorSnackBar('Failed to add expense: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+  } catch (e) {
+    _showErrorSnackBar("Lỗi khi lưu: $e");
+  } finally {
+    if (mounted) {
+      setState(() => _isLoading = false);
     }
   }
+}
+
+
+
 
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -442,33 +428,23 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _isLoading ? null : _saveExpense,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: widget.categoryColor,
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: _isLoading
-                            ? SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                'Save',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                      ),
+  onPressed: _isLoading ? null : _saveExpense,
+  style: ElevatedButton.styleFrom(
+    backgroundColor: widget.categoryColor,
+    padding: const EdgeInsets.symmetric(vertical: 16),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    elevation: 0,
+  ),
+  child: _isLoading
+      ? const SizedBox(width:20, height:20, child:CircularProgressIndicator(strokeWidth:2))
+      : const Text(
+          "Save",
+          style: TextStyle(fontSize:16, fontWeight:FontWeight.bold, color:Colors.white),
+        ),
+),
+
                     ),
                   ],
                 ),

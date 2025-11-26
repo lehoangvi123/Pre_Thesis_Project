@@ -1,193 +1,83 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/TransactionModel.dart';
 import '../service/TransactionService.dart';
+import '../models/Category_model.dart';
 
 class TransactionProvider with ChangeNotifier {
-  final TransactionService _transactionService = TransactionService();
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final TransactionService _service = TransactionService();
 
-  List<TransactionModel> _transactions = [];
-  Map<String, double> _balanceSummary = {
-    'totalIncome': 0,
-    'totalExpense': 0,
-    'balance': 0,
-  };
+  List<TransactionModel> txs = [];
+  double balance = 0;
+  bool loading = false;
+  String? err;
 
-  bool _isLoading = false;
-  String? _error;
-
-  // Getters
-  List<TransactionModel> get transactions => _transactions;
-  Map<String, double> get balanceSummary => _balanceSummary;
-  double get totalIncome => _balanceSummary['totalIncome'] ?? 0;
-  double get totalExpense => _balanceSummary['totalExpense'] ?? 0;
-  double get balance => _balanceSummary['balance'] ?? 0;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
-
-  /// 📌 Lắng nghe transactions realtime từ Firestore của user
-  void listenToTransactions(String userId) {
-    _isLoading = true;
-    notifyListeners();
-
-    _db.collection('users')
-        .doc(userId)
-        .collection('transactions')
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .listen((snapshot) async {
-      
-      _transactions = snapshot.docs
-          .map((doc) => TransactionModel.fromMap(doc.data()))
-          .toList();
-
-      await _calculateBalance(userId);
-      _isLoading = false;
-      notifyListeners();
-    });
-  }
-
-  /// ⚡ Tính lại số dư và thống kê Total Income / Total Expense
-  Future<void> _calculateBalance(String userId) async {
-    double income = 0;
-    double expense = 0;
-
-    for (var tx in _transactions) {
-      if (tx.type == "income") {
-        income += tx.amount;
-      } else {
-        expense += tx.amount; // Lưu chi tiêu đã âm sẵn trong model
-      }
-    }
-
-    double newBalance = income + expense;
-
-    _balanceSummary = {
-      'totalIncome': income,
-      'totalExpense': expense.abs(),
-      'balance': newBalance,
-    };
-
-    await _transactionService.ensureUserBalance(userId);
-  } 
-
-  
-
-  /// ➕ Thêm Income
-  Future<bool> addIncome({
-    required String userId,
-    required String categoryId,
-    required String categoryName,
-    required double amount,
-    required String title,
-    String? message,
-    DateTime? date,
-  }) async {
+  void listenAll() async {
     try {
-      _isLoading = true;
-      _error = null;
+      loading = true;
       notifyListeners();
 
-      final tx = TransactionModel(
-        id: _db.collection('tmp').doc().id,
-        userId: userId,
-        categoryId: categoryId,
-        categoryName: categoryName,
-        type: "income",
-        amount: amount.abs(),
-        title: title,
-        message: message,
-        date: date ?? DateTime.now(),
-        createdAt: DateTime.now(),
-        isIncome: true,
-      );
+      _service.streamUserTransactions().listen((data) async {
+        txs = data;
 
-      await _db.collection('users').doc(userId).collection('transactions').doc(tx.id).set(tx.toMap());
+        final summary = await _service.getBalance();
+        balance = summary["balance"] ?? 0;
 
-      _isLoading = false;
-      notifyListeners();
-      return true;
+        notifyListeners();
+      });
+
     } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
+      err = e.toString();
       notifyListeners();
-      return false;
+    } finally {
+      loading = false;
+      notifyListeners();
     }
   }
 
-  /// ➖ Thêm Expense
-  Future<bool> addExpense({
-    required String userId,
+  Future<void> addExpense({
     required String categoryId,
-    required String categoryName,
     required double amount,
     required String title,
     String? message,
-    DateTime? date,
+    required DateTime date,
   }) async {
-    try {
-      _isLoading = true;
-      _error = null;
-      notifyListeners();
-
-      final tx = TransactionModel(
-        id: _db.collection('tmp').doc().id,
-        userId: userId,
-        categoryId: categoryId,
-        categoryName: categoryName,
+    await _service.addExpense(
+      category: CategoryModel(
+        id: categoryId,
+        name: categoryId,
         type: "expense",
-        amount: -amount.abs(),
-        title: title,
-        message: message,
-        date: date ?? DateTime.now(),
-        createdAt: DateTime.now(),
-        isIncome: false,
-      );
-
-      await _db.collection('users').doc(userId).collection('transactions').doc(tx.id).set(tx.toMap());
-
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
+        iconName: "",
+        colorHex: "",
+      ),
+      amount: amount,
+      title: title,
+      message: message,
+      date: date,
+    );
   }
 
-  // 🗑 Xóa transaction
-  Future<bool> deleteTransaction(String userId, String txId) async {
-    try {
-      await _db.collection('users').doc(userId).collection('transactions').doc(txId).delete();
-      return true;
-    } catch (e) {
-      _error = e.toString();
-      notifyListeners();
-      return false;
-    }
+  Future<void> addIncome({
+    required String categoryId,
+    required double amount,
+    required String title,
+    String? message,
+    required DateTime date,
+  }) async {
+    await _service.addIncome(
+      category: CategoryModel(
+        id: categoryId,
+        name: categoryId,
+        type: "income",
+        iconName: "",
+        colorHex: "",
+      ),
+      amount: amount,
+      title: title,
+      message: message,
+      date: date,
+    );
   }
 
-  // ✏ Update transaction
-  Future<bool> updateTransaction(String userId, TransactionModel transaction) async {
-    try {
-      await _db.collection('users').doc(userId).collection('transactions').doc(transaction.id).update(
-        transaction.toMap(),
-      );
-      return true;
-    } catch (e) {
-      _error = e.toString();
-      notifyListeners();
-      return false;
-    }
-  }
-
-  // 💰 Load spending of 1 category nếu cần hiển thị riêng
-  Future<double> getCategorySpending(String categoryId) async { 
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    return await _transactionService.getCategoryExpenseTotal(uid, categoryId);
-  }
+  Stream<List<TransactionModel>> watchCategoryExpenses(String categoryId) =>
+      _service.streamCategoryExpenses(categoryId);
 }

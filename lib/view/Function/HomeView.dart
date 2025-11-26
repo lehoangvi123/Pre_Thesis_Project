@@ -23,7 +23,7 @@ class _HomeViewState extends State<HomeView> {
 
   @override
   void initState() {
-    super.initState();
+    super.initState(); 
     _loadUserName();
   }
 
@@ -290,7 +290,7 @@ class _HomeViewState extends State<HomeView> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '7,783,000 VND',
+                  '0',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -334,7 +334,7 @@ class _HomeViewState extends State<HomeView> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  '-1,455,444 VND',
+                  '0',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
