@@ -1,104 +1,148 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
-import '../../models/Category_model.dart';
-import 'package:provider/provider.dart';
-import '../../provider/TransactionProvider.dart'; 
-
 
 class AddExpenseView extends StatefulWidget {
-  final String categoryName;
-  final IconData categoryIcon;
-  final Color categoryColor;
-
-  const AddExpenseView({
-    Key? key,
-    required this.categoryName,
-    required this.categoryIcon,
-    required this.categoryColor,
-  }) : super(key: key);
+  final String? initialType; // 'income' or 'expense'
+  
+  const AddExpenseView({Key? key, this.initialType}) : super(key: key);
 
   @override
   State<AddExpenseView> createState() => _AddExpenseViewState();
 }
 
 class _AddExpenseViewState extends State<AddExpenseView> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _messageController = TextEditingController();
-
-  DateTime _selectedDate = DateTime.now();
-  String _selectedCategory = '';
-  bool _isLoading = false;
-
-  final List<Map<String, dynamic>> _categories = [
-    {'name': 'Food', 'icon': Icons.restaurant, 'color': Color(0xFF00CED1)},
-    {'name': 'Transport', 'icon': Icons.directions_bus, 'color': Color(0xFF00CED1)},
-    {'name': 'Medicine', 'icon': Icons.medical_services, 'color': Color(0xFF00CED1)},
-    {'name': 'Groceries', 'icon': Icons.shopping_bag, 'color': Color(0xFF64B5F6)},
-    {'name': 'Rent', 'icon': Icons.home, 'color': Color(0xFF64B5F6)},
-    {'name': 'Gifts', 'icon': Icons.card_giftcard, 'color': Color(0xFF64B5F6)},
-    {'name': 'Savings', 'icon': Icons.savings, 'color': Color(0xFF90CAF9)},
-    {'name': 'Entertainment', 'icon': Icons.movie, 'color': Color(0xFF90CAF9)},
+  final _formKey = GlobalKey<FormState>();
+  final _amountController = TextEditingController();
+  final _titleController = TextEditingController();
+  final _noteController = TextEditingController();
+  
+  String transactionType = 'expense'; // 'income' or 'expense'
+  String? selectedCategory;
+  DateTime selectedDate = DateTime.now();
+  bool isLoading = false;
+  
+  // Categories
+  final List<Map<String, dynamic>> expenseCategories = [
+    {'name': 'Food', 'icon': Icons.restaurant},
+    {'name': 'Transport', 'icon': Icons.directions_car},
+    {'name': 'Shopping', 'icon': Icons.shopping_cart},
+    {'name': 'Entertainment', 'icon': Icons.movie},
+    {'name': 'Health', 'icon': Icons.local_hospital},
+    {'name': 'Education', 'icon': Icons.school},
+    {'name': 'Bills', 'icon': Icons.receipt},
+    {'name': 'Other', 'icon': Icons.more_horiz},
+  ];
+  
+  final List<Map<String, dynamic>> incomeCategories = [
+    {'name': 'Salary', 'icon': Icons.attach_money},
+    {'name': 'Business', 'icon': Icons.business},
+    {'name': 'Investment', 'icon': Icons.trending_up},
+    {'name': 'Gift', 'icon': Icons.card_giftcard},
+    {'name': 'Other', 'icon': Icons.more_horiz},
   ];
 
   @override
   void initState() {
     super.initState();
-    _selectedCategory = widget.categoryName;
+    transactionType = widget.initialType ?? 'expense';
   }
 
   @override
   void dispose() {
     _amountController.dispose();
     _titleController.dispose();
-    _messageController.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
-Future<void> _saveExpense() async {
-  if (_amountController.text.trim().isEmpty || _titleController.text.trim().isEmpty) {
-    _showErrorSnackBar("Please enter amount and title");
-    return;
-  }
+  Future<void> _saveTransaction() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    
+    if (selectedCategory == null) {
+      _showErrorSnackBar('Please select a category');
+      return;
+    }
 
-  final amount = double.tryParse(_amountController.text.replaceAll(RegExp(r"[^\d]"), ""));
-  if (amount == null || amount <= 0) {
-    _showErrorSnackBar("Invalid amount");
-    return;
-  }
+    setState(() {
+      isLoading = true;
+    });
 
-  setState(() => _isLoading = true);
+    try {
+      String userId = FirebaseAuth.instance.currentUser!.uid;
+      String transactionId = const Uuid().v4();
+      double amount = double.parse(_amountController.text.trim());
 
-  try {
-    final userId = _auth.currentUser?.uid;
-    if (userId == null) throw Exception("User not logged in");
+      // 1. Add transaction to Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('transactions')
+          .doc(transactionId)
+          .set({
+        'id': transactionId,
+        'type': transactionType,
+        'amount': amount,
+        'category': selectedCategory,
+        'title': _titleController.text.trim(),
+        'note': _noteController.text.trim(),
+        'date': Timestamp.fromDate(selectedDate),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
-    await context.read<TransactionProvider>().addExpense(
-      categoryId: widget.categoryName.toLowerCase(), // ✅ FIXED
-      amount: amount,
-      title: _titleController.text.trim(),
-      message: _messageController.text.trim(),
-      date: _selectedDate,
-    );
+      // 2. Update user balance and totals
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+      
+      var userData = userDoc.data() as Map<String, dynamic>? ?? {};
+      double currentBalance = (userData['balance'] ?? 0).toDouble();
+      double currentIncome = (userData['totalIncome'] ?? 0).toDouble();
+      double currentExpense = (userData['totalExpense'] ?? 0).toDouble();
 
-    if (mounted) Navigator.pop(context);
-  } catch (e) {
-    _showErrorSnackBar("Save error: $e");
-  } finally {
-    if (mounted) {
-      setState(() => _isLoading = false);
+      double newBalance = currentBalance;
+      double newIncome = currentIncome;
+      double newExpense = currentExpense;
+
+      if (transactionType == 'income') {
+        newBalance += amount;
+        newIncome += amount;
+      } else {
+        newBalance -= amount;
+        newExpense += amount;
+      }
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .update({
+        'balance': newBalance,
+        'totalIncome': newIncome,
+        'totalExpense': newExpense,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        _showSuccessSnackBar('Transaction added successfully!');
+        Navigator.pop(context, true); // Return true to indicate success
+      }
+      
+    } catch (e) {
+      print('Error saving transaction: $e');
+      _showErrorSnackBar('Failed to save transaction: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
-}
-
-
-
-
 
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -109,147 +153,46 @@ Future<void> _saveExpense() async {
     );
   }
 
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
+      initialDate: selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: widget.categoryColor,
-              onPrimary: Colors.white,
-              onSurface: Colors.black,
-            ),
-          ),
-          child: child!,
-        );
-      },
     );
-
-    if (picked != null && picked != _selectedDate) {
+    
+    if (picked != null && picked != selectedDate) {
       setState(() {
-        _selectedDate = picked;
+        selectedDate = picked;
       });
     }
-  }
-
-  void _showCategoryPicker() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Color(0xFF2C2C2C)
-                : Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          padding: EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              SizedBox(height: 20),
-              Text(
-                'Select Category',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 20),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                ),
-                itemCount: _categories.length,
-                itemBuilder: (context, index) {
-                  final category = _categories[index];
-                  final isSelected = _selectedCategory == category['name'];
-
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedCategory = category['name'];
-                      });
-                      Navigator.pop(context);
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? (category['color'] as Color).withOpacity(0.2)
-                            : (category['color'] as Color).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
-                        border: isSelected
-                            ? Border.all(
-                                color: category['color'] as Color, width: 2)
-                            : null,
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            category['icon'] as IconData,
-                            color: category['color'] as Color,
-                            size: 32,
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            category['name'],
-                            style: TextStyle(fontSize: 11),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-              SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
+    
     return Scaffold(
-      backgroundColor: widget.categoryColor,
+      backgroundColor: const Color(0xFF00CED1),
       appBar: AppBar(
-        backgroundColor: widget.categoryColor,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Add Expenses',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+        title: Text(
+          transactionType == 'income' ? 'Add Income' : 'Add Expense',
+          style: const TextStyle(color: Colors.white),
         ),
         actions: [
           IconButton(
@@ -260,7 +203,79 @@ Future<void> _saveExpense() async {
       ),
       body: Column(
         children: [
-          SizedBox(height: 20),
+          // Type Toggle
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        transactionType = 'income';
+                        selectedCategory = null;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: transactionType == 'income'
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Income',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: transactionType == 'income'
+                                ? const Color(0xFF00CED1)
+                                : Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        transactionType = 'expense';
+                        selectedCategory = null;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: transactionType == 'expense'
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Expense',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: transactionType == 'expense'
+                                ? const Color(0xFF00CED1)
+                                : Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Form Container
           Expanded(
             child: Container(
               decoration: BoxDecoration(
@@ -272,204 +287,257 @@ Future<void> _saveExpense() async {
               ),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Date Field
-                    _buildFieldLabel('Date'),
-                    GestureDetector(
-                      onTap: _selectDate,
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Date
+                      Text(
+                        'Date',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: _selectDate,
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                DateFormat('MMMM dd, yyyy').format(selectedDate),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: isDark ? Colors.white : Colors.black,
+                                ),
+                              ),
+                              Icon(
+                                Icons.calendar_today,
+                                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      // Category
+                      Text(
+                        'Category',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
-                          color: widget.categoryColor.withOpacity(0.1),
+                          color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100],
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              DateFormat('MMMM dd, yyyy').format(_selectedDate),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            value: selectedCategory,
+                            hint: Text(
+                              'Select category',
                               style: TextStyle(
-                                fontSize: 15,
-                                color: isDark ? Colors.white : Colors.black,
+                                color: isDark ? Colors.grey[400] : Colors.grey[600],
                               ),
                             ),
-                            Icon(
-                              Icons.calendar_today,
-                              color: widget.categoryColor,
-                              size: 20,
+                            dropdownColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                            icon: Icon(
+                              Icons.keyboard_arrow_down,
+                              color: isDark ? Colors.grey[400] : Colors.grey[600],
                             ),
-                          ],
+                            items: (transactionType == 'income'
+                                    ? incomeCategories
+                                    : expenseCategories)
+                                .map((category) {
+                              return DropdownMenuItem<String>(
+                                value: category['name'],
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      category['icon'],
+                                      size: 20,
+                                      color: const Color(0xFF00CED1),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      category['name'],
+                                      style: TextStyle(
+                                        color: isDark ? Colors.white : Colors.black,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (String? newValue) {
+                              setState(() {
+                                selectedCategory = newValue;
+                              });
+                            },
+                          ),
                         ),
                       ),
-                    ),
-
-                    SizedBox(height: 24),
-
-                    // Category Field
-                    _buildFieldLabel('Category'),
-                    GestureDetector(
-                      onTap: _showCategoryPicker,
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: widget.categoryColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
+                      const SizedBox(height: 20),
+                      
+                      // Amount
+                      Text(
+                        'Amount',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              _selectedCategory,
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: isDark ? Colors.white : Colors.black,
-                              ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _amountController,
+                        keyboardType: TextInputType.number,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: '0.00',
+                          hintStyle: TextStyle(
+                            color: isDark ? Colors.grey[600] : Colors.grey[400],
+                          ),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          prefixText: 'đ ',
+                          prefixStyle: TextStyle(
+                            fontSize: 16,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter amount';
+                          }
+                          if (double.tryParse(value) == null) {
+                            return 'Please enter valid number';
+                          }
+                          if (double.parse(value) <= 0) {
+                            return 'Amount must be greater than 0';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      // Expense Title
+                      Text(
+                        transactionType == 'income' ? 'Income Title' : 'Expense Title',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _titleController,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'E.g., Dinner',
+                          hintStyle: TextStyle(
+                            color: isDark ? Colors.grey[600] : Colors.grey[400],
+                          ),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter title';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      // Enter Message (Optional)
+                      Text(
+                        'Enter Message (Optional)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _noteController,
+                        maxLines: 3,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Add notes (optional)',
+                          hintStyle: TextStyle(
+                            color: isDark ? Colors.grey[600] : Colors.grey[400],
+                          ),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                      
+                      // Save Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: isLoading ? null : _saveTransaction,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF00CED1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                            Icon(
-                              Icons.arrow_drop_down,
-                              color: widget.categoryColor,
-                            ),
-                          ],
+                          ),
+                          child: isLoading
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Text(
+                                  'Save',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
                         ),
                       ),
-                    ),
-
-                    SizedBox(height: 24),
-
-                    // Amount Field
-                    _buildFieldLabel('Amount'),
-                    TextField(
-                      controller: _amountController,
-                      keyboardType: TextInputType.number,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: isDark ? Colors.white : Colors.black,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: '\$20.00',
-                        hintStyle: TextStyle(
-                          color: isDark ? Colors.grey[600] : Colors.grey[400],
-                        ),
-                        filled: true,
-                        fillColor: widget.categoryColor.withOpacity(0.1),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: EdgeInsets.all(16),
-                      ),
-                    ),
-
-                    SizedBox(height: 24),
-
-                    // Expense Title Field
-                    _buildFieldLabel('Expense Title'),
-                    TextField(
-                      controller: _titleController,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: isDark ? Colors.white : Colors.black,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Dinner',
-                        hintStyle: TextStyle(
-                          color: isDark ? Colors.grey[600] : Colors.grey[400],
-                        ),
-                        filled: true,
-                        fillColor: widget.categoryColor.withOpacity(0.1),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: EdgeInsets.all(16),
-                      ),
-                    ),
-
-                    SizedBox(height: 24),
-
-                    // Enter Message Field
-                    _buildFieldLabel('Enter Message', isOptional: true),
-                    TextField(
-                      controller: _messageController,
-                      maxLines: 3,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: isDark ? Colors.white : Colors.black,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Add notes (optional)',
-                        hintStyle: TextStyle(
-                          color: isDark ? Colors.grey[600] : Colors.grey[400],
-                        ),
-                        filled: true,
-                        fillColor: widget.categoryColor.withOpacity(0.1),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: EdgeInsets.all(16),
-                      ),
-                    ),
-
-                    SizedBox(height: 40),
-
-                    // Save Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-  onPressed: _isLoading ? null : _saveExpense,
-  style: ElevatedButton.styleFrom(
-    backgroundColor: widget.categoryColor,
-    padding: const EdgeInsets.symmetric(vertical: 16),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
-    ),
-    elevation: 0,
-  ),
-  child: _isLoading
-      ? const SizedBox(width:20, height:20, child:CircularProgressIndicator(strokeWidth:2))
-      : const Text(
-          "Save",
-          style: TextStyle(fontSize:16, fontWeight:FontWeight.bold, color:Colors.white),
-        ),
-),
-
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFieldLabel(String label, {bool isOptional = false}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.grey[400] : Colors.grey[700],
-            ),
-          ),
-          if (isOptional)
-            Text(
-              ' (Optional)',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[500],
-              ),
-            ),
         ],
       ),
     );

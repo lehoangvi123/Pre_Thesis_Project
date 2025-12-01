@@ -6,15 +6,15 @@ import 'package:intl/intl.dart';
 import '../FunctionCategorize/CurrencyFormatter.dart';
 
 class AddIncomeView extends StatefulWidget {
-  final String categoryName;
-  final IconData categoryIcon;
-  final Color categoryColor;
-
+  final String? categoryName;      // ✅ THÊM
+  final IconData? categoryIcon;    // ✅ THÊM
+  final Color? categoryColor;      // ✅ THÊM
+  
   const AddIncomeView({
     Key? key,
-    required this.categoryName,
-    required this.categoryIcon,
-    required this.categoryColor,
+    this.categoryName,    // ✅ THÊM
+    this.categoryIcon,    // ✅ THÊM
+    this.categoryColor,   // ✅ THÊM
   }) : super(key: key);
 
   @override
@@ -49,7 +49,7 @@ class _AddIncomeViewState extends State<AddIncomeView> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: widget.categoryColor,
+              primary: widget.categoryColor  ?? const Color(0xFF00CED1),
               onPrimary: Colors.white,
               onSurface: Colors.black,
             ),
@@ -293,7 +293,7 @@ class _AddIncomeViewState extends State<AddIncomeView> {
                               ),
                               const SizedBox(width: 12),
                               Text(
-                                widget.categoryName,
+                                widget.categoryName ?? const Color(0xFF00CED1).toString(),
                                 style: TextStyle(
                                   fontSize: 15,
                                   color: isDark ? Colors.white : Colors.black,

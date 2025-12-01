@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart'; 
 import 'package:cloud_firestore/cloud_firestore.dart'; 
-import 'package:shared_preferences/shared_preferences.dart'; 
 import 'package:flutter/material.dart'; 
 import '../login/LoginView.dart'; 
 import '../notification/NotificationView.dart';
@@ -20,14 +19,16 @@ class _HomeViewState extends State<HomeView> {
   String selectedPeriod = 'Monthly'; 
   String userName = 'User'; 
   bool isLoadingUserName = true; 
+  String? userId;
 
   @override
   void initState() {
     super.initState(); 
+    userId = FirebaseAuth.instance.currentUser?.uid;
     _loadUserName();
   }
 
- Future<void> _loadUserName() async {
+  Future<void> _loadUserName() async {
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
       
@@ -40,7 +41,6 @@ class _HomeViewState extends State<HomeView> {
         if (userDoc.exists) {
           Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
           
-          // ⭐ CHECK mounted before setState
           if (mounted) {
             setState(() {
               userName = userData['name'] ?? currentUser.displayName ?? 'User';
@@ -48,7 +48,6 @@ class _HomeViewState extends State<HomeView> {
             });
           }
         } else {
-          // ⭐ CHECK mounted before setState
           if (mounted) {
             setState(() {
               userName = currentUser.displayName ?? currentUser.email?.split('@')[0] ?? 'User';
@@ -56,25 +55,9 @@ class _HomeViewState extends State<HomeView> {
             });
           }
         }
-        
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user_name', userName); 
-        
-      } else {
-        final prefs = await SharedPreferences.getInstance();
-        
-        // ⭐ CHECK mounted before setState
-        if (mounted) {
-          setState(() {
-            userName = prefs.getString('user_name') ?? 'User';
-            isLoadingUserName = false;
-          });
-        }
       }
     } catch (e) {
       print('Error loading user name: $e');
-      
-      // ⭐ CHECK mounted before setState
       if (mounted) {
         setState(() {
           isLoadingUserName = false;
@@ -98,7 +81,7 @@ class _HomeViewState extends State<HomeView> {
               children: [
                 _buildHeader(),
                 const SizedBox(height: 24),
-                _buildBalanceCards(),
+                _buildBalanceCards(), // ✅ Now with real-time data
                 const SizedBox(height: 16),
                 _buildProgressBar(),
                 const SizedBox(height: 20),
@@ -106,7 +89,7 @@ class _HomeViewState extends State<HomeView> {
                 const SizedBox(height: 20),
                 _buildPeriodSelector(),
                 const SizedBox(height: 16),
-                _buildTransactionList(),
+                _buildTransactionList(), // ✅ Now with real-time transactions
               ],
             ),
           ),
@@ -253,9 +236,128 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
+  // ✅ REAL-TIME BALANCE CARDS
   Widget _buildBalanceCards() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
+    if (userId == null) {
+      return const Center(child: Text('Please login'));
+    }
+    
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return _buildEmptyBalanceCards(isDark);
+        }
+        
+        var userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
+        double balance = (userData['balance'] ?? 0).toDouble();
+        double totalExpense = (userData['totalExpense'] ?? 0).toDouble();
+        
+        return Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.account_balance_wallet_outlined,
+                          size: 16,
+                          color: isDark ? Colors.grey[500] : Colors.grey[600],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Total Balance',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_formatCurrency(balance)} đ',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.trending_down,
+                          size: 16,
+                          color: isDark ? Colors.grey[500] : Colors.grey[600],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Total Expenses',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_formatCurrency(totalExpense)} đ',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyBalanceCards(bool isDark) {
     return Row(
       children: [
         Expanded(
@@ -290,7 +392,7 @@ class _HomeViewState extends State<HomeView> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '0',
+                  '0 đ',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -334,11 +436,11 @@ class _HomeViewState extends State<HomeView> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  '0',
+                  '0 đ',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue,
+                    color: Colors.red,
                   ),
                 ),
               ],
@@ -518,39 +620,108 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
+  // ✅ REAL-TIME TRANSACTION LIST
   Widget _buildTransactionList() {
-    return Column(
-      children: [
-        _buildTransactionItem(
-          icon: Icons.attach_money,
-          iconColor: Colors.blue[400]!,
-          title: 'Salary',
-          date: '8-27 - April 30',
-          category: 'Monthly',
-          amount: '5,000,000 VND',
-          isPositive: true,
-        ),
-        const SizedBox(height: 12),
-        _buildTransactionItem(
-          icon: Icons.shopping_cart,
-          iconColor: Colors.blue[600]!,
-          title: 'Groceries',
-          date: '17-30 - April 24',
-          category: 'Pantry',
-          amount: '-10,000,000 VND',
-          isPositive: false,
-        ),
-        const SizedBox(height: 12),
-        _buildTransactionItem(
-          icon: Icons.home,
-          iconColor: Colors.blue[400]!,
-          title: 'Rent',
-          date: '8-30 - April 18',
-          category: 'Rent',
-          amount: '-3,000,000 VND',
-          isPositive: false,
-        ),
-      ],
+    if (userId == null) {
+      return const Center(child: Text('Please login'));
+    }
+    
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('transactions')
+          .orderBy('date', descending: true)
+          .limit(5)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                children: [
+                  Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No transactions yet',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Add your first transaction to get started',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        return Column(
+          children: snapshot.data!.docs.map((doc) {
+            var txData = doc.data() as Map<String, dynamic>;
+            bool isIncome = txData['type']?.toString().toLowerCase() == 'income';
+            
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildTransactionItem(
+                icon: _getCategoryIcon(txData['category'] ?? 'Other'),
+                iconColor: isIncome ? Colors.green[400]! : Colors.blue[400]!,
+                title: txData['title'] ?? 'No title',
+                date: _formatDate(txData['date']),
+                category: txData['category'] ?? 'Other',
+                amount: '${isIncome ? '+' : '-'}${_formatCurrency(txData['amount']?.toDouble() ?? 0)} đ',
+                isPositive: isIncome,
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'food':
+        return Icons.restaurant;
+      case 'transport':
+        return Icons.directions_car;
+      case 'groceries':
+        return Icons.shopping_cart;
+      case 'rent':
+        return Icons.home;
+      case 'salary':
+        return Icons.attach_money;
+      case 'entertainment':
+        return Icons.movie;
+      default:
+        return Icons.category;
+    }
+  }
+
+  String _formatDate(dynamic timestamp) {
+    if (timestamp == null) return 'Unknown date';
+    
+    try {
+      if (timestamp is Timestamp) {
+        DateTime date = timestamp.toDate();
+        return '${date.day}-${date.month}-${date.year}';
+      }
+      return 'Unknown date';
+    } catch (e) {
+      return 'Unknown date';
+    }
+  }
+
+  String _formatCurrency(double amount) {
+    return amount.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
     );
   }
 
