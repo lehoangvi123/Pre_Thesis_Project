@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:project1/models/Category_model.dart';
+import '../../models/Category_model.dart';
 import 'package:provider/provider.dart';
 import '../../provider/TransactionProvider.dart'; 
 
@@ -60,51 +60,42 @@ class _AddExpenseViewState extends State<AddExpenseView> {
     super.dispose();
   }
 
- Future<void> _saveExpense() async {
+Future<void> _saveExpense() async {
   if (_amountController.text.trim().isEmpty || _titleController.text.trim().isEmpty) {
-    _showErrorSnackBar("Vui lòng nhập số tiền và tiêu đề");
+    _showErrorSnackBar("Please enter amount and title");
     return;
   }
 
   final amount = double.tryParse(_amountController.text.replaceAll(RegExp(r"[^\d]"), ""));
   if (amount == null || amount <= 0) {
-    _showErrorSnackBar("Số tiền không hợp lệ");
+    _showErrorSnackBar("Invalid amount");
     return;
   }
 
   setState(() => _isLoading = true);
 
   try {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) throw Exception("User chưa đăng nhập");
-
-    final category = CategoryModel(
-      id: widget.categoryName.toLowerCase(), // demo id, nếu bạn có id thật từ Firestore thì dùng id đó
-      name: widget.categoryName,
-      type: "expense",
-      iconName: widget.categoryIcon.toString(),
-      colorHex: widget.categoryColor.value.toRadixString(16),
-    );
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) throw Exception("User not logged in");
 
     await context.read<TransactionProvider>().addExpense(
-      categoryId: category.id, 
+      categoryId: widget.categoryName.toLowerCase(), // ✅ FIXED
       amount: amount,
       title: _titleController.text.trim(),
       message: _messageController.text.trim(),
       date: _selectedDate,
     );
 
-    if (mounted) {
-      Navigator.pop(context);
-    }
+    if (mounted) Navigator.pop(context);
   } catch (e) {
-    _showErrorSnackBar("Lỗi khi lưu: $e");
+    _showErrorSnackBar("Save error: $e");
   } finally {
     if (mounted) {
       setState(() => _isLoading = false);
     }
   }
 }
+
 
 
 

@@ -7,42 +7,29 @@ import 'package:project1/view/login/WelcomeView.dart';
 import 'package:project1/view/login/OnboardingView.dart';
 import 'package:project1/view/Function/HomeView.dart';
 import './view/ThemeProvider/ThemeProviderDark.dart';
-import './view/Function/Language/MultiLanguage.dart';
+import './view/Function/Language/MultiLanguage.dart'; 
+import './provider/TransactionProvider.dart';
 
-void main() async { 
-  // Đảm bảo Flutter engine đã khởi tạo
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
 
-  // Khởi tạo Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  
-  // Load language (nếu cần)
-  await AppLocalizations.loadLanguage();
-  
-  // Chạy app
 
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    print('✅ Firebase initialized successfully');
-  } catch (e) {
-    print('❌ Firebase init error: $e');
-  }
-  
   await AppLocalizations.loadLanguage();
-  
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    MultiProvider( // ✅ Wrap with MultiProvider
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => TransactionProvider()..listenAll()), // ✅ Add this
+      ],
       child: const MyApp(),
     ),
   );
 }
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});

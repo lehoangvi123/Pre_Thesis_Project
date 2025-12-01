@@ -19,16 +19,18 @@ class TransactionService {
       _db.collection('users').doc(uid).collection('transactions');
 
   // Đảm bảo user doc có field balance tồn tại trước khi update
-  Future<void> ensureUserDoc() async {
-    if (uid.isEmpty) throw Exception("User not logged in");
+ Future<void> ensureUserDoc() async {
+  final uid = this.uid; // use getter value
+  if (uid.isEmpty) throw Exception("User not logged in");
 
-    final snap = await _userDoc.get();
-    if (!snap.exists) {
-      await _userDoc.set({'balance': 0.0});
-    } else if (!snap.data()!.containsKey('balance')) {
-      await _userDoc.update({'balance': 0.0});
-    }
-  }
+  final snap = await _userDoc.get();
+  if (!snap.exists) {
+    await _userDoc.set({'balance': 0.0});
+  } else if (!(snap.data()?.containsKey('balance') ?? false)) {
+    await _userDoc.update({'balance': 0.0});
+  } 
+}
+
 
   // ➕ Thêm INCOME transaction
   Future<void> addIncome({
@@ -58,7 +60,8 @@ class TransactionService {
       isIncome: true,
     );
 
-    await _txRef.doc(id).set(tx.toMap());
+   await _txRef.doc(id).set(tx.toMap()); // ✅ correct
+
 
     // Cộng số dư
     await _userDoc.update({

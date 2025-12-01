@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart'; 
-import './AddExpenseView.dart';
-import './AddIncomeView.dart'; // ✅ Import VND version
+import '../Function/AddExpenseView.dart';
+import '../Function/AddIncomeView.dart'; // ✅ Import VND version
 import './CurrencyFormatter.dart'; // ✅ Import currency formatter
 
 class CategoryDetailView extends StatefulWidget {
@@ -482,13 +482,15 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
       return const Stream.empty();
     }
 
-    return _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('expenses')
-        .where('category', isEqualTo: widget.categoryName)
-        .orderBy('date', descending: true)
-        .snapshots();
+   return _firestore
+  .collection('users')
+  .doc(userId)
+  .collection('transactions') // ✅ Should be 'transactions'
+  .where('categoryId', isEqualTo: widget.categoryName.toLowerCase())
+  .where('type', isEqualTo: 'expense')
+  .orderBy('date', descending: true)
+  .snapshots();
+
   }
 
   // ✅ UPDATED: Returns Future<bool?> to check if something was added

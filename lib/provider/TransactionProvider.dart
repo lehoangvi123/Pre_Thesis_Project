@@ -42,18 +42,18 @@ class TransactionProvider with ChangeNotifier {
     required DateTime date,
   }) async {
     await _service.addExpense(
-      category: CategoryModel(
-        id: categoryId,
-        name: categoryId,
-        type: "expense",
-        iconName: "",
-        colorHex: "",
-      ),
-      amount: amount,
-      title: title,
-      message: message,
-      date: date,
-    );
+  category: CategoryModel.expense(
+    id: categoryId,
+    name: categoryId,
+    iconName: "",
+    colorHex: "",
+  ),
+  amount: amount,
+  title: title,
+  message: message,
+  date: date,
+);
+
   }
 
   Future<void> addIncome({
@@ -64,18 +64,18 @@ class TransactionProvider with ChangeNotifier {
     required DateTime date,
   }) async {
     await _service.addIncome(
-      category: CategoryModel(
-        id: categoryId,
-        name: categoryId,
-        type: "income",
-        iconName: "",
-        colorHex: "",
-      ),
-      amount: amount,
-      title: title,
-      message: message,
-      date: date,
-    );
+  category: CategoryModel.income(
+    id: categoryId,
+    name: categoryId,
+    iconName: "",
+    colorHex: "",
+  ),
+  amount: amount,
+  title: title,
+  message: message,
+  date: date,
+);
+
   }
 
   Stream<List<TransactionModel>> watchCategoryExpenses(String categoryId) =>

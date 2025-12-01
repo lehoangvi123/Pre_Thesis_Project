@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/Category_model.dart';
+import '../../models/Category_model.dart';
 
 class CategoryService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -28,58 +28,51 @@ class CategoryService {
   }
 
   // Get default categories list
-  List<CategoryModel> _getDefaultCategories() {
-    final userId = _uid;
-    final now = DateTime.now();
+ List<CategoryModel> _getDefaultCategories() {
+  final userId = _uid;
 
-    return [
-      // Expense Categories
-      CategoryModel(
-        id: 'exp_food_$userId',
-        name: 'Food',
-        type: 'expense',
-        iconName: 'restaurant',
-        colorHex: '#FF6B6B',
-      ),
-      CategoryModel(
-        id: 'exp_transport_$userId',
-        name: 'Transport',
-        type: 'expense',
-        iconName: 'directions_bus',
-        colorHex: '#4ECDC4',
-      ),
-      CategoryModel(
-        id: 'exp_medicine_$userId',
-        name: 'Medicine',
-        type: 'expense',
-        iconName: 'medical_services',
-        colorHex: '#45B7D1',
-      ),
-      CategoryModel(
-        id: 'exp_savings_$userId',
-        name: 'Savings',
-        type: 'expense',
-        iconName: 'savings',
-        colorHex: '#74B9FF',
-      ),
+  return [
+    // 💸 Expense Categories
+    CategoryModel.expense(
+      id: 'exp_food_$userId',
+      name: 'Food',
+      iconName: 'restaurant',
+      colorHex: '#FF6B6B',
+    ),
+    CategoryModel.expense(
+      id: 'exp_transport_$userId',
+      name: 'Transport',
+      iconName: 'directions_bus',
+      colorHex: '#4ECDC4',
+    ),
+    CategoryModel.expense(
+      id: 'exp_medicine_$userId',
+      name: 'Medicine',
+      iconName: 'medical_services',
+      colorHex: '#45B7D1',
+    ),
+    CategoryModel.expense(
+      id: 'exp_savings_$userId',
+      name: 'Savings',
+      iconName: 'savings',
+      colorHex: '#74B9FF',
+    ),
 
-      // Income Categories
-      CategoryModel(
-        id: 'inc_salary_$userId',
-        name: 'Salary',
-        type: 'income',
-        iconName: 'account_balance_wallet',
-        colorHex: '#00B894',
-      ),
-      CategoryModel(
-        id: 'inc_freelance_$userId',
-        name: 'Freelance',
-        type: 'income',
-        iconName: 'work',
-        colorHex: '#00CEC9',
-      ),
-    ];
-  }
+    // 💰 Income Categories
+    CategoryModel.income(
+      id: 'inc_salary_$userId',
+      name: 'Salary',
+      iconName: 'account_balance_wallet',
+      colorHex: '#00B894',
+    ),
+    CategoryModel.income(
+      id: 'inc_freelance_$userId',
+      name: 'Freelance',
+      iconName: 'work',
+      colorHex: '#00CEC9',
+    ),
+  ];
+}
 
   // 💎 Stream realtime categories của user
   Stream<List<CategoryModel>> getUserCategories() async* {
