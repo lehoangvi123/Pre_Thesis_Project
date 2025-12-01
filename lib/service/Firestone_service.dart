@@ -17,26 +17,26 @@ class FirestoreService {
           .doc(tx.id)
           .set(tx.toJson());
 
-      // 2. Lấy balance hiện tại
+      // 2. Lấy totals hiện tại (KHÔNG lấy balance)
       DocumentSnapshot userDoc = await _db.collection('users').doc(userId).get();
-      double currentBalance = (userDoc.data() as Map<String, dynamic>?)?['balance']?.toDouble() ?? 0.0;
-      double currentIncome = (userDoc.data() as Map<String, dynamic>?)?['totalIncome']?.toDouble() ?? 0.0;
-      double currentExpense = (userDoc.data() as Map<String, dynamic>?)?['totalExpense']?.toDouble() ?? 0.0;
+      var userData = (userDoc.data() as Map<String, dynamic>?) ?? {};
+      double currentIncome = (userData['totalIncome'] ?? 0).toDouble();
+      double currentExpense = (userData['totalExpense'] ?? 0).toDouble();
 
-      // 3. Tính toán mới
-      double newBalance = currentBalance;
+      // 3. Cập nhật totals dựa trên type
       double newIncome = currentIncome;
       double newExpense = currentExpense;
 
       if (tx.type.toLowerCase() == 'income') {
-        newBalance += tx.amount;
         newIncome += tx.amount;
       } else if (tx.type.toLowerCase() == 'expense') {
-        newBalance -= tx.amount;
         newExpense += tx.amount;
       }
 
-      // 4. Update user document
+      // 4. Tính balance từ công thức: Balance = Income - Expense
+      double newBalance = newIncome - newExpense;
+
+      // 5. Update user document
       await _db.collection('users').doc(userId).update({
         'balance': newBalance,
         'totalIncome': newIncome,
@@ -44,7 +44,8 @@ class FirestoreService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      print('✅ Transaction added. New balance: $newBalance');
+      print('✅ Transaction added.');
+      print('   Income: $newIncome, Expense: $newExpense, Balance: $newBalance');
     } catch (e) {
       print('❌ Error adding transaction: $e');
       rethrow;
@@ -62,26 +63,26 @@ class FirestoreService {
           .doc(tx.id)
           .delete();
 
-      // 2. Lấy balance hiện tại
+      // 2. Lấy totals hiện tại
       DocumentSnapshot userDoc = await _db.collection('users').doc(userId).get();
-      double currentBalance = (userDoc.data() as Map<String, dynamic>?)?['balance']?.toDouble() ?? 0.0;
-      double currentIncome = (userDoc.data() as Map<String, dynamic>?)?['totalIncome']?.toDouble() ?? 0.0;
-      double currentExpense = (userDoc.data() as Map<String, dynamic>?)?['totalExpense']?.toDouble() ?? 0.0;
+      var userData = (userDoc.data() as Map<String, dynamic>?) ?? {};
+      double currentIncome = (userData['totalIncome'] ?? 0).toDouble();
+      double currentExpense = (userData['totalExpense'] ?? 0).toDouble();
 
       // 3. Hoàn tác số tiền
-      double newBalance = currentBalance;
       double newIncome = currentIncome;
       double newExpense = currentExpense;
 
       if (tx.type.toLowerCase() == 'income') {
-        newBalance -= tx.amount;
         newIncome -= tx.amount;
       } else if (tx.type.toLowerCase() == 'expense') {
-        newBalance += tx.amount;
         newExpense -= tx.amount;
       }
 
-      // 4. Update
+      // 4. Tính lại balance
+      double newBalance = newIncome - newExpense;
+
+      // 5. Update
       await _db.collection('users').doc(userId).update({
         'balance': newBalance,
         'totalIncome': newIncome,
@@ -89,7 +90,8 @@ class FirestoreService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      print('✅ Transaction deleted. New balance: $newBalance');
+      print('✅ Transaction deleted.');
+      print('   Income: $newIncome, Expense: $newExpense, Balance: $newBalance');
     } catch (e) {
       print('❌ Error deleting transaction: $e');
       rethrow;

@@ -620,70 +620,69 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  // ✅ REAL-TIME TRANSACTION LIST
   Widget _buildTransactionList() {
-    if (userId == null) {
-      return const Center(child: Text('Please login'));
-    }
-    
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .collection('transactions')
-          .orderBy('date', descending: true)
-          .limit(5)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Column(
-                children: [
-                  Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No transactions yet',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Add your first transaction to get started',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
-                  ),
-                ],
-              ),
+  if (userId == null) {
+    return const Center(child: Text('Please login'));
+  }
+  
+  return StreamBuilder<QuerySnapshot>(
+    stream: FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('transactions')
+        .orderBy('date', descending: true)
+        .limit(5)
+        .snapshots(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      
+      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              children: [
+                Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                Text(
+                  'No transactions yet',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      
+      return Column(
+        children: snapshot.data!.docs.map((doc) {
+          var txData = doc.data() as Map<String, dynamic>;
+          
+          // ✅ FIX: Kiểm tra type chính xác
+          String type = (txData['type'] ?? 'expense').toString().toLowerCase();
+          bool isIncome = type == 'income';
+          
+          double amount = (txData['amount'] ?? 0).toDouble();
+          
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildTransactionItem(
+              icon: _getCategoryIcon(txData['category'] ?? 'Other'),
+              iconColor: isIncome ? Colors.green[400]! : Colors.red[400]!,
+              title: txData['title'] ?? 'No title',
+              date: _formatDate(txData['date']),
+              category: txData['category'] ?? 'Other',
+              amount: '${isIncome ? '+' : '-'}${_formatCurrency(amount)} đ',
+              isPositive: isIncome,
             ),
           );
-        }
-        
-        return Column(
-          children: snapshot.data!.docs.map((doc) {
-            var txData = doc.data() as Map<String, dynamic>;
-            bool isIncome = txData['type']?.toString().toLowerCase() == 'income';
-            
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _buildTransactionItem(
-                icon: _getCategoryIcon(txData['category'] ?? 'Other'),
-                iconColor: isIncome ? Colors.green[400]! : Colors.blue[400]!,
-                title: txData['title'] ?? 'No title',
-                date: _formatDate(txData['date']),
-                category: txData['category'] ?? 'Other',
-                amount: '${isIncome ? '+' : '-'}${_formatCurrency(txData['amount']?.toDouble() ?? 0)} đ',
-                isPositive: isIncome,
-              ),
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
+        }).toList(),
+      );
+    },
+  );
+}
 
   IconData _getCategoryIcon(String category) {
     switch (category.toLowerCase()) {
@@ -898,5 +897,7 @@ class _HomeViewState extends State<HomeView> {
         child: Icon(icon, color: color, size: 26),
       ),
     );
-  }
+  } 
+
+  
 }

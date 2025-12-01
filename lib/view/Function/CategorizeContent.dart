@@ -39,45 +39,74 @@ class _CategoriesViewState extends State<CategoriesView> {
     {'name': 'Investment', 'icon': Icons.trending_up, 'color': Color(0xFF81C784), 'type': 'income'},
   ];
 
+  String _formatCurrency(double amount) {
+    return amount.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final userId = _auth.currentUser?.uid;
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF8F9FA),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(),
-                const SizedBox(height: 28),
-                _buildBalanceCards(),
-                const SizedBox(height: 32),
-                
-                // Expense Categories Section
-                _buildCategoriesSection(
-                  title: 'Expense',
-                  categories: _defaultExpenseCategories,
-                  categoryType: 'expense',
-                ),
-                
-                const SizedBox(height: 40),
-                
-                // Income Categories Section
-                _buildCategoriesSection(
-                  title: 'Income',
-                  categories: _defaultIncomeCategories,
-                  categoryType: 'income',
-                ),
-                
-                const SizedBox(height: 100),
-              ],
-            ),
-          ),
-        ),
+        child: userId == null
+            ? const Center(child: Text('Please login'))
+            : StreamBuilder<DocumentSnapshot>(
+                stream: _firestore.collection('users').doc(userId).snapshots(),
+                builder: (context, snapshot) {
+                  double balance = 0.0;
+                  double totalIncome = 0.0;
+                  double totalExpense = 0.0;
+
+                  if (snapshot.hasData && snapshot.data!.exists) {
+                    var userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
+                    balance = (userData['balance'] ?? 0).toDouble();
+                    totalIncome = (userData['totalIncome'] ?? 0).toDouble();
+                    totalExpense = (userData['totalExpense'] ?? 0).toDouble();
+                  }
+
+                  return SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildHeader(),
+                          const SizedBox(height: 28),
+                          
+                          // ✅ UPDATED: Balance Cards với real-time data
+                          _buildBalanceCards(balance, totalIncome, totalExpense, isDark),
+                          
+                          const SizedBox(height: 32),
+                          
+                          // Expense Categories Section
+                          _buildCategoriesSection(
+                            title: 'Expense',
+                            categories: _defaultExpenseCategories,
+                            categoryType: 'expense',
+                          ),
+                          
+                          const SizedBox(height: 40),
+                          
+                          // Income Categories Section
+                          _buildCategoriesSection(
+                            title: 'Income',
+                            categories: _defaultIncomeCategories,
+                            categoryType: 'income',
+                          ),
+                          
+                          const SizedBox(height: 100),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
       ),
       bottomNavigationBar: _buildBottomNavBar(),
     );
@@ -151,12 +180,8 @@ class _CategoriesViewState extends State<CategoriesView> {
     );
   }
 
-// Replace your _buildBalanceCard() method with these two methods:
-
-  // ✅ NEW: Build three cards showing Balance, Income, and Expenses
-  Widget _buildBalanceCards() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
+  // ✅ UPDATED: Balance Cards với real-time data
+  Widget _buildBalanceCards(double balance, double totalIncome, double totalExpense, bool isDark) {
     return Column(
       children: [
         // Row 1: Balance and Income
@@ -166,9 +191,9 @@ class _CategoriesViewState extends State<CategoriesView> {
             Expanded(
               child: _buildInfoCard(
                 title: 'Total Balance',
-                amount: '0',
+                amount: '${_formatCurrency(balance)} đ',
                 icon: Icons.account_balance_wallet_rounded,
-                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                color: balance >= 0 ? const Color(0xFF4CAF50) : const Color(0xFFE53935),
                 isDark: isDark,
               ),
             ),
@@ -177,9 +202,9 @@ class _CategoriesViewState extends State<CategoriesView> {
             Expanded(
               child: _buildInfoCard(
                 title: 'Total Income',
-                amount: '0', 
+                amount: '${_formatCurrency(totalIncome)} đ',
                 icon: Icons.trending_up_rounded,
-                color: const Color(0xFF4CAF50), // Green for income
+                color: const Color(0xFF4CAF50),
                 isDark: isDark, 
               ),
             ),
@@ -189,68 +214,90 @@ class _CategoriesViewState extends State<CategoriesView> {
         // Row 2: Expenses (full width)
         _buildInfoCard(
           title: 'Total Expenses',
-          amount: '0',
+          amount: '${_formatCurrency(totalExpense)} đ',
           icon: Icons.trending_down_rounded,
-          color: const Color(0xFF2196F3), // Blue for expenses
+          color: const Color(0xFF2196F3),
           isDark: isDark,
           isFullWidth: true,
         ),
         const SizedBox(height: 16),
         // Progress bar
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: isDark 
-                ? Colors.green.withOpacity(0.12) 
-                : Colors.green.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: Colors.green.withOpacity(0.2),
-              width: 1,
+        _buildProgressBar(totalExpense, isDark),
+      ],
+    );
+  }
+
+  // ✅ Progress Bar
+  Widget _buildProgressBar(double totalExpense, bool isDark) {
+    double budgetLimit = 20000000; // 20 triệu VND
+    double percentage = totalExpense > 0 
+        ? (totalExpense / budgetLimit * 100).clamp(0, 100) 
+        : 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: isDark 
+            ? Colors.green.withOpacity(0.12) 
+            : Colors.green.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.green.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.check_circle_rounded,
+              color: Colors.green[600],
+              size: 20,
             ),
           ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.check_circle_rounded,
-                  color: Colors.green[600],
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  '30% Of Your Expenses, Looks Good',
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${percentage.toStringAsFixed(1)}% Of Your Expenses',
                   style: TextStyle(
                     fontSize: 14,
                     color: isDark ? Colors.grey[300] : Colors.grey[800],
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                '\$20,000.00',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                const SizedBox(height: 4),
+                LinearProgressIndicator(
+                  value: percentage / 100,
+                  backgroundColor: Colors.grey[300],
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    percentage < 70 ? Colors.green[600]! : Colors.red[600]!,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+          const SizedBox(width: 12),
+          Text(
+            '${_formatCurrency(budgetLimit)} đ',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // ✅ NEW: Helper method to build individual info cards
   Widget _buildInfoCard({
     required String title,
     required String amount,
@@ -305,7 +352,7 @@ class _CategoriesViewState extends State<CategoriesView> {
           Text(
             amount,
             style: TextStyle(
-              fontSize: isFullWidth ? 28 : 24,
+              fontSize: isFullWidth ? 22 : 18,
               fontWeight: FontWeight.bold,
               color: color,
               letterSpacing: -0.5,
@@ -316,6 +363,7 @@ class _CategoriesViewState extends State<CategoriesView> {
     );
   }
 
+  // ... REST OF THE CODE CONTINUES IN NEXT PART 
   Widget _buildCategoriesSection({
     required String title,
     required List<Map<String, dynamic>> categories,
@@ -360,7 +408,7 @@ class _CategoriesViewState extends State<CategoriesView> {
               .collection('users')
               .doc(_auth.currentUser?.uid)
               .collection('categories')
-              .snapshots(),  // ✅ REMOVED type filter to show all categories
+              .snapshots(),
           builder: (context, snapshot) {
             final customCategories = snapshot.hasData
                 ? snapshot.data!.docs
@@ -368,19 +416,15 @@ class _CategoriesViewState extends State<CategoriesView> {
                       try {
                         final data = doc.data() as Map<String, dynamic>;
                         
-                        // ✅ FIXED: Handle icon field - can be int or String
                         IconData icon = Icons.category;
                         if (data['icon'] != null) {
                           if (data['icon'] is int) {
-                            // Icon saved as codePoint (int)
                             icon = IconData(data['icon'] as int, fontFamily: 'MaterialIcons');
                           } else if (data['icon'] is String) {
-                            // Icon saved as string name
                             icon = _getIconFromString(data['icon'] as String);
                           }
                         }
                         
-                        // ✅ FIXED: Handle color field
                         int colorValue = 0xFF00CED1;
                         if (data['color'] != null) {
                           if (data['color'] is int) {
@@ -390,12 +434,10 @@ class _CategoriesViewState extends State<CategoriesView> {
                           }
                         }
                         
-                        // ✅ Get the type, default to 'expense' if not set
                         String docType = data['type'] ?? 'expense';
                         
-                        // ✅ Only include categories matching this section's type
                         if (docType != categoryType) {
-                          return null;  // Skip categories of different type
+                          return null;
                         }
                         
                         return {
@@ -447,7 +489,10 @@ class _CategoriesViewState extends State<CategoriesView> {
     );
   }
 
-  Widget _buildCategoryCard(
+  // ... (Copy tất cả methods còn lại từ file cũ của bạn)
+  // _buildCategoryCard, _getIconFromString, _showDeleteDialog, 
+  // _deleteCategory, _buildMoreButton, _buildBottomNavBar, _buildNavItem 
+   Widget _buildCategoryCard(
       String name, IconData icon, Color color, bool isCustom) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
