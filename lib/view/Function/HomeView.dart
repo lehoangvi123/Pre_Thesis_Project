@@ -236,7 +236,7 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  // ✅ REAL-TIME BALANCE CARDS
+  // ✅ REAL-TIME BALANCE CARDS với Income
   Widget _buildBalanceCards() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
@@ -260,100 +260,133 @@ class _HomeViewState extends State<HomeView> {
         
         var userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
         double balance = (userData['balance'] ?? 0).toDouble();
+        double totalIncome = (userData['totalIncome'] ?? 0).toDouble();
         double totalExpense = (userData['totalExpense'] ?? 0).toDouble();
         
-        return Row(
+        return Column(
           children: [
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+            // Row 1: Balance + Income
+            Row(
+              children: [
+                // Total Balance
+                Expanded(
+                  child: _buildBalanceCard(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: 'Total Balance',
+                    amount: balance,
+                    color: balance >= 0 ? Colors.green : Colors.red,
+                    isDark: isDark,
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.account_balance_wallet_outlined,
-                          size: 16,
-                          color: isDark ? Colors.grey[500] : Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Total Balance',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? Colors.grey[400] : Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${_formatCurrency(balance)} đ',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black,
-                      ),
-                    ),
-                  ],
+                const SizedBox(width: 12),
+                // Total Income
+                Expanded(
+                  child: _buildBalanceCard(
+                    icon: Icons.trending_up,
+                    label: 'Total Income',
+                    amount: totalIncome,
+                    color: Colors.green,
+                    isDark: isDark,
+                  ),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.trending_down,
-                          size: 16,
-                          color: isDark ? Colors.grey[500] : Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Total Expenses',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? Colors.grey[400] : Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${_formatCurrency(totalExpense)} đ',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.red,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            const SizedBox(height: 12),
+            // Row 2: Expenses (full width)
+            _buildBalanceCard(
+              icon: Icons.trending_down,
+              label: 'Total Expenses',
+              amount: totalExpense,
+              color: Colors.red,
+              isDark: isDark,
+              isFullWidth: true,
             ),
           ],
         );
       },
+    );
+  }
+
+  // ✅ Helper method để build balance card
+  Widget _buildBalanceCard({
+    required IconData icon,
+    required String label,
+    required double amount,
+    required Color color,
+    required bool isDark,
+    bool isFullWidth = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+        ),
+      ),
+      child: isFullWidth
+          ? Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      icon,
+                      size: 16,
+                      color: isDark ? Colors.grey[500] : Colors.grey[600],
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  '${_formatCurrency(amount)} đ',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      icon,
+                      size: 16,
+                      color: isDark ? Colors.grey[500] : Colors.grey[600],
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${_formatCurrency(amount)} đ',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
     );
   }
 
@@ -620,69 +653,70 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
+  // ✅ REAL-TIME TRANSACTION LIST
   Widget _buildTransactionList() {
-  if (userId == null) {
-    return const Center(child: Text('Please login'));
-  }
-  
-  return StreamBuilder<QuerySnapshot>(
-    stream: FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
-        .collection('transactions')
-        .orderBy('date', descending: true)
-        .limit(5)
-        .snapshots(),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      
-      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32.0),
-            child: Column(
-              children: [
-                Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                Text(
-                  'No transactions yet',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 16),
-                ),
-              ],
-            ),
-          ),
-        );
-      }
-      
-      return Column(
-        children: snapshot.data!.docs.map((doc) {
-          var txData = doc.data() as Map<String, dynamic>;
-          
-          // ✅ FIX: Kiểm tra type chính xác
-          String type = (txData['type'] ?? 'expense').toString().toLowerCase();
-          bool isIncome = type == 'income';
-          
-          double amount = (txData['amount'] ?? 0).toDouble();
-          
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _buildTransactionItem(
-              icon: _getCategoryIcon(txData['category'] ?? 'Other'),
-              iconColor: isIncome ? Colors.green[400]! : Colors.red[400]!,
-              title: txData['title'] ?? 'No title',
-              date: _formatDate(txData['date']),
-              category: txData['category'] ?? 'Other',
-              amount: '${isIncome ? '+' : '-'}${_formatCurrency(amount)} đ',
-              isPositive: isIncome,
+    if (userId == null) {
+      return const Center(child: Text('Please login'));
+    }
+    
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('transactions')
+          .orderBy('date', descending: true)
+          .limit(5)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                children: [
+                  Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No transactions yet',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Add your first transaction to get started',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                  ),
+                ],
+              ),
             ),
           );
-        }).toList(),
-      );
-    },
-  );
-}
+        }
+        
+        return Column(
+          children: snapshot.data!.docs.map((doc) {
+            var txData = doc.data() as Map<String, dynamic>;
+            bool isIncome = txData['type']?.toString().toLowerCase() == 'income';
+            
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildTransactionItem(
+                icon: _getCategoryIcon(txData['category'] ?? 'Other'),
+                iconColor: isIncome ? Colors.green[400]! : Colors.blue[400]!,
+                title: txData['title'] ?? 'No title',
+                date: _formatDate(txData['date']),
+                category: txData['category'] ?? 'Other',
+                amount: '${isIncome ? '+' : '-'}${_formatCurrency(txData['amount']?.toDouble() ?? 0)} đ',
+                isPositive: isIncome,
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
 
   IconData _getCategoryIcon(String category) {
     switch (category.toLowerCase()) {
@@ -897,7 +931,5 @@ class _HomeViewState extends State<HomeView> {
         child: Icon(icon, color: color, size: 26),
       ),
     );
-  } 
-
-  
+  }
 }

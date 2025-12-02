@@ -3,18 +3,17 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import '../FunctionCategorize/CurrencyFormatter.dart';
 
 class AddIncomeView extends StatefulWidget {
-  final String? categoryName;      // ✅ THÊM
-  final IconData? categoryIcon;    // ✅ THÊM
-  final Color? categoryColor;      // ✅ THÊM
+  final String? categoryName;
+  final IconData? categoryIcon;
+  final Color? categoryColor;
   
   const AddIncomeView({
     Key? key,
-    this.categoryName,    // ✅ THÊM
-    this.categoryIcon,    // ✅ THÊM
-    this.categoryColor,   // ✅ THÊM
+    this.categoryName,
+    this.categoryIcon,
+    this.categoryColor,
   }) : super(key: key);
 
   @override
@@ -49,7 +48,7 @@ class _AddIncomeViewState extends State<AddIncomeView> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: widget.categoryColor  ?? const Color(0xFF00CED1),
+              primary: widget.categoryColor ?? const Color(0xFF00CED1),
               onPrimary: Colors.white,
               onSurface: Colors.black,
             ),
@@ -67,84 +66,95 @@ class _AddIncomeViewState extends State<AddIncomeView> {
   }
 
   Future<void> _saveIncome() async {
-    // Validate input
     if (_amountController.text.trim().isEmpty || _titleController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please fill in amount and title'),
           backgroundColor: Colors.red,
-          duration: Duration(seconds: 2),
         ),
       );
       return;
     }
 
+    if (_isLoading) return; // ✅ Prevent double-tap
+
     setState(() => _isLoading = true);
 
     try {
       final userId = _auth.currentUser?.uid;
-      if (userId == null) {
-        throw Exception('User not authenticated');
-      }
+      if (userId == null) throw Exception('User not authenticated');
 
-      // ✅ FIXED: Parse VND amount (removes commas and dots)
-      final amountText = _amountController.text.trim();
-      
-      // Remove all non-numeric characters (commas, dots, spaces, ₫)
-      final cleanedAmount = amountText.replaceAll(RegExp(r'[^\d]'), '');
-      
-      print('Original amount: $amountText'); // Debug
-      print('Cleaned amount: $cleanedAmount'); // Debug
-      
-      if (cleanedAmount.isEmpty) {
-        throw Exception('Please enter a valid amount');
-      }
-      
+      // ✅ Parse amount
+      final cleanedAmount = _amountController.text.trim().replaceAll(RegExp(r'[^\d]'), '');
       final amount = double.tryParse(cleanedAmount);
       
-      print('Parsed amount: $amount'); // Debug
-      
       if (amount == null || amount <= 0) {
-        throw Exception('Please enter a valid amount greater than 0');
+        throw Exception('Please enter a valid amount');
       }
 
-      // ✅ Save to Firestore
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('expenses')
-          .add({
-        'title': _titleController.text.trim(),
-        'amount': amount,
-        'category': widget.categoryName,
-        'message': _messageController.text.trim(),
-        'date': Timestamp.fromDate(_selectedDate),
-        'type': 'income', // Mark as income
-        'createdAt': FieldValue.serverTimestamp(),
+      // ✅ Use Firestore Transaction for atomic update
+      await _firestore.runTransaction((transaction) async {
+        // Get user doc
+        DocumentSnapshot userDoc = await transaction.get(
+          _firestore.collection('users').doc(userId)
+        );
+
+        var userData = userDoc.data() as Map<String, dynamic>? ?? {};
+        double currentIncome = (userData['totalIncome'] ?? 0).toDouble();
+        double currentExpense = (userData['totalExpense'] ?? 0).toDouble();
+
+        // Calculate new totals
+        double newIncome = currentIncome + amount;
+        double newBalance = newIncome - currentExpense;
+
+        // Add transaction
+        DocumentReference transactionRef = _firestore
+            .collection('users')
+            .doc(userId)
+            .collection('transactions')
+            .doc();
+
+        transaction.set(transactionRef, {
+          'id': transactionRef.id,
+          'title': _titleController.text.trim(),
+          'amount': amount,
+          'category': widget.categoryName ?? 'Other',
+          'note': _messageController.text.trim(),
+          'date': Timestamp.fromDate(_selectedDate),
+          'type': 'income',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        // Update user totals
+        transaction.update(
+          _firestore.collection('users').doc(userId),
+          {
+            'balance': newBalance,
+            'totalIncome': newIncome,
+            'totalExpense': currentExpense,
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+        );
       });
 
       if (mounted) {
-        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Income ${CurrencyFormatter.formatVND(amount)} added to ${widget.categoryName}!'),
+            content: Text('Income added: ${_formatCurrency(amount)} đ'),
             backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
           ),
         );
         
-        // Return true to indicate success
+        await Future.delayed(const Duration(milliseconds: 300));
         Navigator.pop(context, true);
       }
     } catch (e) {
-      print('Error saving income: $e'); // Debug
-      
+      print('Error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to add income: ${e.toString()}'),
+            content: Text('Failed: ${e.toString()}'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -155,6 +165,13 @@ class _AddIncomeViewState extends State<AddIncomeView> {
     }
   }
 
+  String _formatCurrency(double amount) {
+    return amount.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -162,7 +179,7 @@ class _AddIncomeViewState extends State<AddIncomeView> {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF5F5F5),
       appBar: AppBar(
-        backgroundColor: widget.categoryColor,
+        backgroundColor: widget.categoryColor ?? const Color(0xFF4CAF50),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -170,10 +187,7 @@ class _AddIncomeViewState extends State<AddIncomeView> {
         ),
         title: const Text(
           'Add Income',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
@@ -190,7 +204,7 @@ class _AddIncomeViewState extends State<AddIncomeView> {
               width: double.infinity,
               padding: const EdgeInsets.only(bottom: 30),
               decoration: BoxDecoration(
-                color: widget.categoryColor,
+                color: widget.categoryColor ?? const Color(0xFF4CAF50),
                 borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(30),
                   bottomRight: Radius.circular(30),
@@ -220,22 +234,12 @@ class _AddIncomeViewState extends State<AddIncomeView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Date Field
-                    Text(
-                      'Date',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.grey[400] : Colors.grey[700],
-                      ),
-                    ),
+                    _buildLabel('Date', isDark),
                     const SizedBox(height: 8),
                     GestureDetector(
                       onTap: () => _selectDate(context),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: isDark ? const Color(0xFF3C3C3C) : const Color(0xFFF5F5F5),
                           borderRadius: BorderRadius.circular(12),
@@ -253,7 +257,7 @@ class _AddIncomeViewState extends State<AddIncomeView> {
                             Icon(
                               Icons.calendar_today,
                               size: 20,
-                              color: widget.categoryColor,
+                              color: widget.categoryColor ?? const Color(0xFF4CAF50),
                             ),
                           ],
                         ),
@@ -262,48 +266,36 @@ class _AddIncomeViewState extends State<AddIncomeView> {
 
                     const SizedBox(height: 20),
 
-                    // Category Field (Read-only)
-                    Text(
-                      'Category',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.grey[400] : Colors.grey[700],
-                      ),
-                    ),
+                    // Category Field - ✅ FIXED OVERFLOW
+                    _buildLabel('Category', isDark),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF3C3C3C) : const Color(0xFFF5F5F5),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Icon(
-                                widget.categoryIcon,
-                                color: widget.categoryColor,
-                                size: 20,
+                          Icon(
+                            widget.categoryIcon ?? Icons.attach_money,
+                            color: widget.categoryColor ?? const Color(0xFF4CAF50),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(  // ✅ FIX: Wrap with Expanded
+                            child: Text(
+                              widget.categoryName ?? 'Select Category',  // ✅ FIX: Proper default
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: isDark ? Colors.white : Colors.black,
                               ),
-                              const SizedBox(width: 12),
-                              Text(
-                                widget.categoryName ?? const Color(0xFF00CED1).toString(),
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: isDark ? Colors.white : Colors.black,
-                                ),
-                              ),
-                            ],
+                              overflow: TextOverflow.ellipsis,  // ✅ FIX: Handle long text
+                            ),
                           ),
                           Icon(
                             Icons.keyboard_arrow_down,
-                            color: widget.categoryColor,
+                            color: widget.categoryColor ?? const Color(0xFF4CAF50),
                             size: 24,
                           ),
                         ],
@@ -312,38 +304,31 @@ class _AddIncomeViewState extends State<AddIncomeView> {
 
                     const SizedBox(height: 20),
 
-                    // Amount Field - WITH VND FORMATTING
-                    Text(
-                      'Amount',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.grey[400] : Colors.grey[700],
-                      ),
-                    ),
+                    // Amount Field
+                    _buildLabel('Amount', isDark),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _amountController,
                       keyboardType: TextInputType.number,
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
-                        VNDInputFormatter(), // Auto-format with commas
+                        _VNDInputFormatter(),
                       ],
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: widget.categoryColor,
+                        color: widget.categoryColor ?? const Color(0xFF4CAF50),
                       ),
                       decoration: InputDecoration(
                         hintText: '0',
                         hintStyle: TextStyle(
                           color: isDark ? Colors.grey[600] : Colors.grey[400],
                         ),
-                        suffixText: '₫', // VND symbol
+                        suffixText: 'đ',
                         suffixStyle: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: widget.categoryColor,
+                          color: widget.categoryColor ?? const Color(0xFF4CAF50),
                         ),
                         filled: true,
                         fillColor: isDark ? const Color(0xFF3C3C3C) : const Color(0xFFF5F5F5),
@@ -351,24 +336,14 @@ class _AddIncomeViewState extends State<AddIncomeView> {
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
+                        contentPadding: const EdgeInsets.all(16),
                       ),
                     ),
 
                     const SizedBox(height: 20),
 
-                    // Income Title Field
-                    Text(
-                      'Income Title',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.grey[400] : Colors.grey[700],
-                      ),
-                    ),
+                    // Income Title
+                    _buildLabel('Income Title', isDark),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _titleController,
@@ -387,24 +362,14 @@ class _AddIncomeViewState extends State<AddIncomeView> {
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
+                        contentPadding: const EdgeInsets.all(16),
                       ),
                     ),
 
                     const SizedBox(height: 20),
 
-                    // Message Field
-                    Text(
-                      'Enter Message (Optional)',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.grey[400] : Colors.grey[700],
-                      ),
-                    ),
+                    // Message
+                    _buildLabel('Enter Message (Optional)', isDark),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _messageController,
@@ -424,10 +389,7 @@ class _AddIncomeViewState extends State<AddIncomeView> {
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
+                        contentPadding: const EdgeInsets.all(16),
                       ),
                     ),
 
@@ -439,7 +401,7 @@ class _AddIncomeViewState extends State<AddIncomeView> {
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _saveIncome,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: widget.categoryColor,
+                          backgroundColor: widget.categoryColor ?? const Color(0xFF4CAF50),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -472,6 +434,45 @@ class _AddIncomeViewState extends State<AddIncomeView> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLabel(String text, bool isDark) {
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: isDark ? Colors.grey[400] : Colors.grey[700],
+      ),
+    );
+  }
+}
+
+// ✅ VND Input Formatter
+class _VNDInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+
+    final number = int.tryParse(newValue.text.replaceAll(',', ''));
+    if (number == null) {
+      return oldValue;
+    }
+
+    final formatted = number.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }
