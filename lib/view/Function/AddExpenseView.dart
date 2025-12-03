@@ -366,69 +366,112 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                       ),
                       const SizedBox(height: 20),
                       
-                      // Category
-                      Text(
-                        'Category',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      // Category - Show as read-only if pre-selected
+widget.categoryName == null
+    ? Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Category',
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                isExpanded: true,
+                value: selectedCategory,
+                hint: Text(
+                  'Select category',
+                  style: TextStyle(
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  ),
+                ),
+                dropdownColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                icon: Icon(
+                  Icons.keyboard_arrow_down,
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                ),
+                items: (transactionType == 'income'
+                        ? incomeCategories
+                        : expenseCategories)
+                    .map((category) {
+                  return DropdownMenuItem<String>(
+                    value: category['name'],
+                    child: Row(
+                      children: [
+                        Icon(
+                          category['icon'],
+                          size: 20,
+                          color: const Color(0xFF00CED1),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            isExpanded: true,
-                            value: selectedCategory,
-                            hint: Text(
-                              'Select category',
-                              style: TextStyle(
-                                color: isDark ? Colors.grey[400] : Colors.grey[600],
-                              ),
-                            ),
-                            dropdownColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-                            icon: Icon(
-                              Icons.keyboard_arrow_down,
-                              color: isDark ? Colors.grey[400] : Colors.grey[600],
-                            ),
-                            items: (transactionType == 'income'
-                                    ? incomeCategories
-                                    : expenseCategories)
-                                .map((category) {
-                              return DropdownMenuItem<String>(
-                                value: category['name'],
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      category['icon'],
-                                      size: 20,
-                                      color: const Color(0xFF00CED1),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      category['name'],
-                                      style: TextStyle(
-                                        color: isDark ? Colors.white : Colors.black,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (String? newValue) {
-                              setState(() {
-                                selectedCategory = newValue;
-                              });
-                            },
+                        const SizedBox(width: 12),
+                        Text(
+                          category['name'],
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 20),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    selectedCategory = newValue;
+                  });
+                },
+              ),
+            ),
+          ),
+        ],
+      )
+    : Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Category',
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  widget.categoryIcon ?? Icons.category,
+                  size: 20,
+                  color: widget.categoryColor ?? const Color(0xFF00CED1),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  widget.categoryName!,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+const SizedBox(height: 20),
                       
                       // Amount
                       Text(
