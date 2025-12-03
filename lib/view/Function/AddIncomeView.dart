@@ -473,6 +473,6 @@ class _VNDInputFormatter extends TextInputFormatter {
     return TextEditingValue(
       text: formatted,
       selection: TextSelection.collapsed(offset: formatted.length),
-    );
-  }
+    );  
+  }  
 }

@@ -403,7 +403,7 @@ class _HomeViewState extends State<HomeView> {
                 color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
               ),
             ),
-            child: Column(
+            child: Column( 
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
