@@ -495,23 +495,31 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
 
   Future<bool?> _showAddDialog() async {
   if (isIncomeCategory) {
-    // Open AddIncomeView for income categories
+    // ✅ Open AddIncomeView for Income categories
     return await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => const AddIncomeView(), // ✅ Remove parameters
+        builder: (context) => AddIncomeView(
+          categoryName: widget.categoryName,
+          categoryIcon: widget.categoryIcon,
+          categoryColor: widget.categoryColor,
+        ),
       ),
     );
   } else {
-    // Open AddExpenseView for expense categories
+    // ✅ Open AddExpenseView for Expense categories
     return await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => const AddExpenseView(), // ✅ Remove parameters
+        builder: (context) => AddExpenseView(
+          categoryName: widget.categoryName,
+          categoryIcon: widget.categoryIcon,
+          categoryColor: widget.categoryColor,
+          hideToggle: true, // ✅ Hide toggle when opened from category
+        ),
       ),
     );
   }
 }
-
   
 }

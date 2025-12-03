@@ -6,8 +6,19 @@ import 'package:intl/intl.dart';
 
 class AddExpenseView extends StatefulWidget {
   final String? initialType; // 'income' or 'expense'
+  final String? categoryName; // Pre-selected category
+  final IconData? categoryIcon;
+  final Color? categoryColor;
+  final bool hideToggle; // ✅ NEW: Hide Income/Expense toggle
   
-  const AddExpenseView({Key? key, this.initialType}) : super(key: key);
+  const AddExpenseView({
+    Key? key, 
+    this.initialType,
+    this.categoryName,
+    this.categoryIcon,
+    this.categoryColor,
+    this.hideToggle = false, // ✅ Default: show toggle
+  }) : super(key: key);
 
   @override
   State<AddExpenseView> createState() => _AddExpenseViewState();
@@ -48,6 +59,20 @@ class _AddExpenseViewState extends State<AddExpenseView> {
   void initState() {
     super.initState();
     transactionType = widget.initialType ?? 'expense';
+    
+    // ✅ Auto-detect type from category name
+    if (widget.categoryName != null) {
+      final incomeCategories = ['Salary', 'Business', 'Investment', 'Gift', 'Freelance'];
+      
+      if (incomeCategories.contains(widget.categoryName)) {
+        transactionType = 'income';
+      } else {
+        transactionType = 'expense';
+      }
+      
+      // Pre-select category
+      selectedCategory = widget.categoryName;
+    }
   }
 
   @override
@@ -68,6 +93,9 @@ class _AddExpenseViewState extends State<AddExpenseView> {
       return;
     }
 
+    // ✅ Prevent double-tap
+    if (isLoading) return;
+
     setState(() {
       isLoading = true;
     });
@@ -77,64 +105,72 @@ class _AddExpenseViewState extends State<AddExpenseView> {
       String transactionId = const Uuid().v4();
       double amount = double.parse(_amountController.text.trim());
 
-      // 1. Add transaction to Firestore
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .collection('transactions')
-          .doc(transactionId)
-          .set({
-        'id': transactionId,
-        'type': transactionType,
-        'amount': amount,
-        'category': selectedCategory,
-        'title': _titleController.text.trim(),
-        'note': _noteController.text.trim(),
-        'date': Timestamp.fromDate(selectedDate),
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      // ✅ OPTIMIZED: Use Firestore Transaction for atomic update
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        // 1. Get user document
+        DocumentSnapshot userDoc = await transaction.get(
+          FirebaseFirestore.instance.collection('users').doc(userId)
+        );
 
-      // 2. Update user balance and totals
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .get();
-      
-      var userData = userDoc.data() as Map<String, dynamic>? ?? {};
-      double currentBalance = (userData['balance'] ?? 0).toDouble();
-      double currentIncome = (userData['totalIncome'] ?? 0).toDouble();
-      double currentExpense = (userData['totalExpense'] ?? 0).toDouble();
+        var userData = userDoc.data() as Map<String, dynamic>? ?? {};
+        double currentIncome = (userData['totalIncome'] ?? 0).toDouble();
+        double currentExpense = (userData['totalExpense'] ?? 0).toDouble();
 
-      double newBalance = currentBalance;
-      double newIncome = currentIncome;
-      double newExpense = currentExpense;
+        // 2. Calculate new values
+        double newIncome = currentIncome;
+        double newExpense = currentExpense;
 
-      if (transactionType == 'income') {
-        newBalance += amount;
-        newIncome += amount;
-      } else {
-        newBalance -= amount;
-        newExpense += amount;
-      }
+        if (transactionType == 'income') {
+          newIncome += amount;
+        } else {
+          newExpense += amount;
+        }
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .update({
-        'balance': newBalance,
-        'totalIncome': newIncome,
-        'totalExpense': newExpense,
-        'updatedAt': FieldValue.serverTimestamp(),
+        double newBalance = newIncome - newExpense;
+
+        // 3. Add transaction document
+        transaction.set(
+          FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .collection('transactions')
+              .doc(transactionId),
+          {
+            'id': transactionId,
+            'type': transactionType,
+            'amount': amount,
+            'category': selectedCategory,
+            'title': _titleController.text.trim(),
+            'note': _noteController.text.trim(),
+            'date': Timestamp.fromDate(selectedDate),
+            'createdAt': FieldValue.serverTimestamp(),
+          },
+        );
+
+        // 4. Update user totals
+        transaction.update(
+          FirebaseFirestore.instance.collection('users').doc(userId),
+          {
+            'balance': newBalance,
+            'totalIncome': newIncome,
+            'totalExpense': newExpense,
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+        );
       });
 
       if (mounted) {
         _showSuccessSnackBar('Transaction added successfully!');
-        Navigator.pop(context, true); // Return true to indicate success
+        // ✅ Small delay for better UX
+        await Future.delayed(const Duration(milliseconds: 300));
+        Navigator.pop(context, true);
       }
       
     } catch (e) {
       print('Error saving transaction: $e');
-      _showErrorSnackBar('Failed to save transaction: $e');
+      if (mounted) {
+        _showErrorSnackBar('Failed to save: ${e.toString()}');
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -203,77 +239,78 @@ class _AddExpenseViewState extends State<AddExpenseView> {
       ),
       body: Column(
         children: [
-          // Type Toggle
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        transactionType = 'income';
-                        selectedCategory = null;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: transactionType == 'income'
-                            ? Colors.white
-                            : Colors.white.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'Income',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: transactionType == 'income'
-                                ? const Color(0xFF00CED1)
-                                : Colors.white,
+          // ✅ Type Toggle - ONLY show if hideToggle = false AND no categoryName
+          if (!widget.hideToggle && widget.categoryName == null)
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          transactionType = 'income';
+                          selectedCategory = null;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: transactionType == 'income'
+                              ? Colors.white
+                              : Colors.white.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Income',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: transactionType == 'income'
+                                  ? const Color(0xFF00CED1)
+                                  : Colors.white,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        transactionType = 'expense';
-                        selectedCategory = null;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: transactionType == 'expense'
-                            ? Colors.white
-                            : Colors.white.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'Expense',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: transactionType == 'expense'
-                                ? const Color(0xFF00CED1)
-                                : Colors.white,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          transactionType = 'expense';
+                          selectedCategory = null;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: transactionType == 'expense'
+                              ? Colors.white
+                              : Colors.white.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Expense',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: transactionType == 'expense'
+                                  ? const Color(0xFF00CED1)
+                                  : Colors.white,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
           
           // Form Container
           Expanded(
