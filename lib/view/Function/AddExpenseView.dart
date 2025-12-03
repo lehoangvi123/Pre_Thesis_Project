@@ -471,8 +471,7 @@ widget.categoryName == null
           ),
         ],
       ),
-const SizedBox(height: 20),
-                      
+const SizedBox(height: 20), 
                       // Amount
                       Text(
                         'Amount',
