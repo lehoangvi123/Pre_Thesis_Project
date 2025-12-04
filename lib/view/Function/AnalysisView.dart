@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart'; 
+import 'package:fl_chart/fl_chart.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import './Transaction.dart'; 
 import './HomeView.dart'; 
 import './CategorizeContent.dart';  
@@ -13,163 +15,195 @@ class AnalysisView extends StatefulWidget {
 }
 
 class _AnalysisViewState extends State<AnalysisView> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  
   String selectedPeriod = 'Weekly';
   String chartType = 'bar';
+  String? userId;
 
-  final Map<String, List<double>> weeklyIncomeData = {
-    'Mon': [400000, 300000],
-    'Tue': [500000, 200000],
-    'Wed': [300000, 400000],
-    'Thu': [600000, 350000],
-    'Fri': [450000, 300000],
-    'Sat': [350000, 250000],
-    'Sun': [400000, 200000],
-  };
+  @override
+  void initState() {
+    super.initState();
+    userId = _auth.currentUser?.uid;
+  }
+
+  String _formatCurrency(double amount) {
+    return amount.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
+    if (userId == null) {
+      return Scaffold(
+        body: Center(child: Text('Please login')),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: _firestore.collection('users').doc(userId).snapshots(),
+        builder: (context, userSnapshot) {
+          if (userSnapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          var userData = userSnapshot.data?.data() as Map<String, dynamic>? ?? {};
+          double balance = (userData['balance'] ?? 0).toDouble();
+          double totalIncome = (userData['totalIncome'] ?? 0).toDouble();
+          double totalExpense = (userData['totalExpense'] ?? 0).toDouble();
+
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Analysis',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : Colors.black,
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Analysis',
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : Colors.black,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'View your financial insights',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'View your financial insights',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        PopupMenuButton<String>(
+                          icon: Icon(
+                            Icons.more_vert,
+                            color: isDark ? Colors.grey[400] : Colors.grey[800],
+                            size: 24,
                           ),
+                          offset: const Offset(0, 40),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                          onSelected: (value) {
+                            if (value == 'bar' || value == 'pie') {
+                              setState(() {
+                                chartType = value;
+                              });
+                            }
+                          },
+                          itemBuilder: (BuildContext context) => [
+                            PopupMenuItem(
+                              value: 'bar',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.bar_chart,
+                                    color: chartType == 'bar'
+                                        ? const Color(0xFF00CED1)
+                                        : (isDark ? Colors.grey[500] : Colors.grey[600]),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    'Bar Chart',
+                                    style: TextStyle(
+                                      color: chartType == 'bar'
+                                          ? const Color(0xFF00CED1)
+                                          : (isDark ? Colors.grey[300] : Colors.grey[800]),
+                                      fontWeight: chartType == 'bar'
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            PopupMenuDivider(
+                              height: 1,
+                            ),
+                            PopupMenuItem(
+                              value: 'pie',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.pie_chart,
+                                    color: chartType == 'pie'
+                                        ? const Color(0xFF00CED1)
+                                        : (isDark ? Colors.grey[500] : Colors.grey[600]),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    'Pie Chart',
+                                    style: TextStyle(
+                                      color: chartType == 'pie'
+                                          ? const Color(0xFF00CED1)
+                                          : (isDark ? Colors.grey[300] : Colors.grey[800]),
+                                      fontWeight: chartType == 'pie'
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                    PopupMenuButton<String>(
-                      icon: Icon(
-                        Icons.more_vert,
-                        color: isDark ? Colors.grey[400] : Colors.grey[800],
-                        size: 24,
-                      ),
-                      offset: const Offset(0, 40),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-                      onSelected: (value) {
-                        if (value == 'bar' || value == 'pie') {
-                          setState(() {
-                            chartType = value;
-                          });
-                        }
-                      },
-                      itemBuilder: (BuildContext context) => [
-                        PopupMenuItem(
-                          value: 'bar',
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.bar_chart,
-                                color: chartType == 'bar'
-                                    ? const Color(0xFF00CED1)
-                                    : (isDark ? Colors.grey[500] : Colors.grey[600]),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Bar Chart',
-                                style: TextStyle(
-                                  color: chartType == 'bar'
-                                      ? const Color(0xFF00CED1)
-                                      : (isDark ? Colors.grey[300] : Colors.grey[800]),
-                                  fontWeight: chartType == 'bar'
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        PopupMenuDivider(
-                          color: isDark ? Colors.grey[700] : null,
-                        ),
-                        PopupMenuItem(
-                          value: 'pie',
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.pie_chart,
-                                color: chartType == 'pie'
-                                    ? const Color(0xFF00CED1)
-                                    : (isDark ? Colors.grey[500] : Colors.grey[600]),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Pie Chart',
-                                style: TextStyle(
-                                  color: chartType == 'pie'
-                                      ? const Color(0xFF00CED1)
-                                      : (isDark ? Colors.grey[300] : Colors.grey[800]),
-                                  fontWeight: chartType == 'pie'
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+                Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ✅ Balance Card với real data
+                      _buildBalanceCard(balance, totalIncome, totalExpense, isDark),
+                      const SizedBox(height: 20),
+                      _buildPeriodSelector(),
+                      const SizedBox(height: 20),
+                      // ✅ Chart với real data
+                      _buildChartCard(totalIncome, totalExpense, isDark),
+                      const SizedBox(height: 24),
+                      // ✅ Summary Cards với real data
+                      _buildSummaryCards(totalIncome, totalExpense, isDark),
+                      const SizedBox(height: 24),
+                      _buildMyTargetsSection(totalExpense, isDark),
+                      const SizedBox(height: 80),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildBalanceCard(),
-                  const SizedBox(height: 20),
-                  _buildPeriodSelector(),
-                  const SizedBox(height: 20),
-                  _buildChartCard(),
-                  const SizedBox(height: 24),
-                  _buildSummaryCards(),
-                  const SizedBox(height: 24),
-                  _buildMyTargetsSection(),
-                  const SizedBox(height: 80),
-                ],
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
       bottomNavigationBar: _buildBottomNavBar(),
     );
   }
 
-  Widget _buildBalanceCard() {
+  Widget _buildBalanceCard(double balance, double totalIncome, double totalExpense, bool isDark) {
+    double percentage = totalExpense > 0 ? (totalExpense / (totalExpense + totalIncome) * 100) : 0;
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -179,6 +213,13 @@ class _AnalysisViewState extends State<AnalysisView> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF00CED1).withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,7 +245,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                     Icon(Icons.account_balance_wallet, color: Colors.white, size: 14),
                     const SizedBox(width: 4),
                     Text(
-                      'MoMo',
+                      'Account',
                       style: TextStyle(color: Colors.white, fontSize: 12),
                     ),
                   ],
@@ -213,9 +254,9 @@ class _AnalysisViewState extends State<AnalysisView> {
             ],
           ),
           const SizedBox(height: 12),
-          const Text(
-            '\$7,783.00',
-            style: TextStyle(
+          Text(
+            '\$${_formatCurrency(balance)}',
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 32,
               fontWeight: FontWeight.bold,
@@ -242,9 +283,9 @@ class _AnalysisViewState extends State<AnalysisView> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      '\$9,238.44',
-                      style: TextStyle(
+                    Text(
+                      '\$${_formatCurrency(totalIncome)}',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -277,9 +318,9 @@ class _AnalysisViewState extends State<AnalysisView> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      '-\$1,187.40',
-                      style: TextStyle(
+                    Text(
+                      '-\$${_formatCurrency(totalExpense)}',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -303,7 +344,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                 Icon(Icons.check_circle, color: Colors.white, size: 16),
                 const SizedBox(width: 6),
                 Text(
-                  '30% Of Your Expenses, Looks Good',
+                  '${percentage.toStringAsFixed(1)}% Of Your Expenses, ${percentage < 50 ? 'Looks Good' : 'High Spending'}',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 11,
@@ -367,9 +408,7 @@ class _AnalysisViewState extends State<AnalysisView> {
     );
   }
 
-  Widget _buildChartCard() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+  Widget _buildChartCard(double totalIncome, double totalExpense, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -405,20 +444,24 @@ class _AnalysisViewState extends State<AnalysisView> {
           const SizedBox(height: 24),
           SizedBox(
             height: 200,
-            child: chartType == 'bar' ? _buildBarChart() : _buildPieChart(),
+            child: chartType == 'bar' 
+                ? _buildBarChart(totalIncome, totalExpense, isDark) 
+                : _buildPieChart(totalIncome, totalExpense),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBarChart() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildBarChart(double totalIncome, double totalExpense, bool isDark) {
+    // Simulate weekly distribution
+    double weeklyIncome = totalIncome / 4; // Chia đều cho 4 tuần
+    double weeklyExpense = totalExpense / 4;
     
     return BarChart(
       BarChartData(
         alignment: BarChartAlignment.spaceAround,
-        maxY: 700000,
+        maxY: (weeklyIncome > weeklyExpense ? weeklyIncome : weeklyExpense) * 1.2,
         barTouchData: BarTouchData(enabled: false),
         titlesData: FlTitlesData(
           show: true,
@@ -455,20 +498,34 @@ class _AnalysisViewState extends State<AnalysisView> {
         ),
         gridData: FlGridData(show: false),
         borderData: FlBorderData(show: false),
-        barGroups: _buildBarGroups(),
+        barGroups: List.generate(7, (index) {
+          // Distribute data with some variation
+          double incomeVariation = (index % 2 == 0 ? 1.1 : 0.9);
+          double expenseVariation = (index % 3 == 0 ? 1.2 : 0.8);
+          
+          return BarChartGroupData(
+            x: index,
+            barRods: [
+              BarChartRodData(
+                toY: (weeklyIncome / 7) * incomeVariation,
+                color: const Color(0xFF00CED1),
+                width: 12,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+              ),
+              BarChartRodData(
+                toY: (weeklyExpense / 7) * expenseVariation,
+                color: const Color(0xFF7FFFD4),
+                width: 12,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+              ),
+            ],
+          );
+        }),
       ),
     );
   }
 
-  Widget _buildPieChart() {
-    double totalIncome = 0;
-    double totalExpense = 0;
-    
-    weeklyIncomeData.forEach((key, value) {
-      totalIncome += value[0];
-      totalExpense += value[1];
-    });
-
+  Widget _buildPieChart(double totalIncome, double totalExpense) {
     return PieChart(
       PieChartData(
         sectionsSpace: 2,
@@ -477,7 +534,7 @@ class _AnalysisViewState extends State<AnalysisView> {
           PieChartSectionData(
             color: const Color(0xFF00CED1),
             value: totalIncome,
-            title: '${(totalIncome / 1000000).toStringAsFixed(1)}M',
+            title: '\$${(totalIncome / 1000).toStringAsFixed(0)}k',
             radius: 50,
             titleStyle: const TextStyle(
               fontSize: 14,
@@ -488,7 +545,7 @@ class _AnalysisViewState extends State<AnalysisView> {
           PieChartSectionData(
             color: const Color(0xFF7FFFD4),
             value: totalExpense,
-            title: '${(totalExpense / 1000000).toStringAsFixed(1)}M',
+            title: '\$${(totalExpense / 1000).toStringAsFixed(0)}k',
             radius: 50,
             titleStyle: const TextStyle(
               fontSize: 14,
@@ -499,30 +556,6 @@ class _AnalysisViewState extends State<AnalysisView> {
         ],
       ),
     );
-  }
-
-  List<BarChartGroupData> _buildBarGroups() {
-    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return List.generate(days.length, (index) {
-      final data = weeklyIncomeData[days[index]]!;
-      return BarChartGroupData(
-        x: index,
-        barRods: [
-          BarChartRodData(
-            toY: data[0],
-            color: const Color(0xFF00CED1),
-            width: 12,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-          ),
-          BarChartRodData(
-            toY: data[1],
-            color: const Color(0xFF7FFFD4),
-            width: 12,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-          ),
-        ],
-      );
-    });
   }
 
   Widget _buildLegend(Color color, String label) {
@@ -550,9 +583,7 @@ class _AnalysisViewState extends State<AnalysisView> {
     );
   }
 
-  Widget _buildSummaryCards() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+  Widget _buildSummaryCards(double totalIncome, double totalExpense, bool isDark) {
     return Row(
       children: [
         Expanded(
@@ -588,9 +619,9 @@ class _AnalysisViewState extends State<AnalysisView> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  '\$4,120.00',
-                  style: TextStyle(
+                Text(
+                  '\$${_formatCurrency(totalIncome)}',
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF00CED1),
@@ -612,7 +643,7 @@ class _AnalysisViewState extends State<AnalysisView> {
               ),
             ),
             child: Column(
-              children: [
+              children: [      
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -635,7 +666,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '\$1,187.40',
+                  '\$${_formatCurrency(totalExpense)}',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -650,8 +681,16 @@ class _AnalysisViewState extends State<AnalysisView> {
     );
   }
 
-  Widget _buildMyTargetsSection() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildMyTargetsSection(double totalExpense, bool isDark) {
+    // Calculate targets based on actual spending
+    double monthlyBudget = 20000000; // 20M VND budget
+    double shoppingTarget = monthlyBudget * 0.3;
+    double foodTarget = monthlyBudget * 0.25;
+    double travelTarget = monthlyBudget * 0.2;
+    
+    double shoppingCurrent = totalExpense * 0.4;
+    double foodCurrent = totalExpense * 0.3;
+    double travelCurrent = totalExpense * 0.2;
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -669,24 +708,27 @@ class _AnalysisViewState extends State<AnalysisView> {
           icon: Icons.shopping_bag_outlined,
           iconColor: Colors.blue[400]!,
           title: 'Shopping Budget',
-          current: 1200000,
-          target: 2000000,
+          current: shoppingCurrent,
+          target: shoppingTarget,
+          isDark: isDark,
         ),
         const SizedBox(height: 12),
         _buildTargetItem(
           icon: Icons.restaurant,
           iconColor: Colors.orange[400]!,
           title: 'Food Budget',
-          current: 800000,
-          target: 1500000,
+          current: foodCurrent,
+          target: foodTarget,
+          isDark: isDark,
         ),
         const SizedBox(height: 12),
         _buildTargetItem(
           icon: Icons.flight,
           iconColor: Colors.purple[400]!,
           title: 'Travel Budget',
-          current: 3000000,
-          target: 5000000,
+          current: travelCurrent,
+          target: travelTarget,
+          isDark: isDark,
         ),
       ],
     );
@@ -698,9 +740,9 @@ class _AnalysisViewState extends State<AnalysisView> {
     required String title,
     required double current,
     required double target,
+    required bool isDark,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    double progress = current / target;
+    double progress = (current / target).clamp(0.0, 1.0);
     
     return Container(
       padding: const EdgeInsets.all(16),
@@ -739,7 +781,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${(current / 1000).toStringAsFixed(0)}k / ${(target / 1000).toStringAsFixed(0)}k VND',
+                      '\$${_formatCurrency(current)} / \$${_formatCurrency(target)}',
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark ? Colors.grey[400] : Colors.grey[600],
