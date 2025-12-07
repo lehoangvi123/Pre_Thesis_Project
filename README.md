@@ -1,8 +1,8 @@
-**Pre_Thesis_Project 🚀
+**Pre_Thesis_Project 🚀**
 
-Smart Personal Expense Tracker with AI-based Financial Insights
-**
-📄 Giới thiệu
+**Smart Personal Expense Tracker with AI-based Financial Insights**
+
+**📄 Giới thiệu**
 
 Pre_Thesis_Project là một ứng dụng quản lý chi tiêu cá nhân được phát triển bằng Flutter, nhằm giúp người dùng:
 
@@ -27,8 +27,7 @@ UI & Charts: fl_chart
 (Có thể) AI Integration: OpenAI API / Google Gemini
 
 🚀 Cách cài đặt & chạy ứng dụng
-**1. Chuẩn bị môi trường
-**
+**1. Chuẩn bị môi trường**
 Cài Flutter SDK theo hướng dẫn chính thức từ Flutter. 
 Google Codelabs
 +1
@@ -61,8 +60,7 @@ Hoặc trong VS Code, mở Command Palette → “Flutter: Launch Emulator” �
 Medium
 +1
 
-**5. Chạy ứng dụng
-**
+**5. Chạy ứng dụng**
 Trong VS Code:
 
 Mở dự án — chắc chắn bạn đang ở thư mục root (nơi chứa pubspec.yaml)
@@ -80,7 +78,7 @@ Nếu mọi thứ đúng, app sẽ được build và chạy trong emulator / de
 Medium
 +1
 
-6. Một số lệnh hữu ích khi phát triển
+**6. Một số lệnh hữu ích khi phát triển**
 
 Hot reload: khi chỉnh UI / layout → giúp thay đổi nhanh mà không restart app hoàn toàn
 
