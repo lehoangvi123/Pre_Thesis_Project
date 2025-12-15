@@ -29,45 +29,64 @@ class _TransactionViewState extends State<TransactionView> {
     userId = _auth.currentUser?.uid;
   }
 
+  // ✅ Format VND currency
   String _formatCurrency(double amount) {
-    return amount.toStringAsFixed(0).replaceAllMapped(
+    return '${amount.toStringAsFixed(0).replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    );
+      (Match m) => '${m[1]}.',
+    )}₫';
+  }
+
+  // ✅ Vietnamese month format helper
+  String _getVietnameseMonth(DateTime date) {
+    const months = [
+      'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4',
+      'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8',
+      'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
+    ];
+    return '${months[date.month - 1]} ${date.year}';
   }
 
   String _formatDate(dynamic timestamp) {
-    if (timestamp == null) return 'Unknown date';
+    if (timestamp == null) return 'Không rõ ngày';
     
     try {
       if (timestamp is Timestamp) {
         DateTime date = timestamp.toDate();
-        return DateFormat('h:mm a - MMM dd').format(date);
+        return DateFormat('h:mm a - dd/MM').format(date);
       }
-      return 'Unknown date';
+      return 'Không rõ ngày';
     } catch (e) {
-      return 'Unknown date';
+      return 'Không rõ ngày';
     }
   }
 
   IconData _getCategoryIcon(String category) {
     switch (category.toLowerCase()) {
       case 'food':
+      case 'đồ ăn':
         return Icons.restaurant;
       case 'transport':
+      case 'di chuyển':
         return Icons.directions_car;
       case 'groceries':
+      case 'mua sắm':
         return Icons.shopping_cart;
       case 'rent':
+      case 'thuê nhà':
         return Icons.home;
       case 'salary':
+      case 'lương':
         return Icons.attach_money;
       case 'entertainment':
+      case 'giải trí':
         return Icons.movie;
       case 'medicine':
       case 'health':
+      case 'sức khỏe':
         return Icons.medical_services;
       case 'gifts':
+      case 'quà tặng':
         return Icons.card_giftcard;
       default:
         return Icons.category;
@@ -77,16 +96,22 @@ class _TransactionViewState extends State<TransactionView> {
   Color _getCategoryColor(String category) {
     switch (category.toLowerCase()) {
       case 'food':
+      case 'đồ ăn':
         return const Color(0xFF00CED1);
       case 'transport':
+      case 'di chuyển':
         return const Color(0xFF64B5F6);
       case 'salary':
+      case 'lương':
         return const Color(0xFF4CAF50);
       case 'groceries':
+      case 'mua sắm':
         return const Color(0xFF9C27B0);
       case 'rent':
+      case 'thuê nhà':
         return const Color(0xFFFF9800);
       case 'entertainment':
+      case 'giải trí':
         return const Color(0xFFE91E63);
       default:
         return const Color(0xFF607D8B);
@@ -99,7 +124,7 @@ class _TransactionViewState extends State<TransactionView> {
 
     if (userId == null) {
       return Scaffold(
-        body: Center(child: Text('Please login')),
+        body: Center(child: Text('Vui lòng đăng nhập')),
       );
     }
 
@@ -171,7 +196,7 @@ class _TransactionViewState extends State<TransactionView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Transaction',
+                'Giao dịch',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -180,7 +205,7 @@ class _TransactionViewState extends State<TransactionView> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Track your spending',
+                'Theo dõi chi tiêu của bạn',
                 style: TextStyle(
                   fontSize: 14,
                   color: isDark ? Colors.grey[400] : Colors.grey[600],
@@ -245,7 +270,7 @@ class _TransactionViewState extends State<TransactionView> {
       child: Column(
         children: [
           Text(
-            'Total Balance',
+            'Tổng số dư',
             style: TextStyle(
               fontSize: 14,
               color: Colors.white.withOpacity(0.8),
@@ -253,7 +278,7 @@ class _TransactionViewState extends State<TransactionView> {
           ),
           const SizedBox(height: 8),
           Text(
-            '\$${_formatCurrency(balance)}',
+            _formatCurrency(balance),
             style: const TextStyle(
               fontSize: 36,
               fontWeight: FontWeight.bold,
@@ -265,7 +290,7 @@ class _TransactionViewState extends State<TransactionView> {
             children: [
               Expanded(
                 child: _buildBalanceItem(
-                  'Total Income',
+                  'Tổng thu nhập',
                   totalIncome,
                   Icons.arrow_downward,
                   Colors.green[300]!,
@@ -278,7 +303,7 @@ class _TransactionViewState extends State<TransactionView> {
               ),
               Expanded(
                 child: _buildBalanceItem(
-                  'Total Expense',
+                  'Tổng chi tiêu',
                   totalExpense,
                   Icons.arrow_upward,
                   Colors.red[300]!,
@@ -310,7 +335,7 @@ class _TransactionViewState extends State<TransactionView> {
         ),
         const SizedBox(height: 4),
         Text(
-          '\$${_formatCurrency(amount)}',
+          _formatCurrency(amount),
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -343,12 +368,12 @@ class _TransactionViewState extends State<TransactionView> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
+              color: (percentage < 70 ? Colors.green : Colors.orange).withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               Icons.check_circle,
-              color: Colors.green[600],
+              color: percentage < 70 ? Colors.green[600] : Colors.orange[600],
               size: 20,
             ),
           ),
@@ -358,7 +383,7 @@ class _TransactionViewState extends State<TransactionView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${percentage.toStringAsFixed(1)}% Of Your Expenses, Looks Good',
+                  '${percentage.toStringAsFixed(1)}% chi tiêu, ${percentage < 70 ? 'Tốt' : 'Cẩn thận'}',
                   style: TextStyle(
                     fontSize: 13,
                     color: isDark ? Colors.grey[300] : Colors.grey[700],
@@ -381,7 +406,7 @@ class _TransactionViewState extends State<TransactionView> {
           ),
           const SizedBox(width: 12),
           Text(
-            '\$${_formatCurrency(budgetLimit)}',
+            _formatCurrency(budgetLimit),
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -398,24 +423,24 @@ class _TransactionViewState extends State<TransactionView> {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          _buildFilterChip('All', isDark),
+          _buildFilterChip('All', 'Tất cả', isDark),
           const SizedBox(width: 8),
-          _buildFilterChip('Income', isDark),
+          _buildFilterChip('Income', 'Thu nhập', isDark),
           const SizedBox(width: 8),
-          _buildFilterChip('Expense', isDark),
+          _buildFilterChip('Expense', 'Chi tiêu', isDark),
         ],
       ),
     );
   }
 
-  Widget _buildFilterChip(String label, bool isDark) {
-    bool isSelected = selectedFilter == label;
+  Widget _buildFilterChip(String value, String label, bool isDark) {
+    bool isSelected = selectedFilter == value;
     
     return Expanded(
       child: GestureDetector(
         onTap: () {
           setState(() {
-            selectedFilter = label;
+            selectedFilter = value;
           });
         },
         child: Container(
@@ -473,7 +498,7 @@ class _TransactionViewState extends State<TransactionView> {
                   Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
                   const SizedBox(height: 16),
                   Text(
-                    'No transactions yet',
+                    'Chưa có giao dịch',
                     style: TextStyle(
                       fontSize: 16,
                       color: isDark ? Colors.grey[400] : Colors.grey[600],
@@ -481,7 +506,7 @@ class _TransactionViewState extends State<TransactionView> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Tap + to add your first transaction',
+                    'Nhấn + để thêm giao dịch đầu tiên',
                     style: TextStyle(
                       fontSize: 14,
                       color: isDark ? Colors.grey[500] : Colors.grey[500],
@@ -501,7 +526,8 @@ class _TransactionViewState extends State<TransactionView> {
           var timestamp = data['date'] as Timestamp?;
           
           if (timestamp != null) {
-            String monthKey = DateFormat('MMMM yyyy').format(timestamp.toDate());
+            // ✅ Fixed: Use Vietnamese month helper
+            String monthKey = _getVietnameseMonth(timestamp.toDate());
             
             if (!groupedTransactions.containsKey(monthKey)) {
               groupedTransactions[monthKey] = [];
@@ -560,9 +586,9 @@ class _TransactionViewState extends State<TransactionView> {
 
   Widget _buildTransactionItem(DocumentSnapshot doc, bool isDark) {
     var data = doc.data() as Map<String, dynamic>;
-    String title = data['title'] ?? 'Untitled';
+    String title = data['title'] ?? 'Không có tiêu đề';
     double amount = (data['amount'] ?? 0).toDouble();
-    String category = data['category'] ?? 'Other';
+    String category = data['category'] ?? 'Khác';
     String type = (data['type'] ?? 'expense').toString().toLowerCase();
     bool isIncome = type == 'income';
 
@@ -636,7 +662,7 @@ class _TransactionViewState extends State<TransactionView> {
               ),
               const SizedBox(height: 4),
               Text(
-                '${isIncome ? '+' : '-'}\$${_formatCurrency(amount)}',
+                '${isIncome ? '+' : '-'}${_formatCurrency(amount)}',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,

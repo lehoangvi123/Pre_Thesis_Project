@@ -418,8 +418,9 @@ class _HomeViewState extends State<HomeView> {
                       'Total Balance',
                       style: TextStyle(
                         fontSize: 12,
+               
                         color: isDark ? Colors.grey[400] : Colors.grey[600],
-                      ),
+                      ),       
                     ),
                   ],
                 ),

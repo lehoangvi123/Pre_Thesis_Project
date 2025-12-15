@@ -21,7 +21,7 @@ class TransactionService {
   // Đảm bảo user doc có field balance tồn tại trước khi update
  Future<void> ensureUserDoc() async {
   final uid = this.uid; // use getter value
-  if (uid.isEmpty) throw Exception("User not logged in");
+  if (uid.isEmpty) throw Exception("User not logged in.");
 
   final snap = await _userDoc.get();
   if (!snap.exists) {

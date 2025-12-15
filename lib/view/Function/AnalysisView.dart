@@ -28,11 +28,22 @@ class _AnalysisViewState extends State<AnalysisView> {
     userId = _auth.currentUser?.uid;
   }
 
+  // ✅ Format VND currency
   String _formatCurrency(double amount) {
-    return amount.toStringAsFixed(0).replaceAllMapped(
+    return '${amount.toStringAsFixed(0).replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    );
+      (Match m) => '${m[1]}.',
+    )}₫';
+  }
+
+  // ✅ Format short VND (for charts)
+  String _formatShortCurrency(double amount) {
+    if (amount >= 1000000) {
+      return '${(amount / 1000000).toStringAsFixed(1)}M₫';
+    } else if (amount >= 1000) {
+      return '${(amount / 1000).toStringAsFixed(0)}K₫';
+    }
+    return '${amount.toStringAsFixed(0)}₫';
   }
 
   @override
@@ -72,7 +83,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Analysis',
+                              'Phân tích',
                               style: TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
@@ -81,7 +92,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'View your financial insights',
+                              'Xem thông tin tài chính của bạn',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: isDark ? Colors.grey[400] : Colors.grey[600],
@@ -121,7 +132,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                                   ),
                                   const SizedBox(width: 12),
                                   Text(
-                                    'Bar Chart',
+                                    'Biểu đồ cột',
                                     style: TextStyle(
                                       color: chartType == 'bar'
                                           ? const Color(0xFF00CED1)
@@ -151,7 +162,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                                   ),
                                   const SizedBox(width: 12),
                                   Text(
-                                    'Pie Chart',
+                                    'Biểu đồ tròn',
                                     style: TextStyle(
                                       color: chartType == 'pie'
                                           ? const Color(0xFF00CED1)
@@ -176,15 +187,12 @@ class _AnalysisViewState extends State<AnalysisView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ✅ Balance Card với real data
                       _buildBalanceCard(balance, totalIncome, totalExpense, isDark),
                       const SizedBox(height: 20),
                       _buildPeriodSelector(),
                       const SizedBox(height: 20),
-                      // ✅ Chart với real data
                       _buildChartCard(totalIncome, totalExpense, isDark),
                       const SizedBox(height: 24),
-                      // ✅ Summary Cards với real data
                       _buildSummaryCards(totalIncome, totalExpense, isDark),
                       const SizedBox(height: 24),
                       _buildMyTargetsSection(totalExpense, isDark),
@@ -228,7 +236,7 @@ class _AnalysisViewState extends State<AnalysisView> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Total Balance',
+                'Tổng số dư',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.9),
                   fontSize: 14,
@@ -245,7 +253,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                     Icon(Icons.account_balance_wallet, color: Colors.white, size: 14),
                     const SizedBox(width: 4),
                     Text(
-                      'Account',
+                      'Tài khoản',
                       style: TextStyle(color: Colors.white, fontSize: 12),
                     ),
                   ],
@@ -255,7 +263,7 @@ class _AnalysisViewState extends State<AnalysisView> {
           ),
           const SizedBox(height: 12),
           Text(
-            '\$${_formatCurrency(balance)}',
+            _formatCurrency(balance),
             style: const TextStyle(
               color: Colors.white,
               fontSize: 32,
@@ -274,7 +282,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                         Icon(Icons.arrow_downward, color: Colors.white, size: 14),
                         const SizedBox(width: 4),
                         Text(
-                          'Income',
+                          'Thu nhập',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.9),
                             fontSize: 12,
@@ -284,7 +292,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '\$${_formatCurrency(totalIncome)}',
+                      _formatCurrency(totalIncome),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -309,7 +317,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                         Icon(Icons.arrow_upward, color: Colors.white, size: 14),
                         const SizedBox(width: 4),
                         Text(
-                          'Expenses',
+                          'Chi tiêu',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.9),
                             fontSize: 12,
@@ -319,7 +327,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '-\$${_formatCurrency(totalExpense)}',
+                      '-${_formatCurrency(totalExpense)}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -344,7 +352,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                 Icon(Icons.check_circle, color: Colors.white, size: 16),
                 const SizedBox(width: 6),
                 Text(
-                  '${percentage.toStringAsFixed(1)}% Of Your Expenses, ${percentage < 50 ? 'Looks Good' : 'High Spending'}',
+                  '${percentage.toStringAsFixed(1)}% chi tiêu, ${percentage < 50 ? 'Tốt' : 'Chi nhiều'}',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 11,
@@ -361,26 +369,32 @@ class _AnalysisViewState extends State<AnalysisView> {
   Widget _buildPeriodSelector() {
     return Row(
       children: [
-        _buildPeriodButton('Daily'),
+        _buildPeriodButton('Ngày'),
         const SizedBox(width: 8),
-        _buildPeriodButton('Weekly'),
+        _buildPeriodButton('Tuần'),
         const SizedBox(width: 8),
-        _buildPeriodButton('Monthly'),
+        _buildPeriodButton('Tháng'),
         const SizedBox(width: 8),
-        _buildPeriodButton('Year'),
+        _buildPeriodButton('Năm'),
       ],
     );
   }
 
   Widget _buildPeriodButton(String period) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    bool isSelected = selectedPeriod == period;
+    bool isSelected = (selectedPeriod == 'Daily' && period == 'Ngày') ||
+                      (selectedPeriod == 'Weekly' && period == 'Tuần') ||
+                      (selectedPeriod == 'Monthly' && period == 'Tháng') ||
+                      (selectedPeriod == 'Year' && period == 'Năm');
     
     return Expanded(
       child: GestureDetector(
         onTap: () {
           setState(() {
-            selectedPeriod = period;
+            if (period == 'Ngày') selectedPeriod = 'Daily';
+            else if (period == 'Tuần') selectedPeriod = 'Weekly';
+            else if (period == 'Tháng') selectedPeriod = 'Monthly';
+            else if (period == 'Năm') selectedPeriod = 'Year';
           });
         },
         child: Container(
@@ -425,7 +439,7 @@ class _AnalysisViewState extends State<AnalysisView> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Income & Expenses',
+                'Thu nhập & Chi tiêu',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -434,9 +448,9 @@ class _AnalysisViewState extends State<AnalysisView> {
               ),
               Row(
                 children: [
-                  _buildLegend(const Color(0xFF00CED1), 'Income'),
+                  _buildLegend(const Color(0xFF00CED1), 'Thu'),
                   const SizedBox(width: 12),
-                  _buildLegend(const Color(0xFF7FFFD4), 'Expense'),
+                  _buildLegend(const Color(0xFF7FFFD4), 'Chi'),
                 ],
               ),
             ],
@@ -454,8 +468,7 @@ class _AnalysisViewState extends State<AnalysisView> {
   }
 
   Widget _buildBarChart(double totalIncome, double totalExpense, bool isDark) {
-    // Simulate weekly distribution
-    double weeklyIncome = totalIncome / 4; // Chia đều cho 4 tuần
+    double weeklyIncome = totalIncome / 4;
     double weeklyExpense = totalExpense / 4;
     
     return BarChart(
@@ -469,7 +482,7 @@ class _AnalysisViewState extends State<AnalysisView> {
             sideTitles: SideTitles(
               showTitles: true,
               getTitlesWidget: (value, meta) {
-                const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
                 if (value.toInt() < days.length) {
                   return Padding(
                     padding: const EdgeInsets.only(top: 8.0),
@@ -499,7 +512,6 @@ class _AnalysisViewState extends State<AnalysisView> {
         gridData: FlGridData(show: false),
         borderData: FlBorderData(show: false),
         barGroups: List.generate(7, (index) {
-          // Distribute data with some variation
           double incomeVariation = (index % 2 == 0 ? 1.1 : 0.9);
           double expenseVariation = (index % 3 == 0 ? 1.2 : 0.8);
           
@@ -534,7 +546,7 @@ class _AnalysisViewState extends State<AnalysisView> {
           PieChartSectionData(
             color: const Color(0xFF00CED1),
             value: totalIncome,
-            title: '\$${(totalIncome / 1000).toStringAsFixed(0)}k',
+            title: _formatShortCurrency(totalIncome),
             radius: 50,
             titleStyle: const TextStyle(
               fontSize: 14,
@@ -545,7 +557,7 @@ class _AnalysisViewState extends State<AnalysisView> {
           PieChartSectionData(
             color: const Color(0xFF7FFFD4),
             value: totalExpense,
-            title: '\$${(totalExpense / 1000).toStringAsFixed(0)}k',
+            title: _formatShortCurrency(totalExpense),
             radius: 50,
             titleStyle: const TextStyle(
               fontSize: 14,
@@ -612,7 +624,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Income',
+                  'Thu nhập',
                   style: TextStyle(
                     fontSize: 12,
                     color: isDark ? Colors.grey[400] : Colors.grey[600],
@@ -620,7 +632,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '\$${_formatCurrency(totalIncome)}',
+                  _formatCurrency(totalIncome),
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -658,7 +670,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Expense',
+                  'Chi tiêu',
                   style: TextStyle(
                     fontSize: 12,
                     color: isDark ? Colors.grey[400] : Colors.grey[600],
@@ -666,7 +678,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '\$${_formatCurrency(totalExpense)}',
+                  _formatCurrency(totalExpense),
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -682,8 +694,7 @@ class _AnalysisViewState extends State<AnalysisView> {
   }
 
   Widget _buildMyTargetsSection(double totalExpense, bool isDark) {
-    // Calculate targets based on actual spending
-    double monthlyBudget = 20000000; // 20M VND budget
+    double monthlyBudget = 20000000; // 20M VND
     double shoppingTarget = monthlyBudget * 0.3;
     double foodTarget = monthlyBudget * 0.25;
     double travelTarget = monthlyBudget * 0.2;
@@ -696,7 +707,7 @@ class _AnalysisViewState extends State<AnalysisView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'My Targets',
+          'Mục tiêu của tôi',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -707,7 +718,7 @@ class _AnalysisViewState extends State<AnalysisView> {
         _buildTargetItem(
           icon: Icons.shopping_bag_outlined,
           iconColor: Colors.blue[400]!,
-          title: 'Shopping Budget',
+          title: 'Ngân sách mua sắm',
           current: shoppingCurrent,
           target: shoppingTarget,
           isDark: isDark,
@@ -716,7 +727,7 @@ class _AnalysisViewState extends State<AnalysisView> {
         _buildTargetItem(
           icon: Icons.restaurant,
           iconColor: Colors.orange[400]!,
-          title: 'Food Budget',
+          title: 'Ngân sách ăn uống',
           current: foodCurrent,
           target: foodTarget,
           isDark: isDark,
@@ -725,7 +736,7 @@ class _AnalysisViewState extends State<AnalysisView> {
         _buildTargetItem(
           icon: Icons.flight,
           iconColor: Colors.purple[400]!,
-          title: 'Travel Budget',
+          title: 'Ngân sách du lịch',
           current: travelCurrent,
           target: travelTarget,
           isDark: isDark,
@@ -781,7 +792,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '\$${_formatCurrency(current)} / \$${_formatCurrency(target)}',
+                      '${_formatCurrency(current)} / ${_formatCurrency(target)}',
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark ? Colors.grey[400] : Colors.grey[600],
