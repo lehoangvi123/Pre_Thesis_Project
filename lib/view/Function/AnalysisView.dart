@@ -5,19 +5,27 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import './Transaction.dart'; 
 import './HomeView.dart'; 
 import './CategorizeContent.dart';  
-import './ProfileView.dart';
+import './ProfileView.dart'; 
+import './SavingGoals.dart';
+import './SavingGoalsService.dart'; 
+import './AddSavingGoalView.dart'; 
+import './SavingGoalDetailView.dart';
 
 class AnalysisView extends StatefulWidget {
   const AnalysisView({Key? key}) : super(key: key);
 
   @override
-  State<AnalysisView> createState() => _AnalysisViewState();
+  State<AnalysisView> createState() => _AnalysisViewState(); 
+
 }
 
 class _AnalysisViewState extends State<AnalysisView> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance; 
+  final SavingGoalService _goalService = SavingGoalService(); 
   
+
+
   String selectedPeriod = 'Weekly';
   String chartType = 'bar';
   String? userId;
@@ -694,56 +702,244 @@ class _AnalysisViewState extends State<AnalysisView> {
   }
 
   Widget _buildMyTargetsSection(double totalExpense, bool isDark) {
-    double monthlyBudget = 20000000; // 20M VND
-    double shoppingTarget = monthlyBudget * 0.3;
-    double foodTarget = monthlyBudget * 0.25;
-    double travelTarget = monthlyBudget * 0.2;
-    
-    double shoppingCurrent = totalExpense * 0.4;
-    double foodCurrent = totalExpense * 0.3;
-    double travelCurrent = totalExpense * 0.2;
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Mục tiêu của tôi',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.grey[800],
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Mục tiêu của tôi',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.grey[800],
+            ),
           ),
+          TextButton.icon(
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AddSavingGoalView(),
+                ),
+              );
+              if (result == true && mounted) {
+                setState(() {}); // Refresh to show new goal
+              }
+            },
+            icon: const Icon(
+              Icons.add_circle_outline,
+              color: Color(0xFF00CED1),
+              size: 20,
+            ),
+            label: const Text(
+              'Thêm',
+              style: TextStyle(
+                color: Color(0xFF00CED1),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      
+      // StreamBuilder to show real-time goals
+      StreamBuilder<List<SavingGoal>>(
+        stream: _goalService.getSavingGoalsStream(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return _buildEmptyGoalsState(isDark);
+          }
+
+          List<SavingGoal> goals = snapshot.data!;
+          
+          return Column(
+            children: goals.map((goal) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildSavingGoalItem(goal, isDark),
+              );
+            }).toList(),
+          );
+        },
+      ),
+    ],
+  );
+}
+
+Widget _buildEmptyGoalsState(bool isDark) {
+  return Container(
+    padding: const EdgeInsets.all(32),
+    decoration: BoxDecoration(
+      color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+      ),
+    ),
+    child: Column(
+      children: [
+        Icon(
+          Icons.flag_outlined,
+          size: 64,
+          color: isDark ? Colors.grey[600] : Colors.grey[400],
         ),
         const SizedBox(height: 16),
-        _buildTargetItem(
-          icon: Icons.shopping_bag_outlined,
-          iconColor: Colors.blue[400]!,
-          title: 'Ngân sách mua sắm',
-          current: shoppingCurrent,
-          target: shoppingTarget,
-          isDark: isDark,
+        Text(
+          'Chưa có mục tiêu',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.grey[400] : Colors.grey[600],
+          ),
         ),
-        const SizedBox(height: 12),
-        _buildTargetItem(
-          icon: Icons.restaurant,
-          iconColor: Colors.orange[400]!,
-          title: 'Ngân sách ăn uống',
-          current: foodCurrent,
-          target: foodTarget,
-          isDark: isDark,
-        ),
-        const SizedBox(height: 12),
-        _buildTargetItem(
-          icon: Icons.flight,
-          iconColor: Colors.purple[400]!,
-          title: 'Ngân sách du lịch',
-          current: travelCurrent,
-          target: travelTarget,
-          isDark: isDark,
+        const SizedBox(height: 8),
+        Text(
+          'Nhấn "Thêm" để tạo mục tiêu tiết kiệm đầu tiên',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            color: isDark ? Colors.grey[500] : Colors.grey[500],
+          ),
         ),
       ],
-    );
-  }
+    ),
+  );
+}
+
+Widget _buildSavingGoalItem(SavingGoal goal, bool isDark) {
+  Color goalColor = Color(goal.color ?? 0xFF00CED1);
+  
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: goalColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                goal.icon ?? '🎯',
+                style: const TextStyle(fontSize: 24),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    goal.title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${_formatCurrency(goal.currentAmount)} / ${_formatCurrency(goal.targetAmount)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${goal.progress.toStringAsFixed(0)}%',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.grey[300] : Colors.grey[800],
+                  ),
+                ),
+                if (goal.isCompleted)
+                  Container(
+                    margin: const EdgeInsets.only(top: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Hoàn thành',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.green,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        
+        // Progress bar
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: LinearProgressIndicator(
+            value: goal.progress / 100,
+            backgroundColor: isDark ? Colors.grey[700] : Colors.grey[200],
+            valueColor: AlwaysStoppedAnimation<Color>(goalColor),
+            minHeight: 8,
+          ),
+        ),
+        
+        // Optional: Target date
+        if (goal.targetDate != null) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                Icons.calendar_today,
+                size: 14,
+                color: isDark ? Colors.grey[500] : Colors.grey[400],
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Đích: ${goal.targetDate!.day}/${goal.targetDate!.month}/${goal.targetDate!.year}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDark ? Colors.grey[500] : Colors.grey[500],
+                ),
+              ),
+            ],
+          ),  
+        ],
+      ],
+    ),
+  );
+}
 
   Widget _buildTargetItem({
     required IconData icon,
