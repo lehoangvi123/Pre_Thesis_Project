@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
 import './HomeView.dart';
 import './AnalysisView.dart';
 import './CategorizeContent.dart';
 import './ProfileView.dart';
 import './AddExpenseView.dart';
 import '../notification/NotificationView.dart';
+import './transaction_widgets.dart';
 
 class TransactionView extends StatefulWidget {
   const TransactionView({Key? key}) : super(key: key);
@@ -19,9 +19,11 @@ class TransactionView extends StatefulWidget {
 class _TransactionViewState extends State<TransactionView> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  
+  final TextEditingController _searchController = TextEditingController();
+
   String selectedFilter = 'All'; // All, Income, Expense
   String? userId;
+  String searchQuery = '';
 
   @override
   void initState() {
@@ -29,93 +31,139 @@ class _TransactionViewState extends State<TransactionView> {
     userId = _auth.currentUser?.uid;
   }
 
-  // ✅ Format VND currency
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   String _formatCurrency(double amount) {
-    return '${amount.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]}.',
-    )}₫';
+    return TransactionWidgets.formatCurrency(amount);
   }
 
-  // ✅ Vietnamese month format helper
-  String _getVietnameseMonth(DateTime date) {
-    const months = [
-      'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4',
-      'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8',
-      'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
-    ];
-    return '${months[date.month - 1]} ${date.year}';
-  }
-
-  String _formatDate(dynamic timestamp) {
-    if (timestamp == null) return 'Không rõ ngày';
-    
+  Future<void> _deleteTransaction(String transactionId, Map<String, dynamic> data) async {
     try {
-      if (timestamp is Timestamp) {
-        DateTime date = timestamp.toDate();
-        return DateFormat('h:mm a - dd/MM').format(date);
+      double amount = (data['amount'] ?? 0).toDouble();
+      String type = (data['type'] ?? 'expense').toString().toLowerCase();
+
+      // Delete transaction
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('transactions')
+          .doc(transactionId)
+          .delete();
+
+      // Update user balance
+      DocumentReference userRef = _firestore.collection('users').doc(userId);
+
+      await _firestore.runTransaction((transaction) async {
+        DocumentSnapshot userDoc = await transaction.get(userRef);
+
+        double currentBalance = (userDoc.get('balance') ?? 0).toDouble();
+        double totalIncome = (userDoc.get('totalIncome') ?? 0).toDouble();
+        double totalExpense = (userDoc.get('totalExpense') ?? 0).toDouble();
+
+        if (type == 'income') {
+          currentBalance -= amount;
+          totalIncome -= amount;
+        } else {
+          currentBalance += amount;
+          totalExpense -= amount;
+        }
+
+        transaction.update(userRef, {
+          'balance': currentBalance,
+          'totalIncome': totalIncome,
+          'totalExpense': totalExpense,
+        });
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã xóa giao dịch thành công'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
-      return 'Không rõ ngày';
     } catch (e) {
-      return 'Không rõ ngày';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
-  IconData _getCategoryIcon(String category) {
-    switch (category.toLowerCase()) {
-      case 'food':
-      case 'đồ ăn':
-        return Icons.restaurant;
-      case 'transport':
-      case 'di chuyển':
-        return Icons.directions_car;
-      case 'groceries':
-      case 'mua sắm':
-        return Icons.shopping_cart;
-      case 'rent':
-      case 'thuê nhà':
-        return Icons.home;
-      case 'salary':
-      case 'lương':
-        return Icons.attach_money;
-      case 'entertainment':
-      case 'giải trí':
-        return Icons.movie;
-      case 'medicine':
-      case 'health':
-      case 'sức khỏe':
-        return Icons.medical_services;
-      case 'gifts':
-      case 'quà tặng':
-        return Icons.card_giftcard;
-      default:
-        return Icons.category;
-    }
-  }
-
-  Color _getCategoryColor(String category) {
-    switch (category.toLowerCase()) {
-      case 'food':
-      case 'đồ ăn':
-        return const Color(0xFF00CED1);
-      case 'transport':
-      case 'di chuyển':
-        return const Color(0xFF64B5F6);
-      case 'salary':
-      case 'lương':
-        return const Color(0xFF4CAF50);
-      case 'groceries':
-      case 'mua sắm':
-        return const Color(0xFF9C27B0);
-      case 'rent':
-      case 'thuê nhà':
-        return const Color(0xFFFF9800);
-      case 'entertainment':
-      case 'giải trí':
-        return const Color(0xFFE91E63);
-      default:
-        return const Color(0xFF607D8B);
-    }
+  void _showSearchDialog(bool isDark) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Text(
+            'Tìm kiếm giao dịch',
+            style: TextStyle(color: isDark ? Colors.white : Colors.black),
+          ),
+          content: TextField(
+            controller: _searchController,
+            autofocus: true,
+            style: TextStyle(color: isDark ? Colors.white : Colors.black),
+            decoration: InputDecoration(
+              hintText: 'Nhập tên giao dịch...',
+              hintStyle: TextStyle(
+                color: isDark ? Colors.grey[600] : Colors.grey[400],
+              ),
+              prefixIcon: const Icon(Icons.search, color: Color(0xFF00CED1)),
+              filled: true,
+              fillColor: isDark ? Colors.grey[800] : Colors.grey[100],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: (value) {
+              setState(() {
+                searchQuery = value.toLowerCase();
+              });
+              Navigator.pop(context);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  searchQuery = '';
+                  _searchController.clear();
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('Xóa'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00CED1),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Đóng',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -123,13 +171,14 @@ class _TransactionViewState extends State<TransactionView> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (userId == null) {
-      return Scaffold(
+      return const Scaffold(
         body: Center(child: Text('Vui lòng đăng nhập')),
       );
     }
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF8F9FA),
+      backgroundColor:
+          isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF8F9FA),
       body: SafeArea(
         child: Column(
           children: [
@@ -142,20 +191,24 @@ class _TransactionViewState extends State<TransactionView> {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  var userData = userSnapshot.data?.data() as Map<String, dynamic>? ?? {};
+                  var userData =
+                      userSnapshot.data?.data() as Map<String, dynamic>? ?? {};
                   double balance = (userData['balance'] ?? 0).toDouble();
-                  double totalIncome = (userData['totalIncome'] ?? 0).toDouble();
-                  double totalExpense = (userData['totalExpense'] ?? 0).toDouble();
+                  double totalIncome =
+                      (userData['totalIncome'] ?? 0).toDouble();
+                  double totalExpense =
+                      (userData['totalExpense'] ?? 0).toDouble();
 
                   return SingleChildScrollView(
                     child: Column(
                       children: [
-                        _buildBalanceCard(balance, totalIncome, totalExpense, isDark),
+                        _buildBalanceCard(
+                            balance, totalIncome, totalExpense, isDark),
                         const SizedBox(height: 16),
                         _buildProgressBar(totalExpense, isDark),
-                        const SizedBox(height: 20),
-                        _buildFilterChips(isDark),
                         const SizedBox(height: 16),
+                        _buildFilterChips(isDark),
+                        const SizedBox(height: 8),
                         _buildTransactionsList(isDark),
                         const SizedBox(height: 80),
                       ],
@@ -176,7 +229,7 @@ class _TransactionViewState extends State<TransactionView> {
             ),
           );
           if (result == true && mounted) {
-            setState(() {}); // Refresh
+            setState(() {});
           }
         },
         backgroundColor: const Color(0xFF00CED1),
@@ -205,7 +258,9 @@ class _TransactionViewState extends State<TransactionView> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Theo dõi chi tiêu của bạn',
+                searchQuery.isEmpty
+                    ? 'Theo dõi chi tiêu của bạn'
+                    : 'Tìm kiếm: "$searchQuery"',
                 style: TextStyle(
                   fontSize: 14,
                   color: isDark ? Colors.grey[400] : Colors.grey[600],
@@ -213,49 +268,75 @@ class _TransactionViewState extends State<TransactionView> {
               ),
             ],
           ),
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const NotificationView(),
-                ),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => _showSearchDialog(isDark),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                      ),
+                    ],
                   ),
-                ],
+                  child: Icon(
+                    Icons.search,
+                    color: isDark ? Colors.grey[300] : Colors.grey[700],
+                  ),
+                ),
               ),
-              child: Icon(
-                Icons.notifications_outlined,
-                color: isDark ? Colors.grey[300] : Colors.grey[700],
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationView(),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.notifications_outlined,
+                    color: isDark ? Colors.grey[300] : Colors.grey[700],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBalanceCard(double balance, double totalIncome, double totalExpense, bool isDark) {
+  Widget _buildBalanceCard(
+      double balance, double totalIncome, double totalExpense, bool isDark) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF00CED1),
-            const Color(0xFF00A8AA),
+            Color(0xFF00CED1),
+            Color(0xFF00A8AA),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
@@ -316,7 +397,8 @@ class _TransactionViewState extends State<TransactionView> {
     );
   }
 
-  Widget _buildBalanceItem(String label, double amount, IconData icon, Color iconColor) {
+  Widget _buildBalanceItem(
+      String label, double amount, IconData icon, Color iconColor) {
     return Column(
       children: [
         Row(
@@ -368,7 +450,8 @@ class _TransactionViewState extends State<TransactionView> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: (percentage < 70 ? Colors.green : Colors.orange).withOpacity(0.1),
+              color: (percentage < 70 ? Colors.green : Colors.orange)
+                  .withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
@@ -435,7 +518,7 @@ class _TransactionViewState extends State<TransactionView> {
 
   Widget _buildFilterChip(String value, String label, bool isDark) {
     bool isSelected = selectedFilter == value;
-    
+
     return Expanded(
       child: GestureDetector(
         onTap: () {
@@ -490,45 +573,42 @@ class _TransactionViewState extends State<TransactionView> {
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                children: [
-                  Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Chưa có giao dịch',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: isDark ? Colors.grey[400] : Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Nhấn + để thêm giao dịch đầu tiên',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDark ? Colors.grey[500] : Colors.grey[500],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
+          return TransactionWidgets.buildEmptyState(isDark, selectedFilter);
+        }
+
+        // Filter by search query
+        List<DocumentSnapshot> filteredDocs = snapshot.data!.docs.where((doc) {
+          if (searchQuery.isEmpty) return true;
+
+          var data = doc.data() as Map<String, dynamic>;
+          String title = (data['title'] ?? '').toString().toLowerCase();
+          String category = (data['category'] ?? '').toString().toLowerCase();
+
+          return title.contains(searchQuery) || category.contains(searchQuery);
+        }).toList();
+
+        if (filteredDocs.isEmpty) {
+          return TransactionWidgets.buildEmptyState(isDark, selectedFilter);
+        }
+
+        // Calculate statistics
+        double totalAmount = 0;
+        for (var doc in filteredDocs) {
+          var data = doc.data() as Map<String, dynamic>;
+          totalAmount += (data['amount'] ?? 0).toDouble();
         }
 
         // Group by month
         Map<String, List<DocumentSnapshot>> groupedTransactions = {};
-        
-        for (var doc in snapshot.data!.docs) {
+
+        for (var doc in filteredDocs) {
           var data = doc.data() as Map<String, dynamic>;
           var timestamp = data['date'] as Timestamp?;
-          
+
           if (timestamp != null) {
-            // ✅ Fixed: Use Vietnamese month helper
-            String monthKey = _getVietnameseMonth(timestamp.toDate());
-            
+            String monthKey =
+                TransactionWidgets.getVietnameseMonth(timestamp.toDate());
+
             if (!groupedTransactions.containsKey(monthKey)) {
               groupedTransactions[monthKey] = [];
             }
@@ -536,13 +616,26 @@ class _TransactionViewState extends State<TransactionView> {
           }
         }
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            children: groupedTransactions.entries.map((entry) {
-              return _buildMonthSection(entry.key, entry.value, isDark);
-            }).toList(),
-          ),
+        return Column(
+          children: [
+            // Statistics card
+            if (selectedFilter != 'All')
+              TransactionWidgets.buildStatisticsCard(
+                transactionCount: filteredDocs.length,
+                totalAmount: totalAmount,
+                isIncome: selectedFilter == 'Income',
+                isDark: isDark,
+              ),
+            // Transactions list
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: groupedTransactions.entries.map((entry) {
+                  return _buildMonthSection(entry.key, entry.value, isDark);
+                }).toList(),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -564,7 +657,8 @@ class _TransactionViewState extends State<TransactionView> {
     return query.snapshots();
   }
 
-  Widget _buildMonthSection(String month, List<DocumentSnapshot> transactions, bool isDark) {
+  Widget _buildMonthSection(
+      String month, List<DocumentSnapshot> transactions, bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -579,100 +673,24 @@ class _TransactionViewState extends State<TransactionView> {
             ),
           ),
         ),
-        ...transactions.map((doc) => _buildTransactionItem(doc, isDark)).toList(),
+        ...transactions.map((doc) {
+          var data = doc.data() as Map<String, dynamic>;
+          return TransactionWidgets.buildTransactionItem(
+            context: context,
+            doc: doc,
+            isDark: isDark,
+            onDelete: () => _deleteTransaction(doc.id, data),
+            onTap: () async {
+              // Navigate to edit (coming soon)
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Chức năng chỉnh sửa đang phát triển'),
+                ),
+              );
+            },
+          );
+        }).toList(),
       ],
-    );
-  }
-
-  Widget _buildTransactionItem(DocumentSnapshot doc, bool isDark) {
-    var data = doc.data() as Map<String, dynamic>;
-    String title = data['title'] ?? 'Không có tiêu đề';
-    double amount = (data['amount'] ?? 0).toDouble();
-    String category = data['category'] ?? 'Khác';
-    String type = (data['type'] ?? 'expense').toString().toLowerCase();
-    bool isIncome = type == 'income';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: _getCategoryColor(category).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              _getCategoryIcon(category),
-              color: _getCategoryColor(category),
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : Colors.black,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _formatDate(data['date']),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? Colors.grey[400] : Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[700] : Colors.grey[200],
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  category,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.grey[300] : Colors.grey[700],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${isIncome ? '+' : '-'}${_formatCurrency(amount)}',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isIncome ? Colors.green[600] : Colors.red[600],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -694,30 +712,33 @@ class _TransactionViewState extends State<TransactionView> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(Icons.home, false, isDark ? Colors.grey[500]! : Colors.grey[400]!,
-                  onTap: () {
+              _buildNavItem(Icons.home, false,
+                  isDark ? Colors.grey[500]! : Colors.grey[400]!, onTap: () {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const HomeView()),
                 );
               }),
-              _buildNavItem(Icons.search, false, isDark ? Colors.grey[500]! : Colors.grey[400]!,
-                  onTap: () {
+              _buildNavItem(Icons.search, false,
+                  isDark ? Colors.grey[500]! : Colors.grey[400]!, onTap: () {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => const AnalysisView()),
+                  MaterialPageRoute(
+                      builder: (context) => const AnalysisView()),
                 );
               }),
-              _buildNavItem(Icons.swap_horiz, true, const Color(0xFF00CED1), onTap: () {}),
-              _buildNavItem(Icons.layers, false, isDark ? Colors.grey[500]! : Colors.grey[400]!,
-                  onTap: () {
+              _buildNavItem(Icons.swap_horiz, true, const Color(0xFF00CED1),
+                  onTap: () {}),
+              _buildNavItem(Icons.layers, false,
+                  isDark ? Colors.grey[500]! : Colors.grey[400]!, onTap: () {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => const CategoriesView()),
+                  MaterialPageRoute(
+                      builder: (context) => const CategoriesView()),
                 );
               }),
-              _buildNavItem(Icons.person_outline, false, isDark ? Colors.grey[500]! : Colors.grey[400]!,
-                  onTap: () {
+              _buildNavItem(Icons.person_outline, false,
+                  isDark ? Colors.grey[500]! : Colors.grey[400]!, onTap: () {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const ProfileView()),
@@ -730,7 +751,8 @@ class _TransactionViewState extends State<TransactionView> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, bool isActive, Color color, {VoidCallback? onTap}) {
+  Widget _buildNavItem(IconData icon, bool isActive, Color color,
+      {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
