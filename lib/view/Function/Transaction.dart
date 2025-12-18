@@ -765,4 +765,4 @@ class _TransactionViewState extends State<TransactionView> {
       ),
     );
   }
-}
+} 

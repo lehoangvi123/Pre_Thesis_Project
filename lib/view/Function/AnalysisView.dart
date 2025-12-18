@@ -10,7 +10,8 @@ import './SavingGoals.dart';
 import './SavingGoalsService.dart';
 import './AddSavingGoalView.dart';
 import './analysis_widgets.dart'; // ✅ Import helper
-
+import './Chart/chart_service.dart'; // ✅ Chart service
+import './Chart/chart_widgets.dart'; // ✅ Chart widgets
 
 class AnalysisView extends StatefulWidget {
   const AnalysisView({Key? key}) : super(key: key);
@@ -23,15 +24,37 @@ class _AnalysisViewState extends State<AnalysisView> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final SavingGoalService _goalService = SavingGoalService();
+  final ChartService _chartService = ChartService();
 
   String selectedPeriod = 'Weekly';
   String chartType = 'bar';
+  String pieChartType = 'expense'; // expense or income
   String? userId;
+  
+  Map<String, double> expenseByCategory = {};
+  Map<String, double> incomeByCategory = {};
+  bool isLoadingChartData = false;
 
   @override
   void initState() {
     super.initState();
     userId = _auth.currentUser?.uid;
+    _loadChartData();
+  }
+
+  Future<void> _loadChartData() async {
+    if (userId == null) return;
+    
+    setState(() {
+      isLoadingChartData = true;
+    });
+
+    expenseByCategory = await _chartService.getExpenseByCategory(userId!);
+    incomeByCategory = await _chartService.getIncomeByCategory(userId!);
+
+    setState(() {
+      isLoadingChartData = false;
+    });
   }
 
   String _formatCurrency(double amount) {
@@ -423,9 +446,9 @@ class _AnalysisViewState extends State<AnalysisView> {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 50),
           SizedBox(
-            height: 200,
+            height: 270,
             child: chartType == 'bar'
                 ? _buildBarChart(totalIncome, totalExpense, isDark)
                 : _buildPieChart(totalIncome, totalExpense),
@@ -504,35 +527,37 @@ class _AnalysisViewState extends State<AnalysisView> {
   }
 
   Widget _buildPieChart(double totalIncome, double totalExpense) {
-    return PieChart(
-      PieChartData(
-        sectionsSpace: 2,
-        centerSpaceRadius: 60,
-        sections: [
-          PieChartSectionData(
-            color: const Color(0xFF00CED1),
-            value: totalIncome,
-            title: _formatShortCurrency(totalIncome),
-            radius: 50,
-            titleStyle: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          PieChartSectionData(
-            color: const Color(0xFF7FFFD4),
-            value: totalExpense,
-            title: _formatShortCurrency(totalExpense),
-            radius: 50,
-            titleStyle: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-        ],
-      ),
+    return Column(
+      children: [
+        // Selector: Chi tiêu / Thu nhập
+        ChartWidgets.buildChartTypeSelector(
+          selectedType: pieChartType,
+          onTypeChanged: (type) {
+            setState(() {
+              pieChartType = type;
+            });
+          },
+          isDark: Theme.of(context).brightness == Brightness.dark,
+        ),
+        const SizedBox(height: 30),
+        // Pie Chart
+        isLoadingChartData
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            : pieChartType == 'expense'
+                ? ChartWidgets.buildExpensePieChart(
+                    categoryData: expenseByCategory,
+                    isDark: Theme.of(context).brightness == Brightness.dark,
+                  )
+                : ChartWidgets.buildIncomePieChart(
+                    categoryData: incomeByCategory,
+                    isDark: Theme.of(context).brightness == Brightness.dark,
+                  ),
+      ],
     );
   }
 
