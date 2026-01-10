@@ -10,6 +10,9 @@ import './view/ThemeProvider/ThemeProviderDark.dart';
 import './view/Function/Language/MultiLanguage.dart'; 
 import './provider/TransactionProvider.dart';
 
+// ⭐ IMPORT TEST VOICE SCREEN
+import 'package:project1/view/TextVoice/test_voice.dart'; // Tạo file này ở bước sau
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -20,16 +23,15 @@ void main() async {
   await AppLocalizations.loadLanguage();
 
   runApp(
-    MultiProvider( // ✅ Wrap with MultiProvider
+    MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => TransactionProvider()..listenAll()), // ✅ Add this
+        ChangeNotifierProvider(create: (_) => TransactionProvider()..listenAll()),
       ],
       child: const MyApp(),
     ),
   );
 }
-
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -45,13 +47,14 @@ class MyApp extends StatelessWidget {
           darkTheme: themeProvider.darkTheme,
           themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
           
-          // ⭐ THAY ĐỔI QUAN TRỌNG: Dùng AuthWrapper thay vì WelcomeView
+          // ⭐ GIỮ NGUYÊN AuthWrapper
           home: const AuthWrapper(),
           
           routes: {
             '/welcome': (context) => const WelcomeView(),
             '/onboarding': (context) => const OnboardingView(),
             '/home': (context) => const HomeView(),
+            '/test-voice': (context) =>  TestVoiceScreen(), // ⭐ THÊM ROUTE TEST
           },
         );
       },
@@ -59,7 +62,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// ⭐ THÊM AuthWrapper để check login state
+// ⭐ AuthWrapper - GIỮ NGUYÊN
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({Key? key}) : super(key: key);
 
@@ -68,21 +71,19 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // Debug logs
         print('🔍 ConnectionState: ${snapshot.connectionState}');
         print('🔍 HasData: ${snapshot.hasData}');
         print('🔍 User: ${snapshot.data?.email}');
         print('🔍 User UID: ${snapshot.data?.uid}');
         
-        // 1️⃣ Loading State - Show splash screen
+        // 1️⃣ Loading State
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
-            backgroundColor: const Color(0xFF00BCD4), // Cyan background
+            backgroundColor: const Color(0xFF00BCD4),
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // App Logo hoặc Icon
                   Container(
                     width: 120,
                     height: 120,
@@ -163,7 +164,6 @@ class AuthWrapper extends StatelessWidget {
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: () {
-                      // Restart app hoặc retry
                       Navigator.of(context).pushReplacement(
                         MaterialPageRoute(builder: (_) => const MyApp()),
                       );
@@ -176,21 +176,49 @@ class AuthWrapper extends StatelessWidget {
           );
         }
         
-        // 3️⃣ User Logged In → Navigate to HomeView
+        // 3️⃣ User Logged In → HomeView với nút Test Voice
         if (snapshot.hasData && snapshot.data != null) {
           print('✅ User logged in: ${snapshot.data!.email}');
-          print('✅ Navigating to HomeView');
+          print('✅ Navigating to HomeView with Voice Test option');
           
-          // ⭐ ĐÃ LOGIN → Vào Home
-          return const HomeView();
+          // ⭐ Wrap HomeView để thêm nút Test
+          return HomeViewWrapper();
         }
         
-        // 4️⃣ No User → Show WelcomeView
+        // 4️⃣ No User → WelcomeView
         print('❌ No user found, showing WelcomeView');
-        
-        // ⭐ CHƯA LOGIN → Vào Welcome/Onboarding
         return const WelcomeView();
       },
+    );
+  }
+}
+
+// ⭐ WRAPPER để thêm nút Test Voice vào HomeView
+class HomeViewWrapper extends StatelessWidget {
+  const HomeViewWrapper({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Màn hình Home bình thường
+        const HomeView(),
+        
+        // ⭐ Floating button để vào Test Voice (CHỈ DÙNG KHI ĐANG DEV)
+        Positioned(
+          bottom: 80, // Đặt cao hơn bottom navigation
+          right: 16,
+          child: FloatingActionButton.extended(
+            onPressed: () {
+              Navigator.pushNamed(context, '/test-voice');
+            },
+            icon: Icon(Icons.mic),
+            label: Text('Test Voice'),
+            backgroundColor: Colors.deepPurple,
+            heroTag: 'testVoiceBtn', // Tránh conflict với FAB khác
+          ),
+        ),
+      ],
     );
   }
 }

@@ -1,34 +1,40 @@
 plugins {
     id("com.android.application")
-    // START: FlutterFire Configuration
     id("com.google.gms.google-services")
-    // END: FlutterFire Configuration
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
     namespace = "com.example.project1"
-    compileSdk = flutter.compileSdkVersion
+    
+    // ⭐ SỬA: Tăng compileSdk lên 34 (từ flutter.compileSdkVersion)
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
+    // ⭐ SỬA: Nâng Java lên VERSION_17 (từ VERSION_11)
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // ⭐ SỬA: Nâng Kotlin JVM target lên 17
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        jvmTarget = "17"
     }
 
     defaultConfig {
         applicationId = "com.example.project1"
+        
+        // ⭐ SỬA: Đảm bảo minSdk >= 21
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        
+        // ⭐ SỬA: Tăng targetSdk lên 34
+        targetSdk = 34
+        
         versionCode = flutter.versionCode
         versionName = flutter.versionName 
-        multiDexEnabled = true  // ← SỬA: thêm dấu = và true
+        multiDexEnabled = true
     }
 
     buildTypes {
@@ -39,10 +45,10 @@ android {
 } 
 
 dependencies {
-    // Thêm Google Sign-In (KOTLIN DSL dùng ngoặc kép)
+    // Google Sign-In
     implementation("com.google.android.gms:play-services-auth:20.7.0")
     
-    // Thêm MultiDex nếu cần
+    // MultiDex
     implementation("androidx.multidex:multidex:2.0.1")
 }
 
