@@ -93,9 +93,23 @@ class _HomeViewState extends State<HomeView> {
               ],
             ),
           ),
-        ),
-      ),
-      bottomNavigationBar: _buildBottomNavBar(),
+        ),  
+
+        
+      ), 
+      // ⭐ THÊM DÒNG NÀY - NÚT TEST VOICE
+    floatingActionButton: FloatingActionButton.extended(
+      onPressed: () {
+        Navigator.pushNamed(context, '/test-voice');
+      },
+      icon: Icon(Icons.mic),
+      label: Text('Test Voice'),
+      backgroundColor: Colors.deepPurple,
+      heroTag: 'testVoiceBtn',
+    ),
+    floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+    
+       bottomNavigationBar: _buildBottomNavBar(),
     );
   }
 

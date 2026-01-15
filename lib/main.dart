@@ -9,9 +9,7 @@ import 'package:project1/view/Function/HomeView.dart';
 import './view/ThemeProvider/ThemeProviderDark.dart';
 import './view/Function/Language/MultiLanguage.dart'; 
 import './provider/TransactionProvider.dart';
-
-// ⭐ IMPORT TEST VOICE SCREEN
-import 'package:project1/view/TextVoice/test_voice.dart'; // Tạo file này ở bước sau
+import 'package:project1/view/TextVoice/test_voice.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,14 +45,13 @@ class MyApp extends StatelessWidget {
           darkTheme: themeProvider.darkTheme,
           themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
           
-          // ⭐ GIỮ NGUYÊN AuthWrapper
           home: const AuthWrapper(),
           
           routes: {
             '/welcome': (context) => const WelcomeView(),
             '/onboarding': (context) => const OnboardingView(),
             '/home': (context) => const HomeView(),
-            '/test-voice': (context) =>  TestVoiceScreen(), // ⭐ THÊM ROUTE TEST
+            '/test-voice': (context) => TestVoiceScreen(),
           },
         );
       },
@@ -62,7 +59,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// ⭐ AuthWrapper - GIỮ NGUYÊN
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({Key? key}) : super(key: key);
 
@@ -71,12 +67,7 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        print('🔍 ConnectionState: ${snapshot.connectionState}');
-        print('🔍 HasData: ${snapshot.hasData}');
-        print('🔍 User: ${snapshot.data?.email}');
-        print('🔍 User UID: ${snapshot.data?.uid}');
-        
-        // 1️⃣ Loading State
+        // Loading State
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
             backgroundColor: const Color(0xFF00BCD4),
@@ -106,7 +97,7 @@ class AuthWrapper extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   const Text(
-                    'Expense Tracker',
+                    'Budget Buddy',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -117,49 +108,24 @@ class AuthWrapper extends StatelessWidget {
                   const CircularProgressIndicator(
                     color: Colors.white,
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Loading...',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white70,
-                    ),
-                  ),
                 ],
               ),
             ),
           );
         }
         
-        // 2️⃣ Error State
+        // Error State
         if (snapshot.hasError) {
-          print('❌ Auth Error: ${snapshot.error}');
           return Scaffold(
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
-                    Icons.error_outline,
-                    size: 80,
-                    color: Colors.red,
-                  ),
+                  const Icon(Icons.error_outline, size: 80, color: Colors.red),
                   const SizedBox(height: 16),
                   const Text(
                     'Something went wrong',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${snapshot.error}',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
@@ -176,49 +142,14 @@ class AuthWrapper extends StatelessWidget {
           );
         }
         
-        // 3️⃣ User Logged In → HomeView với nút Test Voice
+        // User Logged In
         if (snapshot.hasData && snapshot.data != null) {
-          print('✅ User logged in: ${snapshot.data!.email}');
-          print('✅ Navigating to HomeView with Voice Test option');
-          
-          // ⭐ Wrap HomeView để thêm nút Test
-          return HomeViewWrapper();
+          return const HomeView();
         }
         
-        // 4️⃣ No User → WelcomeView
-        print('❌ No user found, showing WelcomeView');
+        // No User
         return const WelcomeView();
       },
-    );
-  }
-}
-
-// ⭐ WRAPPER để thêm nút Test Voice vào HomeView
-class HomeViewWrapper extends StatelessWidget {
-  const HomeViewWrapper({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // Màn hình Home bình thường
-        const HomeView(),
-        
-        // ⭐ Floating button để vào Test Voice (CHỈ DÙNG KHI ĐANG DEV)
-        Positioned(
-          bottom: 80, // Đặt cao hơn bottom navigation
-          right: 16,
-          child: FloatingActionButton.extended(
-            onPressed: () {
-              Navigator.pushNamed(context, '/test-voice');
-            },
-            icon: Icon(Icons.mic),
-            label: Text('Test Voice'),
-            backgroundColor: Colors.deepPurple,
-            heroTag: 'testVoiceBtn', // Tránh conflict với FAB khác
-          ),
-        ),
-      ],
     );
   }
 }
