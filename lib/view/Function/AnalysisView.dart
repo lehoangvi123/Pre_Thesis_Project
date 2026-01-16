@@ -1,11 +1,11 @@
 // lib/view/AnalysisView.dart
-// FIXED VERSION - Pie chart không overlap
+// UPDATED - Dùng CustomBarChartWidget với vertical labels
 
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import './Transaction.dart';
+import 'Navbar_AI_replacement.dart';
 import './HomeView.dart';
 import './CategorizeContent.dart';
 import './ProfileView.dart';
@@ -13,6 +13,8 @@ import './SavingGoals.dart';
 import './SavingGoalsService.dart';
 import './AddSavingGoalView.dart';
 import './analysis_widgets.dart';
+import './Chart/bar_chart_widgets.dart';
+import './Chart/pie_chart_widget.dart'; // ← Import bar chart widget
 
 class AnalysisView extends StatefulWidget {
   const AnalysisView({Key? key}) : super(key: key);
@@ -49,7 +51,6 @@ class _AnalysisViewState extends State<AnalysisView> {
       isLoadingChartData = true;
     });
 
-    // Get expense by category
     expenseByCategory = await _getExpenseByCategory();
     incomeByCategory = await _getIncomeByCategory();
 
@@ -488,109 +489,47 @@ class _AnalysisViewState extends State<AnalysisView> {
                   color: isDark ? Colors.white : Colors.grey[800],
                 ),
               ),
-              Row(
-                children: [
-                  _buildLegend(const Color(0xFF00CED1), 'Thu'),
-                  const SizedBox(width: 12),
-                  _buildLegend(const Color(0xFF7FFFD4), 'Chi'),
-                ],
-              ),
+              if (chartType == 'bar')
+                Row(
+                  children: [
+                    _buildLegend(const Color(0xFF00CED1), 'Thu'),
+                    const SizedBox(width: 12),
+                    _buildLegend(const Color(0xFFFF6B6B), 'Chi'),
+                  ],
+                ),
             ],
           ),
           const SizedBox(height: 20),
           SizedBox(
-            height: 300, // ✅ Fixed height
+            height: 280, // ✅ Fixed height for chart
             child: chartType == 'bar'
-                ? _buildBarChart(totalIncome, totalExpense, isDark)
-                : _buildPieChart(totalIncome, totalExpense, isDark),
+                ? CustomBarChartWidget( // ✅ Dùng widget mới
+                    totalIncome: totalIncome,
+                    totalExpense: totalExpense,
+                    isDark: isDark,
+                  )
+                : _buildPieChart(isDark),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBarChart(
-      double totalIncome, double totalExpense, bool isDark) {
-    double weeklyIncome = totalIncome / 4;
-    double weeklyExpense = totalExpense / 4;
-
-    return BarChart(
-      BarChartData(
-        alignment: BarChartAlignment.spaceAround,
-        maxY: (weeklyIncome > weeklyExpense ? weeklyIncome : weeklyExpense) *
-            1.2,
-        barTouchData: BarTouchData(enabled: false),
-        titlesData: FlTitlesData(
-          show: true,
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, meta) {
-                const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-                if (value.toInt() < days.length) {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: Text(
-                      days[value.toInt()],
-                      style: TextStyle(
-                        color: isDark ? Colors.grey[400] : Colors.grey[600],
-                        fontSize: 11,
-                      ),
-                    ),
-                  );
-                }
-                return const Text('');
-              },
-            ),
-          ),
-          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        ),
-        gridData: FlGridData(show: false),
-        borderData: FlBorderData(show: false),
-        barGroups: List.generate(7, (index) {
-          double incomeVariation = (index % 2 == 0 ? 1.1 : 0.9);
-          double expenseVariation = (index % 3 == 0 ? 1.2 : 0.8);
-
-          return BarChartGroupData(
-            x: index,
-            barRods: [
-              BarChartRodData(
-                toY: (weeklyIncome / 7) * incomeVariation,
-                color: const Color(0xFF00CED1),
-                width: 12,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(4)),
-              ),
-              BarChartRodData(
-                toY: (weeklyExpense / 7) * expenseVariation,
-                color: const Color(0xFF7FFFD4),
-                width: 12,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(4)),
-              ),
-            ],
-          );
-        }),
-      ),
-    );
-  }
-
-  // ✅ FIXED PIE CHART - Row layout để không overlap
-  Widget _buildPieChart(
-      double totalIncome, double totalExpense, bool isDark) {
+  Widget _buildPieChart(bool isDark) {
     return Column(
       children: [
-        // Selector
         _buildPieChartTypeSelector(isDark),
-        const SizedBox(height: 20),
-        
-        // Loading or Chart
+        const SizedBox(height: 16),
         Expanded(
           child: isLoadingChartData
               ? const Center(child: CircularProgressIndicator())
-              : _buildPieChartWithLegend(isDark),
+              : CustomPieChartWidget(
+                  categoryData: pieChartType == 'expense'
+                      ? expenseByCategory
+                      : incomeByCategory,
+                  type: pieChartType,
+                  isDark: isDark,
+                ),
         ),
       ],
     );
@@ -635,131 +574,6 @@ class _AnalysisViewState extends State<AnalysisView> {
           ),
         ),
       ),
-    );
-  }
-
-  // ✅ PIE CHART + LEGEND SIDE BY SIDE
-  Widget _buildPieChartWithLegend(bool isDark) {
-    Map<String, double> data =
-        pieChartType == 'expense' ? expenseByCategory : incomeByCategory;
-
-    if (data.isEmpty) {
-      return Center(
-        child: Text(
-          'Chưa có dữ liệu',
-          style: TextStyle(
-            color: isDark ? Colors.grey[500] : Colors.grey[600],
-          ),
-        ),
-      );
-    }
-
-    double total = data.values.fold(0, (sum, value) => sum + value);
-    var sortedEntries = data.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    var topCategories = sortedEntries.take(5).toList();
-
-    List<Color> colors = pieChartType == 'expense'
-        ? [
-            const Color(0xFFFF6B6B),
-            const Color(0xFFFFBE0B),
-            const Color(0xFF4ECDC4),
-            const Color(0xFFFF006E),
-            const Color(0xFF8338EC),
-          ]
-        : [
-            const Color(0xFF00CED1),
-            const Color(0xFF48D1CC),
-            const Color(0xFF00FA9A),
-            const Color(0xFF7FFFD4),
-            const Color(0xFF40E0D0),
-          ];
-
-    return Row(
-      children: [
-        // PIE CHART - LEFT
-        Expanded(
-          flex: 2,
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: PieChart(
-              PieChartData(
-                sectionsSpace: 2,
-                centerSpaceRadius: 40,
-                sections: topCategories.asMap().entries.map((entry) {
-                  int index = entry.key;
-                  var category = entry.value;
-                  double percentage = (category.value / total) * 100;
-
-                  return PieChartSectionData(
-                    value: category.value,
-                    title: '${percentage.toStringAsFixed(0)}%',
-                    color: colors[index % colors.length],
-                    radius: 50,
-                    titleStyle: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(width: 20),
-
-        // LEGEND - RIGHT
-        Expanded(
-          flex: 3,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: topCategories.asMap().entries.map((entry) {
-              int index = entry.key;
-              var category = entry.value;
-              double percentage = (category.value / total) * 100;
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: colors[index % colors.length],
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        category.key,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark ? Colors.grey[300] : Colors.grey[700],
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Text(
-                      '${percentage.toStringAsFixed(0)}%',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : Colors.black,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
     );
   }
 
