@@ -139,12 +139,7 @@ class TransactionService {
     };
   }
 
-  // ========================================
-  // 🎤 VOICE INPUT METHODS (THÊM MỚI)
-  // ========================================
-
-  /// 🎤 Save voice transaction - wrapper cho addIncome/addExpense
-  // lib/service/TransactionService.dart
+// lib/service/TransactionService.dart
 // FIXED VERSION - Tương thích với CategoryModel có sẵn
 
 // ========================================
