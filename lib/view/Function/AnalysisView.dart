@@ -1,3 +1,6 @@
+// lib/view/AnalysisView.dart
+// FIXED VERSION - Pie chart không overlap
+
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,9 +12,7 @@ import './ProfileView.dart';
 import './SavingGoals.dart';
 import './SavingGoalsService.dart';
 import './AddSavingGoalView.dart';
-import './analysis_widgets.dart'; // ✅ Import helper
-import './Chart/chart_service.dart'; // ✅ Chart service
-import './Chart/chart_widgets.dart'; // ✅ Chart widgets
+import './analysis_widgets.dart';
 
 class AnalysisView extends StatefulWidget {
   const AnalysisView({Key? key}) : super(key: key);
@@ -24,11 +25,10 @@ class _AnalysisViewState extends State<AnalysisView> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final SavingGoalService _goalService = SavingGoalService();
-  final ChartService _chartService = ChartService();
 
   String selectedPeriod = 'Weekly';
   String chartType = 'bar';
-  String pieChartType = 'expense'; // expense or income
+  String pieChartType = 'expense';
   String? userId;
   
   Map<String, double> expenseByCategory = {};
@@ -49,20 +49,71 @@ class _AnalysisViewState extends State<AnalysisView> {
       isLoadingChartData = true;
     });
 
-    expenseByCategory = await _chartService.getExpenseByCategory(userId!);
-    incomeByCategory = await _chartService.getIncomeByCategory(userId!);
+    // Get expense by category
+    expenseByCategory = await _getExpenseByCategory();
+    incomeByCategory = await _getIncomeByCategory();
 
     setState(() {
       isLoadingChartData = false;
     });
   }
 
-  String _formatCurrency(double amount) {
-    return AnalysisWidgets.formatCurrency(amount);
+  Future<Map<String, double>> _getExpenseByCategory() async {
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('transactions')
+          .where('type', isEqualTo: 'expense')
+          .get();
+
+      Map<String, double> categoryTotals = {};
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        String categoryName = data['categoryName'] ?? 'Khác';
+        double amount = (data['amount'] as num).abs().toDouble();
+
+        categoryTotals[categoryName] = 
+            (categoryTotals[categoryName] ?? 0) + amount;
+      }
+
+      return categoryTotals;
+    } catch (e) {
+      print('Error: $e');
+      return {};
+    }
   }
 
-  String _formatShortCurrency(double amount) {
-    return AnalysisWidgets.formatShortCurrency(amount);
+  Future<Map<String, double>> _getIncomeByCategory() async {
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('transactions')
+          .where('type', isEqualTo: 'income')
+          .get();
+
+      Map<String, double> categoryTotals = {};
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        String categoryName = data['categoryName'] ?? 'Khác';
+        double amount = (data['amount'] as num).abs().toDouble();
+
+        categoryTotals[categoryName] = 
+            (categoryTotals[categoryName] ?? 0) + amount;
+      }
+
+      return categoryTotals;
+    } catch (e) {
+      print('Error: $e');
+      return {};
+    }
+  }
+
+  String _formatCurrency(double amount) {
+    return AnalysisWidgets.formatCurrency(amount);
   }
 
   @override
@@ -446,12 +497,12 @@ class _AnalysisViewState extends State<AnalysisView> {
               ),
             ],
           ),
-          const SizedBox(height: 50),
+          const SizedBox(height: 20),
           SizedBox(
-            height: 270,
+            height: 300, // ✅ Fixed height
             child: chartType == 'bar'
                 ? _buildBarChart(totalIncome, totalExpense, isDark)
-                : _buildPieChart(totalIncome, totalExpense),
+                : _buildPieChart(totalIncome, totalExpense, isDark),
           ),
         ],
       ),
@@ -526,37 +577,188 @@ class _AnalysisViewState extends State<AnalysisView> {
     );
   }
 
-  Widget _buildPieChart(double totalIncome, double totalExpense) {
+  // ✅ FIXED PIE CHART - Row layout để không overlap
+  Widget _buildPieChart(
+      double totalIncome, double totalExpense, bool isDark) {
     return Column(
       children: [
-        // Selector: Chi tiêu / Thu nhập
-        ChartWidgets.buildChartTypeSelector(
-          selectedType: pieChartType,
-          onTypeChanged: (type) {
-            setState(() {
-              pieChartType = type;
-            });
-          },
-          isDark: Theme.of(context).brightness == Brightness.dark,
+        // Selector
+        _buildPieChartTypeSelector(isDark),
+        const SizedBox(height: 20),
+        
+        // Loading or Chart
+        Expanded(
+          child: isLoadingChartData
+              ? const Center(child: CircularProgressIndicator())
+              : _buildPieChartWithLegend(isDark),
         ),
-        const SizedBox(height: 30),
-        // Pie Chart
-        isLoadingChartData
-            ? const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: CircularProgressIndicator(),
+      ],
+    );
+  }
+
+  Widget _buildPieChartTypeSelector(bool isDark) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _buildTypeButton('Chi tiêu', 'expense', Colors.red, isDark),
+        const SizedBox(width: 12),
+        _buildTypeButton('Thu nhập', 'income', const Color(0xFF00CED1), isDark),
+      ],
+    );
+  }
+
+  Widget _buildTypeButton(
+      String label, String type, Color color, bool isDark) {
+    bool isSelected = pieChartType == type;
+    return GestureDetector(
+      onTap: () => setState(() => pieChartType = type),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? color.withOpacity(0.15)
+              : (isDark ? Colors.grey[800] : Colors.grey[100]),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? color : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected
+                ? color
+                : (isDark ? Colors.grey[400] : Colors.grey[600]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ✅ PIE CHART + LEGEND SIDE BY SIDE
+  Widget _buildPieChartWithLegend(bool isDark) {
+    Map<String, double> data =
+        pieChartType == 'expense' ? expenseByCategory : incomeByCategory;
+
+    if (data.isEmpty) {
+      return Center(
+        child: Text(
+          'Chưa có dữ liệu',
+          style: TextStyle(
+            color: isDark ? Colors.grey[500] : Colors.grey[600],
+          ),
+        ),
+      );
+    }
+
+    double total = data.values.fold(0, (sum, value) => sum + value);
+    var sortedEntries = data.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    var topCategories = sortedEntries.take(5).toList();
+
+    List<Color> colors = pieChartType == 'expense'
+        ? [
+            const Color(0xFFFF6B6B),
+            const Color(0xFFFFBE0B),
+            const Color(0xFF4ECDC4),
+            const Color(0xFFFF006E),
+            const Color(0xFF8338EC),
+          ]
+        : [
+            const Color(0xFF00CED1),
+            const Color(0xFF48D1CC),
+            const Color(0xFF00FA9A),
+            const Color(0xFF7FFFD4),
+            const Color(0xFF40E0D0),
+          ];
+
+    return Row(
+      children: [
+        // PIE CHART - LEFT
+        Expanded(
+          flex: 2,
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: PieChart(
+              PieChartData(
+                sectionsSpace: 2,
+                centerSpaceRadius: 40,
+                sections: topCategories.asMap().entries.map((entry) {
+                  int index = entry.key;
+                  var category = entry.value;
+                  double percentage = (category.value / total) * 100;
+
+                  return PieChartSectionData(
+                    value: category.value,
+                    title: '${percentage.toStringAsFixed(0)}%',
+                    color: colors[index % colors.length],
+                    radius: 50,
+                    titleStyle: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 20),
+
+        // LEGEND - RIGHT
+        Expanded(
+          flex: 3,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: topCategories.asMap().entries.map((entry) {
+              int index = entry.key;
+              var category = entry.value;
+              double percentage = (category.value / total) * 100;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: colors[index % colors.length],
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        category.key,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? Colors.grey[300] : Colors.grey[700],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Text(
+                      '${percentage.toStringAsFixed(0)}%',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                    ),
+                  ],
                 ),
-              )
-            : pieChartType == 'expense'
-                ? ChartWidgets.buildExpensePieChart(
-                    categoryData: expenseByCategory,
-                    isDark: Theme.of(context).brightness == Brightness.dark,
-                  )
-                : ChartWidgets.buildIncomePieChart(
-                    categoryData: incomeByCategory,
-                    isDark: Theme.of(context).brightness == Brightness.dark,
-                  ),
+              );
+            }).toList(),
+          ),
+        ),
       ],
     );
   }
