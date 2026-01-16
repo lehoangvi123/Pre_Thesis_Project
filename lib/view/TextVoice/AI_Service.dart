@@ -1,6 +1,5 @@
 // lib/service/ai_service.dart
-// COPY FILE NÀY VÀO: lib/service/ai_service.dart
-// OPTIONAL: Chỉ cần nếu muốn dùng AI
+// SIMPLIFIED VERSION - Không crash khi không có API key
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -9,11 +8,11 @@ class AIService {
   // TODO: Thay bằng API key của bạn từ https://makersuite.google.com/app/apikey
   static const String GEMINI_API_KEY = 'YOUR_API_KEY_HERE';
   
-  // Analyze with AI (OPTIONAL)
+  // Analyze with AI (OPTIONAL - không bắt buộc)
   static Future<Map<String, dynamic>?> analyzeVoice(String voiceText) async {
-    // Nếu chưa có API key, return null
-    if (GEMINI_API_KEY == 'YOUR_API_KEY_HERE') {
-      print('⚠️ No API key - skipping AI analysis');
+    // Nếu chưa có API key, return null ngay (không log gì cả)
+    if (GEMINI_API_KEY == 'YOUR_API_KEY_HERE' || GEMINI_API_KEY.isEmpty) {
+      // Im lặng, không in gì để tránh spam console
       return null;
     }
     
@@ -24,14 +23,19 @@ class AIService {
       
       final prompt = '''
 Phân tích câu: "$voiceText"
-Trả về JSON:
+
+Trả về JSON (không thêm markdown):
 {
   "type": "expense" hoặc "income",
-  "amount": số tiền VNĐ,
+  "amount": số tiền VNĐ (số nguyên),
   "category": danh mục phù hợp,
   "note": ghi chú ngắn
 }
-Chỉ trả về JSON, không thêm gì khác.
+
+Lưu ý:
+- "10 tỷ" = 10000000000
+- "5 triệu" = 5000000
+- "35 nghìn" = 35000
 ''';
       
       final response = await http.post(
@@ -39,18 +43,32 @@ Chỉ trả về JSON, không thêm gì khác.
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'contents': [{'parts': [{'text': prompt}]}],
-          'generationConfig': {'temperature': 0.2}
+          'generationConfig': {
+            'temperature': 0.2,
+            'maxOutputTokens': 200,
+          }
         }),
       ).timeout(Duration(seconds: 10));
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final text = data['candidates'][0]['content']['parts'][0]['text'];
-        final cleaned = text.replaceAll('```json', '').replaceAll('```', '').trim();
-        return jsonDecode(cleaned);
+        final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'];
+        
+        if (text != null) {
+          // Clean response
+          final cleaned = text
+              .replaceAll('```json', '')
+              .replaceAll('```', '')
+              .trim();
+          
+          final result = jsonDecode(cleaned);
+          print('🤖 AI Analysis: $result');
+          return result;
+        }
       }
     } catch (e) {
-      print('AI error: $e');
+      // Silent fail - không log để tránh spam
+      // print('AI error: $e');
     }
     
     return null;

@@ -1,6 +1,5 @@
 // lib/view/TextVoice/Voice_confirm_dialog.dart
-// COPY FILE NÀY VÀO: lib/view/TextVoice/Voice_confirm_dialog.dart
-// CHÚ Ý: Tên file phải là Voice_confirm_dialog.dart (chữ V hoa, c thường)
+// AUTO TYPE DETECTION - Tự động chọn income/expense
 
 import 'package:flutter/material.dart';
 
@@ -34,6 +33,8 @@ class _VoiceconfirmDialogState extends State<VoiceconfirmDialog> {
     'Shopping',
     'Healthcare',
     'Entertainment',
+    'Education',
+    'Gym & Sports',
     'Other Expenses',
   ];
   
@@ -41,19 +42,35 @@ class _VoiceconfirmDialogState extends State<VoiceconfirmDialog> {
     'Salary',
     'Freelance',
     'Gift',
+    'Investment',
     'Other Income',
   ];
   
   @override
   void initState() {
     super.initState();
+    
+    // ✨ TỰ ĐỘNG DETECT TYPE TỪ DATA
     type = widget.data['type'] ?? 'expense';
     amount = (widget.data['amount'] ?? 0).toDouble();
-    category = widget.data['category'] ?? 'Other Expenses';
+    category = widget.data['category'] ?? _getDefaultCategory();
     note = widget.data['note'] ?? '';
+    
+    // Đảm bảo category phù hợp với type
+    if (type == 'income' && !incomeCategories.contains(category)) {
+      category = 'Salary';
+    } else if (type == 'expense' && !expenseCategories.contains(category)) {
+      category = 'Other Expenses';
+    }
     
     amountController.text = amount.toStringAsFixed(0);
     noteController.text = note;
+    
+    print('💡 Dialog auto-detected type: $type');
+  }
+  
+  String _getDefaultCategory() {
+    return type == 'income' ? 'Salary' : 'Other Expenses';
   }
   
   @override
@@ -65,6 +82,10 @@ class _VoiceconfirmDialogState extends State<VoiceconfirmDialog> {
   
   List<String> get categories {
     return type == 'expense' ? expenseCategories : incomeCategories;
+  }
+  
+  Color get primaryColor {
+    return type == 'expense' ? Colors.red : Colors.green;
   }
   
   void _confirm() {
@@ -98,22 +119,47 @@ class _VoiceconfirmDialogState extends State<VoiceconfirmDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Title
+              // Title with auto-detected badge
               Row(
                 children: [
-                  Icon(Icons.check_circle_outline, color: Colors.green, size: 28),
+                  Icon(
+                    type == 'income' 
+                        ? Icons.trending_up 
+                        : Icons.trending_down,
+                    color: primaryColor,
+                    size: 28,
+                  ),
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'Xác nhận giao dịch',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  // AI badge nếu có
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      type == 'income' ? 'THU' : 'CHI',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: primaryColor,
+                      ),
                     ),
                   ),
                 ],
               ),
               SizedBox(height: 20),
               
-              // Type toggle
+              // Type toggle (vẫn cho phép user đổi nếu cần)
               Container(
                 decoration: BoxDecoration(
                   color: Colors.grey[100],
@@ -134,14 +180,18 @@ class _VoiceconfirmDialogState extends State<VoiceconfirmDialog> {
                         child: Container(
                           padding: EdgeInsets.symmetric(vertical: 12),
                           decoration: BoxDecoration(
-                            color: type == 'expense' ? Colors.red : Colors.transparent,
+                            color: type == 'expense' 
+                                ? Colors.red 
+                                : Colors.transparent,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Center(
                             child: Text(
                               'Chi tiêu',
                               style: TextStyle(
-                                color: type == 'expense' ? Colors.white : Colors.grey[700],
+                                color: type == 'expense' 
+                                    ? Colors.white 
+                                    : Colors.grey[700],
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -162,14 +212,18 @@ class _VoiceconfirmDialogState extends State<VoiceconfirmDialog> {
                         child: Container(
                           padding: EdgeInsets.symmetric(vertical: 12),
                           decoration: BoxDecoration(
-                            color: type == 'income' ? Colors.green : Colors.transparent,
+                            color: type == 'income' 
+                                ? Colors.green 
+                                : Colors.transparent,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Center(
                             child: Text(
                               'Thu nhập',
                               style: TextStyle(
-                                color: type == 'income' ? Colors.white : Colors.grey[700],
+                                color: type == 'income' 
+                                    ? Colors.white 
+                                    : Colors.grey[700],
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -199,7 +253,7 @@ class _VoiceconfirmDialogState extends State<VoiceconfirmDialog> {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: type == 'expense' ? Colors.red : Colors.green,
+                  color: primaryColor,
                 ),
                 decoration: InputDecoration(
                   prefixText: type == 'expense' ? '-' : '+',
@@ -299,7 +353,7 @@ class _VoiceconfirmDialogState extends State<VoiceconfirmDialog> {
                     child: ElevatedButton(
                       onPressed: _confirm,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: type == 'expense' ? Colors.red : Colors.green,
+                        backgroundColor: primaryColor,
                         padding: EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
