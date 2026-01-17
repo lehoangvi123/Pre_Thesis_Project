@@ -180,53 +180,52 @@ class _CategoriesViewState extends State<CategoriesView> {
     );
   }
 
-  // ✅ UPDATED: Balance Cards với real-time data
-  Widget _buildBalanceCards(double balance, double totalIncome, double totalExpense, bool isDark) {
-    return Column(
-      children: [
-        // Row 1: Balance and Income
-        Row(
-          children: [
-            // Total Balance Card
-            Expanded(
-              child: _buildInfoCard(
-                title: 'Total Balance',
-                amount: '${_formatCurrency(balance)} đ',
-                icon: Icons.account_balance_wallet_rounded,
-                color: balance >= 0 ? const Color(0xFF4CAF50) : const Color(0xFFE53935),
-                isDark: isDark,
-              ),
+  // ✅ LAYOUT MỚI: Income + Expense trên, Balance dưới
+Widget _buildBalanceCards(double balance, double totalIncome, double totalExpense, bool isDark) {
+  return Column(
+    children: [
+      // ✅ HÀNG 1: Income + Expense
+      Row(
+        children: [
+          // Total Income (Xanh lá)
+          Expanded(
+            child: _buildInfoCard(
+              title: 'Total Income',
+              amount: '+${_formatCurrency(totalIncome)} đ',
+              icon: Icons.trending_up_rounded,
+              color: Colors.green[600]!, // Xanh lá
+              isDark: isDark,
             ),
-            const SizedBox(width: 12),
-            // Total Income Card
-            Expanded(
-              child: _buildInfoCard(
-                title: 'Total Income',
-                amount: '${_formatCurrency(totalIncome)} đ',
-                icon: Icons.trending_up_rounded,
-                color: const Color(0xFF4CAF50),
-                isDark: isDark, 
-              ),
+          ),
+          const SizedBox(width: 12),
+          // Total Expense (Đỏ)
+          Expanded(
+            child: _buildInfoCard(
+              title: 'Total Expenses',
+              amount: '${_formatCurrency(totalExpense)} đ',
+              icon: Icons.trending_down_rounded,
+              color: Colors.red[600]!, // Đỏ
+              isDark: isDark,
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        // Row 2: Expenses (full width)
-        _buildInfoCard(
-          title: 'Total Expenses',
-          amount: '${_formatCurrency(totalExpense)} đ',
-          icon: Icons.trending_down_rounded,
-          color: const Color(0xFF2196F3),
-          isDark: isDark,
-          isFullWidth: true,
-        ),
-        const SizedBox(height: 16),
-        // Progress bar
-        _buildProgressBar(totalExpense, isDark),
-      ],
-    );
-  }
-
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      // ✅ HÀNG 2: Balance (Xanh dương - Full width)
+      _buildInfoCard(
+        title: 'Total Balance',
+        amount: '${balance >= 0 ? '+' : ''}${_formatCurrency(balance.abs())} đ',
+        icon: Icons.account_balance_wallet_rounded,
+        color: Colors.blue[600]!, // Xanh dương
+        isDark: isDark,
+        isFullWidth: true,
+      ),
+      const SizedBox(height: 16),
+      // Progress bar
+      _buildProgressBar(totalExpense, isDark),
+    ],
+  );
+}
   // ✅ Progress Bar
   Widget _buildProgressBar(double totalExpense, bool isDark) {
     double budgetLimit = 20000000; // 20 triệu VND

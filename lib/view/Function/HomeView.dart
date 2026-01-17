@@ -250,76 +250,76 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  // ✅ REAL-TIME BALANCE CARDS với Income
-  Widget _buildBalanceCards() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    if (userId == null) {
-      return const Center(child: Text('Please login'));
-    }
-    
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        
-        if (!snapshot.hasData || !snapshot.data!.exists) {
-          return _buildEmptyBalanceCards(isDark);
-        }
-        
-        var userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
-        double balance = (userData['balance'] ?? 0).toDouble();
-        double totalIncome = (userData['totalIncome'] ?? 0).toDouble();
-        double totalExpense = (userData['totalExpense'] ?? 0).toDouble();
-        
-        return Column(
-          children: [
-            // Row 1: Balance + Income
-            Row(
-              children: [
-                // Total Balance
-                Expanded(
-                  child: _buildBalanceCard(
-                    icon: Icons.account_balance_wallet_outlined,
-                    label: 'Total Balance',
-                    amount: balance,
-                    color: balance >= 0 ? Colors.green : Colors.red,
-                    isDark: isDark,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Total Income
-                Expanded(
-                  child: _buildBalanceCard(
-                    icon: Icons.trending_up,
-                    label: 'Total Income',
-                    amount: totalIncome,
-                    color: Colors.green,
-                    isDark: isDark,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // Row 2: Expenses (full width)
-            _buildBalanceCard(
-              icon: Icons.trending_down,
-              label: 'Total Expenses',
-              amount: totalExpense,
-              color: Colors.red,
-              isDark: isDark,
-              isFullWidth: true,
-            ),
-          ],
-        );
-      },
-    );
+  // ✅ LAYOUT MỚI: Income + Expense trên, Balance dưới
+Widget _buildBalanceCards() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  if (userId == null) {
+    return const Center(child: Text('Please login'));
   }
+  
+  return StreamBuilder<DocumentSnapshot>(
+    stream: FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .snapshots(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      
+      if (!snapshot.hasData || !snapshot.data!.exists) {
+        return _buildEmptyBalanceCards(isDark);
+      }
+      
+      var userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
+      double balance = (userData['balance'] ?? 0).toDouble();
+      double totalIncome = (userData['totalIncome'] ?? 0).toDouble();
+      double totalExpense = (userData['totalExpense'] ?? 0).toDouble();
+      
+      return Column(
+        children: [
+          // ✅ HÀNG 1: Income + Expense
+          Row(
+            children: [
+              // Total Income (Xanh lá)
+              Expanded(
+                child: _buildBalanceCard(
+                  icon: Icons.trending_up,
+                  label: 'Total Income',
+                  amount: totalIncome,
+                  color: Colors.green[600]!, // Xanh lá
+                  isDark: isDark,
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Total Expense (Đỏ)
+              Expanded(
+                child: _buildBalanceCard(
+                  icon: Icons.trending_down,
+                  label: 'Total Expenses',
+                  amount: totalExpense,
+                  color: Colors.red[600]!, // Đỏ
+                  isDark: isDark,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // ✅ HÀNG 2: Balance (Xanh dương - Full width)
+          _buildBalanceCard(
+            icon: Icons.account_balance_wallet_outlined,
+            label: 'Total Balance',
+            amount: balance,
+            color: Colors.blue[600]!, // Xanh dương
+            isDark: isDark,
+            isFullWidth: true,
+          ),
+        ],
+      );
+    },
+  );
+}
 
   // ✅ Helper method để build balance card
   Widget _buildBalanceCard({

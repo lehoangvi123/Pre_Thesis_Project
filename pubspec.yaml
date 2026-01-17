@@ -27,6 +27,7 @@ dependencies:
   speech_to_text: ^7.3.0
   permission_handler: ^11.0.1 
   http: ^1.1.0  
+  table_calendar: ^3.0.9
   
 
 
