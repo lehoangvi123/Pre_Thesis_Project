@@ -1,7 +1,10 @@
+// lib/view/AnalysisView.dart
+// FIXED - Added mounted checks to prevent setState after dispose
+
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:table_calendar/table_calendar.dart';
 import './Transaction.dart';
 import './HomeView.dart';
 import './CategorizeContent.dart';
@@ -25,18 +28,10 @@ class _AnalysisViewState extends State<AnalysisView> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final SavingGoalService _goalService = SavingGoalService();
 
+  String selectedPeriod = 'Weekly';
   String chartType = 'bar';
   String pieChartType = 'expense';
   String? userId;
-  
-  // ✅ Calendar variables
-  DateTime _focusedDay = DateTime.now();
-  DateTime? _selectedDay;
-  
-  // ✅ Data for selected day
-  double selectedDayIncome = 0;
-  double selectedDayExpense = 0;
-  double selectedDayTotal = 0;
   
   Map<String, double> expenseByCategory = {};
   Map<String, double> incomeByCategory = {};
@@ -46,55 +41,20 @@ class _AnalysisViewState extends State<AnalysisView> {
   void initState() {
     super.initState();
     userId = _auth.currentUser?.uid;
-    _selectedDay = _focusedDay;
     _loadChartData();
-    _loadSelectedDayData(_selectedDay!);
   }
 
-  // ✅ Load data for selected day
-  Future<void> _loadSelectedDayData(DateTime day) async {
-    if (userId == null) return;
-
-    try {
-      DateTime startOfDay = DateTime(day.year, day.month, day.day);
-      DateTime endOfDay = DateTime(day.year, day.month, day.day, 23, 59, 59);
-
-      QuerySnapshot snapshot = await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('transactions')
-          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
-          .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay))
-          .get();
-
-      double dayIncome = 0;
-      double dayExpense = 0;
-
-      for (var doc in snapshot.docs) {
-        var data = doc.data() as Map<String, dynamic>;
-        String type = data['type'] ?? '';
-        double amount = (data['amount'] ?? 0).toDouble().abs();
-
-        if (type == 'income') {
-          dayIncome += amount;
-        } else if (type == 'expense') {
-          dayExpense += amount;
-        }
-      }
-
-      setState(() {
-        selectedDayIncome = dayIncome;
-        selectedDayExpense = dayExpense;
-        selectedDayTotal = dayIncome - dayExpense;
-      });
-    } catch (e) {
-      print('Error loading day data: $e');
-    }
+  @override
+  void dispose() {
+    // Clean up any resources if needed
+    super.dispose();
   }
 
   Future<void> _loadChartData() async {
     if (userId == null) return;
     
+    // ✅ CHECK mounted before setState
+    if (!mounted) return;
     setState(() {
       isLoadingChartData = true;
     });
@@ -102,6 +62,8 @@ class _AnalysisViewState extends State<AnalysisView> {
     expenseByCategory = await _getExpenseByCategory();
     incomeByCategory = await _getIncomeByCategory();
 
+    // ✅ CHECK mounted before setState
+    if (!mounted) return;
     setState(() {
       isLoadingChartData = false;
     });
@@ -120,7 +82,7 @@ class _AnalysisViewState extends State<AnalysisView> {
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        String categoryName = data['category'] ?? 'Khác';
+        String categoryName = data['categoryName'] ?? 'Khác';
         double amount = (data['amount'] as num).abs().toDouble();
 
         categoryTotals[categoryName] = 
@@ -147,7 +109,7 @@ class _AnalysisViewState extends State<AnalysisView> {
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        String categoryName = data['category'] ?? 'Khác';
+        String categoryName = data['categoryName'] ?? 'Khác';
         double amount = (data['amount'] as num).abs().toDouble();
 
         categoryTotals[categoryName] = 
@@ -162,10 +124,7 @@ class _AnalysisViewState extends State<AnalysisView> {
   }
 
   String _formatCurrency(double amount) {
-    return amount.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    );
+    return AnalysisWidgets.formatCurrency(amount);
   }
 
   @override
@@ -202,17 +161,10 @@ class _AnalysisViewState extends State<AnalysisView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildBalanceCard(balance, totalIncome, totalExpense, isDark),
-                      const SizedBox(height: 24),
-                      
-                      // ✅ CALENDAR (thay thế Period Selector)
-                      _buildCalendar(isDark),
-                      
+                      _buildBalanceCard(
+                          balance, totalIncome, totalExpense, isDark),
                       const SizedBox(height: 20),
-                      
-                      // ✅ Selected Day Summary
-                      _buildSelectedDaySummary(isDark),
-                      
+                      _buildPeriodSelector(),
                       const SizedBox(height: 20),
                       _buildChartCard(totalIncome, totalExpense, isDark),
                       const SizedBox(height: 24),
@@ -279,6 +231,8 @@ class _AnalysisViewState extends State<AnalysisView> {
       color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
       onSelected: (value) {
         if (value == 'bar' || value == 'pie') {
+          // ✅ CHECK mounted before setState
+          if (!mounted) return;
           setState(() => chartType = value);
         }
       },
@@ -357,7 +311,8 @@ class _AnalysisViewState extends State<AnalysisView> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
@@ -378,7 +333,7 @@ class _AnalysisViewState extends State<AnalysisView> {
           ),
           const SizedBox(height: 12),
           Text(
-            '${_formatCurrency(balance)}đ',
+            _formatCurrency(balance),
             style: const TextStyle(
               color: Colors.white,
               fontSize: 32,
@@ -448,8 +403,8 @@ class _AnalysisViewState extends State<AnalysisView> {
         const SizedBox(height: 4),
         Text(
           label == 'Chi tiêu'
-              ? '-${_formatCurrency(amount)}đ'
-              : '+${_formatCurrency(amount)}đ',
+              ? '-${_formatCurrency(amount)}'
+              : _formatCurrency(amount),
           style: const TextStyle(
             color: Colors.white,
             fontSize: 16,
@@ -460,187 +415,66 @@ class _AnalysisViewState extends State<AnalysisView> {
     );
   }
 
-  // ✅ CALENDAR WIDGET
-  Widget _buildCalendar(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
-        ),
-      ),
-      child: TableCalendar(
-        firstDay: DateTime.utc(2020, 1, 1),
-        lastDay: DateTime.utc(2030, 12, 31),
-        focusedDay: _focusedDay,
-        selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-        calendarFormat: CalendarFormat.month,
-        startingDayOfWeek: StartingDayOfWeek.monday,
-        
-        headerStyle: HeaderStyle(
-          formatButtonVisible: false,
-          titleCentered: true,
-          titleTextStyle: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black,
-          ),
-          leftChevronIcon: Icon(
-            Icons.chevron_left,
-            color: isDark ? Colors.white : Colors.black,
-          ),
-          rightChevronIcon: Icon(
-            Icons.chevron_right,
-            color: isDark ? Colors.white : Colors.black,
-          ),
-        ),
-        
-        calendarStyle: CalendarStyle(
-          todayDecoration: BoxDecoration(
-            color: const Color(0xFF00CED1).withOpacity(0.3),
-            shape: BoxShape.circle,
-          ),
-          todayTextStyle: TextStyle(
-            color: isDark ? Colors.white : Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-          
-          selectedDecoration: const BoxDecoration(
-            color: Color(0xFF00CED1),
-            shape: BoxShape.circle,
-          ),
-          selectedTextStyle: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-          
-          defaultTextStyle: TextStyle(
-            color: isDark ? Colors.white : Colors.black,
-          ),
-          
-          weekendTextStyle: TextStyle(
-            color: isDark ? Colors.red[300] : Colors.red[600],
-          ),
-          
-          outsideTextStyle: TextStyle(
-            color: isDark ? Colors.grey[600] : Colors.grey[400],
-          ),
-        ),
-        
-        daysOfWeekStyle: DaysOfWeekStyle(
-          weekdayStyle: TextStyle(
-            color: isDark ? Colors.grey[400] : Colors.grey[600],
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
-          ),
-          weekendStyle: TextStyle(
-            color: isDark ? Colors.red[300] : Colors.red[600],
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
-          ),
-        ),
-        
-        onDaySelected: (selectedDay, focusedDay) {
-          setState(() {
-            _selectedDay = selectedDay;
-            _focusedDay = focusedDay;
-          });
-          _loadSelectedDayData(selectedDay);
-        },
-        
-        onPageChanged: (focusedDay) {
-          _focusedDay = focusedDay;
-        },
-      ),
+  Widget _buildPeriodSelector() {
+    return Row(
+      children: [
+        _buildPeriodButton('Ngày'),
+        const SizedBox(width: 8),
+        _buildPeriodButton('Tuần'),
+        const SizedBox(width: 8),
+        _buildPeriodButton('Tháng'),
+        const SizedBox(width: 8),
+        _buildPeriodButton('Năm'),
+      ],
     );
   }
 
-  // ✅ SELECTED DAY SUMMARY
-  Widget _buildSelectedDaySummary(bool isDark) {
-    String dateText = _selectedDay != null
-        ? '${_selectedDay!.day}/${_selectedDay!.month}/${_selectedDay!.year}'
-        : 'Chọn ngày';
+  Widget _buildPeriodButton(String period) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    bool isSelected = (selectedPeriod == 'Daily' && period == 'Ngày') ||
+        (selectedPeriod == 'Weekly' && period == 'Tuần') ||
+        (selectedPeriod == 'Monthly' && period == 'Tháng') ||
+        (selectedPeriod == 'Year' && period == 'Năm');
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[850] : Colors.grey[50],
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
-        ),
-      ),
-      child: Column(
-        children: [
-          Text(
-            'Chi tiêu ngày $dateText',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.grey[300] : Colors.grey[700],
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          // ✅ CHECK mounted before setState
+          if (!mounted) return;
+          setState(() {
+            if (period == 'Ngày') {
+              selectedPeriod = 'Daily';
+            } else if (period == 'Tuần') {
+              selectedPeriod = 'Weekly';
+            } else if (period == 'Tháng') {
+              selectedPeriod = 'Monthly';
+            } else if (period == 'Năm') {
+              selectedPeriod = 'Year';
+            }
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? const Color(0xFF00CED1)
+                : (isDark ? Colors.grey[800] : Colors.grey[100]),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(
+            child: Text(
+              period,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? Colors.grey[400] : Colors.grey[700]),
+              ),
             ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildDaySummaryItem(
-                'Income',
-                selectedDayIncome,
-                const Color(0xFF00CED1),
-                isDark,
-              ),
-              Container(
-                height: 40,
-                width: 1,
-                color: isDark ? Colors.grey[700] : Colors.grey[300],
-              ),
-              _buildDaySummaryItem(
-                'Expense',
-                selectedDayExpense,
-                Colors.red[600]!,
-                isDark,
-              ),
-              Container(
-                height: 40,
-                width: 1,
-                color: isDark ? Colors.grey[700] : Colors.grey[300],
-              ),
-              _buildDaySummaryItem(
-                'Total',
-                selectedDayTotal,
-                selectedDayTotal >= 0 ? Colors.green[600]! : Colors.red[600]!,
-                isDark,
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
-    );
-  }
-
-  Widget _buildDaySummaryItem(String label, double amount, Color color, bool isDark) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: isDark ? Colors.grey[400] : Colors.grey[600],
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '${amount >= 0 ? '+' : ''}${_formatCurrency(amount.abs())}đ',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-      ],
     );
   }
 
@@ -730,7 +564,11 @@ class _AnalysisViewState extends State<AnalysisView> {
       String label, String type, Color color, bool isDark) {
     bool isSelected = pieChartType == type;
     return GestureDetector(
-      onTap: () => setState(() => pieChartType = type),
+      onTap: () {
+        // ✅ CHECK mounted before setState
+        if (!mounted) return;
+        setState(() => pieChartType = type);
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
         decoration: BoxDecoration(
@@ -787,10 +625,12 @@ class _AnalysisViewState extends State<AnalysisView> {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF00CED1).withOpacity(isDark ? 0.15 : 0.1),
+              color:
+                  const Color(0xFF00CED1).withOpacity(isDark ? 0.15 : 0.1),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: const Color(0xFF00CED1).withOpacity(isDark ? 0.2 : 0.3),
+                color:
+                    const Color(0xFF00CED1).withOpacity(isDark ? 0.2 : 0.3),
               ),
             ),
             child: Column(
@@ -818,7 +658,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${_formatCurrency(totalIncome)}đ',
+                  _formatCurrency(totalIncome),
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -864,7 +704,7 @@ class _AnalysisViewState extends State<AnalysisView> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${_formatCurrency(totalExpense)}đ',
+                  _formatCurrency(totalExpense),
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -935,7 +775,7 @@ class _AnalysisViewState extends State<AnalysisView> {
             }
 
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return _buildEmptyGoalsState(isDark);
+              return AnalysisWidgets.buildEmptyGoalsState(isDark);
             }
 
             List<SavingGoal> goals = snapshot.data!;
@@ -950,7 +790,11 @@ class _AnalysisViewState extends State<AnalysisView> {
                     isDark: isDark,
                     userId: userId,
                     firestore: _firestore,
-                    onGoalUpdated: () => setState(() {}),
+                    onGoalUpdated: () {
+                      // ✅ CHECK mounted before setState
+                      if (!mounted) return;
+                      setState(() {});
+                    },
                   ),
                 );
               }).toList(),
@@ -958,46 +802,6 @@ class _AnalysisViewState extends State<AnalysisView> {
           },
         ),
       ],
-    );
-  }
-
-  Widget _buildEmptyGoalsState(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[850] : Colors.grey[50],
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.flag_outlined,
-            size: 48,
-            color: isDark ? Colors.grey[600] : Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Chưa có mục tiêu nào',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.grey[300] : Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Thêm mục tiêu tiết kiệm để theo dõi tiến độ',
-            style: TextStyle(
-              fontSize: 14,
-              color: isDark ? Colors.grey[500] : Colors.grey[600],
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
     );
   }
 

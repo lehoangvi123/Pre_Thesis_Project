@@ -32,6 +32,12 @@ class _ProfileViewState extends State<ProfileView> {
     _loadUserData();
   }
 
+  @override
+  void dispose() {
+    // Clean up any resources if needed
+    super.dispose();
+  }
+
   Future<void> _loadUserData() async {
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
@@ -46,6 +52,8 @@ class _ProfileViewState extends State<ProfileView> {
           Map<String, dynamic> userData =
               userDoc.data() as Map<String, dynamic>;
 
+          // ✅ CHECK mounted before setState
+          if (!mounted) return;
           setState(() {
             userName = userData['name'] ?? currentUser.displayName ?? 'User';
             userEmail =
@@ -57,6 +65,8 @@ class _ProfileViewState extends State<ProfileView> {
           await prefs.setString('user_name', userName);
           await prefs.setString('user_email', userEmail);
         } else {
+          // ✅ CHECK mounted before setState
+          if (!mounted) return;
           setState(() {
             userName =
                 currentUser.displayName ??
@@ -68,6 +78,8 @@ class _ProfileViewState extends State<ProfileView> {
         }
       } else {
         final prefs = await SharedPreferences.getInstance();
+        // ✅ CHECK mounted before setState
+        if (!mounted) return;
         setState(() {
           userName = prefs.getString('user_name') ?? 'User';
           userEmail = prefs.getString('user_email') ?? 'user@example.com';
@@ -78,12 +90,16 @@ class _ProfileViewState extends State<ProfileView> {
       print('Error loading user data: $e');
       try {
         final prefs = await SharedPreferences.getInstance();
+        // ✅ CHECK mounted before setState
+        if (!mounted) return;
         setState(() {
           userName = prefs.getString('user_name') ?? 'User';
           userEmail = prefs.getString('user_email') ?? 'user@example.com';
           isLoading = false;
         });
       } catch (e) {
+        // ✅ CHECK mounted before setState
+        if (!mounted) return;
         setState(() {
           isLoading = false;
         });
@@ -246,7 +262,7 @@ class _ProfileViewState extends State<ProfileView> {
         children: [
           GestureDetector(
             onTap: () {
-               Navigator.pushReplacement(  // ✅ Now explicitly goes to HomeView
+               Navigator.pushReplacement(
                  context,
                  MaterialPageRoute(builder: (context) => const HomeView()),
                );
@@ -533,24 +549,30 @@ class _ProfileViewState extends State<ProfileView> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user_name', newName);
 
+        // ✅ CHECK mounted before setState
+        if (!mounted) return;
         setState(() {
           userName = newName;
         });
 
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile updated successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile updated successfully'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Text('Update failed: $e'),
+            backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Update failed: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 
@@ -627,12 +649,14 @@ class _ProfileViewState extends State<ProfileView> {
       }
     } catch (e) {
       print('Logout error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Logout failed: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Logout failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
