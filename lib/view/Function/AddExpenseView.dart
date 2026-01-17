@@ -281,7 +281,7 @@ class _AddExpenseViewState extends State<AddExpenseView> {
     // Parse amount
     double amount;
     try {
-      amount = double.parse(_amountController.text.trim());
+      amount = double.parse(_amountController.text.trim()).abs(); // ✅ Always positive
     } catch (e) {
       _showErrorSnackBar('Invalid amount');
       return;

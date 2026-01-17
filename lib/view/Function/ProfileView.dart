@@ -12,6 +12,7 @@ import '../FunctionProfileView/Help.dart';
 import '../FunctionProfileView/converting_currency_view.dart';
 import '../FunctionProfileView//security_view.dart';
 import '../FunctionProfileView/settings_view.dart';
+import './FixDataScript.dart';
 
 class ProfileView extends StatefulWidget {
   const ProfileView({Key? key}) : super(key: key);
@@ -192,6 +193,22 @@ class _ProfileViewState extends State<ProfileView> {
                                     context,
                                     MaterialPageRoute(
                                       builder: (context) => const HelpView(),
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              // ✅ NEW: FIX DATA BUTTON
+                              _buildMenuItem(
+                                icon: Icons.build_circle,
+                                iconColor: Colors.orange[400]!,
+                                iconBackground: Colors.orange[50]!,
+                                title: '🔧 Fix Data (Income âm)',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const FixDataScreen(),
                                     ),
                                   );
                                 },

@@ -1,5 +1,5 @@
 // lib/view/EditTransactionView.dart
-// EDIT TRANSACTION - Sửa giao dịch đã nhập nhầm (FIXED)
+// EDIT TRANSACTION - Sửa giao dịch đã nhập nhầm
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -27,7 +27,7 @@ class _EditTransactionViewState extends State<EditTransactionView> {
   late TextEditingController _noteController;
   
   late String transactionType;
-  String? selectedCategory; // ✅ KHÔNG DÙNG late
+  late String? selectedCategory;
   late DateTime selectedDate;
   bool isLoading = false;
   
@@ -64,15 +64,7 @@ class _EditTransactionViewState extends State<EditTransactionView> {
     originalType = widget.transactionData['type'] ?? 'expense';
     
     transactionType = originalType;
-    
-    // ✅ KIỂM TRA category có hợp lệ không
-    String? initialCategory = widget.transactionData['category'];
-    List<Map<String, dynamic>> currentCategories = 
-        transactionType == 'income' ? incomeCategories : expenseCategories;
-    
-    // Chỉ set selectedCategory nếu nó tồn tại trong danh sách hiện tại
-    bool categoryExists = currentCategories.any((cat) => cat['name'] == initialCategory);
-    selectedCategory = categoryExists ? initialCategory : null;
+    selectedCategory = widget.transactionData['category'];
     
     // Parse date
     Timestamp? timestamp = widget.transactionData['date'] as Timestamp?;
@@ -400,10 +392,6 @@ class _EditTransactionViewState extends State<EditTransactionView> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    // ✅ LẤY DANH SÁCH CATEGORIES ĐÚNG THEO TYPE HIỆN TẠI
-    List<Map<String, dynamic>> currentCategories = 
-        transactionType == 'income' ? incomeCategories : expenseCategories;
-    
     return Scaffold(
       backgroundColor: const Color(0xFF00CED1),
       appBar: AppBar(
@@ -430,8 +418,7 @@ class _EditTransactionViewState extends State<EditTransactionView> {
                     onTap: () {
                       setState(() {
                         transactionType = 'income';
-                        // ✅ RESET category khi đổi type
-                        selectedCategory = null;
+                        selectedCategory = null;  // ✅ RESET category when changing type
                       });
                     },
                     child: Container(
@@ -463,8 +450,7 @@ class _EditTransactionViewState extends State<EditTransactionView> {
                     onTap: () {
                       setState(() {
                         transactionType = 'expense';
-                        // ✅ RESET category khi đổi type
-                        selectedCategory = null;
+                        selectedCategory = null;  // ✅ RESET category when changing type
                       });
                     },
                     child: Container(
@@ -566,10 +552,7 @@ class _EditTransactionViewState extends State<EditTransactionView> {
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
                             isExpanded: true,
-                            // ✅ CHỈ SỬ DỤNG selectedCategory NÊU NÓ TỒN TẠI TRONG DANH SÁCH HIỆN TẠI
-                            value: currentCategories.any((cat) => cat['name'] == selectedCategory) 
-                                ? selectedCategory 
-                                : null,
+                            value: selectedCategory,
                             hint: Text(
                               'Chọn danh mục',
                               style: TextStyle(
@@ -581,7 +564,10 @@ class _EditTransactionViewState extends State<EditTransactionView> {
                               Icons.keyboard_arrow_down,
                               color: isDark ? Colors.grey[400] : Colors.grey[600],
                             ),
-                            items: currentCategories.map((category) {
+                            items: (transactionType == 'income'
+                                    ? incomeCategories
+                                    : expenseCategories)
+                                .map((category) {
                               return DropdownMenuItem<String>(
                                 value: category['name'],
                                 child: Row(

@@ -9,7 +9,7 @@ import './AddExpenseView.dart';
 import '../notification/NotificationView.dart';
 import './transaction_widgets.dart';
 import '../TextVoice/AI_deep_analysis_view.dart';
-import 'EditTransactionView.dart';  // ✅ ADD THIS
+import './EditTransactionView.dart';  // ✅ ADD THIS
 
 class TransactionView extends StatefulWidget {
   const TransactionView({Key? key}) : super(key: key);
@@ -45,7 +45,8 @@ class _TransactionViewState extends State<TransactionView> {
 
   Future<void> _deleteTransaction(String transactionId, Map<String, dynamic> data) async {
     try {
-      double amount = (data['amount'] ?? 0).toDouble();
+      // ✅ Get absolute value
+      double amount = ((data['amount'] ?? 0) as num).abs().toDouble();
       String type = (data['type'] ?? 'expense').toString().toLowerCase();
 
       // Delete transaction
