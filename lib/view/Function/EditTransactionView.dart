@@ -1,39 +1,39 @@
+// lib/view/EditTransactionView.dart
+// EDIT TRANSACTION - Sửa giao dịch đã nhập nhầm (FIXED)
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 
-class AddExpenseView extends StatefulWidget {
-  final String? initialType; // 'income' or 'expense'
-  final String? categoryName; // Pre-selected category
-  final IconData? categoryIcon;
-  final Color? categoryColor;
-  final bool hideToggle; // ✅ NEW: Hide Income/Expense toggle
+class EditTransactionView extends StatefulWidget {
+  final String transactionId;
+  final Map<String, dynamic> transactionData;
   
-  const AddExpenseView({
-    Key? key, 
-    this.initialType,
-    this.categoryName,
-    this.categoryIcon,
-    this.categoryColor,
-    this.hideToggle = false, // ✅ Default: show toggle
+  const EditTransactionView({
+    Key? key,
+    required this.transactionId,
+    required this.transactionData,
   }) : super(key: key);
 
   @override
-  State<AddExpenseView> createState() => _AddExpenseViewState();
+  State<EditTransactionView> createState() => _EditTransactionViewState();
 }
 
-class _AddExpenseViewState extends State<AddExpenseView> {
+class _EditTransactionViewState extends State<EditTransactionView> {
   final _formKey = GlobalKey<FormState>();
-  final _amountController = TextEditingController();
-  final _titleController = TextEditingController();
-  final _noteController = TextEditingController();
+  late TextEditingController _amountController;
+  late TextEditingController _titleController;
+  late TextEditingController _noteController;
   
-  String transactionType = 'expense'; // 'income' or 'expense'
-  String? selectedCategory;
-  DateTime selectedDate = DateTime.now();
+  late String transactionType;
+  String? selectedCategory; // ✅ KHÔNG DÙNG late
+  late DateTime selectedDate;
   bool isLoading = false;
+  
+  // Original values for comparison
+  late double originalAmount;
+  late String originalType;
   
   // Categories
   final List<Map<String, dynamic>> expenseCategories = [
@@ -58,21 +58,36 @@ class _AddExpenseViewState extends State<AddExpenseView> {
   @override
   void initState() {
     super.initState();
-    transactionType = widget.initialType ?? 'expense';
     
-    // ✅ Auto-detect type from category name
-    if (widget.categoryName != null) {
-      final incomeCategories = ['Salary', 'Business', 'Investment', 'Gift', 'Freelance'];
-      
-      if (incomeCategories.contains(widget.categoryName)) {
-        transactionType = 'income';
-      } else {
-        transactionType = 'expense';
-      }
-      
-      // Pre-select category
-      selectedCategory = widget.categoryName;
-    }
+    // Load existing data
+    originalAmount = (widget.transactionData['amount'] as num).toDouble();
+    originalType = widget.transactionData['type'] ?? 'expense';
+    
+    transactionType = originalType;
+    
+    // ✅ KIỂM TRA category có hợp lệ không
+    String? initialCategory = widget.transactionData['category'];
+    List<Map<String, dynamic>> currentCategories = 
+        transactionType == 'income' ? incomeCategories : expenseCategories;
+    
+    // Chỉ set selectedCategory nếu nó tồn tại trong danh sách hiện tại
+    bool categoryExists = currentCategories.any((cat) => cat['name'] == initialCategory);
+    selectedCategory = categoryExists ? initialCategory : null;
+    
+    // Parse date
+    Timestamp? timestamp = widget.transactionData['date'] as Timestamp?;
+    selectedDate = timestamp?.toDate() ?? DateTime.now();
+    
+    // Initialize controllers with existing values
+    _amountController = TextEditingController(
+      text: originalAmount.toString(),
+    );
+    _titleController = TextEditingController(
+      text: widget.transactionData['title'] ?? '',
+    );
+    _noteController = TextEditingController(
+      text: widget.transactionData['note'] ?? '',
+    );
   }
 
   @override
@@ -83,8 +98,8 @@ class _AddExpenseViewState extends State<AddExpenseView> {
     super.dispose();
   }
 
-  // ✅ NEW: VALIDATE BALANCE
-  Future<bool> _validateBalance(double amount) async {
+  // ✅ VALIDATE BALANCE (for expense only)
+  Future<bool> _validateBalance(double newAmount) async {
     // Income doesn't need validation
     if (transactionType != 'expense') {
       return true;
@@ -102,9 +117,19 @@ class _AddExpenseViewState extends State<AddExpenseView> {
       var userData = userDoc.data() as Map<String, dynamic>? ?? {};
       double currentBalance = (userData['balance'] ?? 0).toDouble();
       
-      // ✅ CHECK: Enough money?
-      if (amount > currentBalance) {
-        _showInsufficientFundsDialog(currentBalance, amount);
+      // Calculate available balance considering we're editing
+      double availableBalance = currentBalance;
+      
+      // If editing an existing expense, add it back first
+      if (originalType == 'expense') {
+        availableBalance += originalAmount;
+      } else if (originalType == 'income') {
+        availableBalance -= originalAmount;
+      }
+      
+      // Check if new amount is affordable
+      if (transactionType == 'expense' && newAmount > availableBalance) {
+        _showInsufficientFundsDialog(availableBalance, newAmount);
         return false;
       }
       
@@ -115,7 +140,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
     }
   }
 
-  // ✅ NEW: SHOW ERROR DIALOG
   void _showInsufficientFundsDialog(double balance, double amount) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
@@ -126,8 +150,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
-        
-        // Title with icon
         title: Row(
           children: [
             Container(
@@ -146,45 +168,33 @@ class _AddExpenseViewState extends State<AddExpenseView> {
             const Text('Không đủ tiền'),
           ],
         ),
-        
-        // Content
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Bạn không thể chi tiêu vượt quá số dư hiện tại.',
+              'Số dư khả dụng không đủ để sửa thành số tiền này.',
               style: TextStyle(
                 fontSize: 15,
-                height: 1.5,
                 color: isDark ? Colors.grey[400] : Colors.grey[700],
               ),
             ),
             const SizedBox(height: 16),
-            
-            // Balance info card
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.red.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.red.withOpacity(0.3),
-                ),
+                border: Border.all(color: Colors.red.withOpacity(0.3)),
               ),
               child: Column(
                 children: [
-                  // Current balance
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Số dư hiện tại:',
-                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                      ),
+                      Text('Số dư khả dụng:', style: TextStyle(fontSize: 13)),
                       Text(
                         _formatCurrency(balance),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: Colors.green,
@@ -193,18 +203,13 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  
-                  // Requested amount
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Số tiền muốn chi:',
-                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                      ),
+                      Text('Số tiền muốn chi:', style: TextStyle(fontSize: 13)),
                       Text(
                         _formatCurrency(amount),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: Colors.red,
@@ -213,22 +218,13 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                     ],
                   ),
                   const Divider(height: 24),
-                  
-                  // Shortage
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Thiếu:',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[800],
-                        ),
-                      ),
+                      Text('Thiếu:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                       Text(
                         _formatCurrency(amount - balance),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: Colors.red,
@@ -241,8 +237,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
             ),
           ],
         ),
-        
-        // Actions
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -253,7 +247,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
     );
   }
 
-  // ✅ NEW: FORMAT CURRENCY
   String _formatCurrency(double amount) {
     if (amount >= 1000000000) {
       return '${(amount / 1000000000).toStringAsFixed(1)}B₫';
@@ -265,32 +258,31 @@ class _AddExpenseViewState extends State<AddExpenseView> {
     return '${amount.toStringAsFixed(0)}₫';
   }
 
-  Future<void> _saveTransaction() async {
+  Future<void> _updateTransaction() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
     
     if (selectedCategory == null) {
-      _showErrorSnackBar('Please select a category');
+      _showErrorSnackBar('Vui lòng chọn danh mục');
       return;
     }
 
-    // ✅ Prevent double-tap
     if (isLoading) return;
 
-    // Parse amount
-    double amount;
+    // Parse new amount
+    double newAmount;
     try {
-      amount = double.parse(_amountController.text.trim());
+      newAmount = double.parse(_amountController.text.trim());
     } catch (e) {
-      _showErrorSnackBar('Invalid amount');
+      _showErrorSnackBar('Số tiền không hợp lệ');
       return;
     }
 
-    // ✅ VALIDATE BALANCE (NEW!)
-    bool canProceed = await _validateBalance(amount);
+    // ✅ VALIDATE BALANCE
+    bool canProceed = await _validateBalance(newAmount);
     if (!canProceed) {
-      return; // Stop if not enough money
+      return;
     }
 
     setState(() {
@@ -299,9 +291,8 @@ class _AddExpenseViewState extends State<AddExpenseView> {
 
     try {
       String userId = FirebaseAuth.instance.currentUser!.uid;
-      String transactionId = const Uuid().v4();
 
-      // ✅ OPTIMIZED: Use Firestore Transaction for atomic update
+      // Use Firestore Transaction for atomic update
       await FirebaseFirestore.instance.runTransaction((transaction) async {
         // 1. Get user document
         DocumentSnapshot userDoc = await transaction.get(
@@ -312,60 +303,62 @@ class _AddExpenseViewState extends State<AddExpenseView> {
         double currentIncome = (userData['totalIncome'] ?? 0).toDouble();
         double currentExpense = (userData['totalExpense'] ?? 0).toDouble();
 
-        // 2. Calculate new values
-        double newIncome = currentIncome;
-        double newExpense = currentExpense;
-
-        if (transactionType == 'income') {
-          newIncome += amount;
+        // 2. Reverse old transaction
+        if (originalType == 'income') {
+          currentIncome -= originalAmount;
         } else {
-          newExpense += amount;
+          currentExpense -= originalAmount;
         }
 
-        double newBalance = newIncome - newExpense;
+        // 3. Apply new transaction
+        if (transactionType == 'income') {
+          currentIncome += newAmount;
+        } else {
+          currentExpense += newAmount;
+        }
 
-        // 3. Add transaction document
-        transaction.set(
+        double newBalance = currentIncome - currentExpense;
+
+        // 4. Update transaction document
+        transaction.update(
           FirebaseFirestore.instance
               .collection('users')
               .doc(userId)
               .collection('transactions')
-              .doc(transactionId),
+              .doc(widget.transactionId),
           {
-            'id': transactionId,
             'type': transactionType,
-            'amount': amount,
+            'amount': newAmount,
             'category': selectedCategory,
             'title': _titleController.text.trim(),
             'note': _noteController.text.trim(),
             'date': Timestamp.fromDate(selectedDate),
-            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
           },
         );
 
-        // 4. Update user totals
+        // 5. Update user totals
         transaction.update(
           FirebaseFirestore.instance.collection('users').doc(userId),
           {
             'balance': newBalance,
-            'totalIncome': newIncome,
-            'totalExpense': newExpense,
+            'totalIncome': currentIncome,
+            'totalExpense': currentExpense,
             'updatedAt': FieldValue.serverTimestamp(),
           },
         );
       });
 
       if (mounted) {
-        _showSuccessSnackBar('Transaction added successfully!');
-        // ✅ Small delay for better UX
+        _showSuccessSnackBar('Đã cập nhật giao dịch!');
         await Future.delayed(const Duration(milliseconds: 300));
         Navigator.pop(context, true);
       }
       
     } catch (e) {
-      print('Error saving transaction: $e');
+      print('Error updating transaction: $e');
       if (mounted) {
-        _showErrorSnackBar('Failed to save: ${e.toString()}');
+        _showErrorSnackBar('Lỗi: ${e.toString()}');
       }
     } finally {
       if (mounted) {
@@ -378,19 +371,13 @@ class _AddExpenseViewState extends State<AddExpenseView> {
 
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.green),
     );
   }
 
@@ -413,6 +400,10 @@ class _AddExpenseViewState extends State<AddExpenseView> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
+    // ✅ LẤY DANH SÁCH CATEGORIES ĐÚNG THEO TYPE HIỆN TẠI
+    List<Map<String, dynamic>> currentCategories = 
+        transactionType == 'income' ? incomeCategories : expenseCategories;
+    
     return Scaffold(
       backgroundColor: const Color(0xFF00CED1),
       appBar: AppBar(
@@ -422,91 +413,86 @@ class _AddExpenseViewState extends State<AddExpenseView> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          transactionType == 'income' ? 'Add Income' : 'Add Expense',
-          style: const TextStyle(color: Colors.white),
+        title: const Text(
+          'Chỉnh sửa giao dịch',
+          style: TextStyle(color: Colors.white),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: Column(
         children: [
-          // ✅ Type Toggle - ONLY show if hideToggle = false AND no categoryName
-          if (!widget.hideToggle && widget.categoryName == null)
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          transactionType = 'income';
-                          selectedCategory = null;
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color: transactionType == 'income'
-                              ? Colors.white
-                              : Colors.white.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Income',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: transactionType == 'income'
-                                  ? const Color(0xFF00CED1)
-                                  : Colors.white,
-                            ),
+          // Type Toggle
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        transactionType = 'income';
+                        // ✅ RESET category khi đổi type
+                        selectedCategory = null;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: transactionType == 'income'
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Thu nhập',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: transactionType == 'income'
+                                ? const Color(0xFF00CED1)
+                                : Colors.white,
                           ),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          transactionType = 'expense';
-                          selectedCategory = null;
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color: transactionType == 'expense'
-                              ? Colors.white
-                              : Colors.white.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Expense',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: transactionType == 'expense'
-                                  ? const Color(0xFF00CED1)
-                                  : Colors.white,
-                            ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        transactionType = 'expense';
+                        // ✅ RESET category khi đổi type
+                        selectedCategory = null;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: transactionType == 'expense'
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Chi tiêu',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: transactionType == 'expense'
+                                ? const Color(0xFF00CED1)
+                                : Colors.white,
                           ),
                         ),
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+          ),
           
           // Form Container
           Expanded(
@@ -527,7 +513,7 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                     children: [
                       // Date
                       Text(
-                        'Date',
+                        'Ngày',
                         style: TextStyle(
                           fontSize: 14,
                           color: isDark ? Colors.grey[400] : Colors.grey[600],
@@ -546,7 +532,7 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                DateFormat('MMMM dd, yyyy').format(selectedDate),
+                                DateFormat('dd/MM/yyyy').format(selectedDate),
                                 style: TextStyle(
                                   fontSize: 16,
                                   color: isDark ? Colors.white : Colors.black,
@@ -562,116 +548,73 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                       ),
                       const SizedBox(height: 20),
                       
-                      // Category - Show as read-only if pre-selected
-                      widget.categoryName == null
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Category',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isDark ? Colors.grey[400] : Colors.grey[600],
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                                  decoration: BoxDecoration(
-                                    color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100],
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      isExpanded: true,
-                                      value: selectedCategory,
-                                      hint: Text(
-                                        'Select category',
-                                        style: TextStyle(
-                                          color: isDark ? Colors.grey[400] : Colors.grey[600],
-                                        ),
-                                      ),
-                                      dropdownColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-                                      icon: Icon(
-                                        Icons.keyboard_arrow_down,
-                                        color: isDark ? Colors.grey[400] : Colors.grey[600],
-                                      ),
-                                      items: (transactionType == 'income'
-                                              ? incomeCategories
-                                              : expenseCategories)
-                                          .map((category) {
-                                        return DropdownMenuItem<String>(
-                                          value: category['name'],
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                category['icon'],
-                                                size: 20,
-                                                color: const Color(0xFF00CED1),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              Text(
-                                                category['name'],
-                                                style: TextStyle(
-                                                  color: isDark ? Colors.white : Colors.black,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      }).toList(),
-                                      onChanged: (String? newValue) {
-                                        setState(() {
-                                          selectedCategory = newValue;
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            )
-                          : Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Category',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isDark ? Colors.grey[400] : Colors.grey[600],
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100],
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        widget.categoryIcon ?? Icons.category,
-                                        size: 20,
-                                        color: widget.categoryColor ?? const Color(0xFF00CED1),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Text(
-                                        widget.categoryName!,
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: isDark ? Colors.white : Colors.black,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                      // Category
+                      Text(
+                        'Danh mục',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            // ✅ CHỈ SỬ DỤNG selectedCategory NÊU NÓ TỒN TẠI TRONG DANH SÁCH HIỆN TẠI
+                            value: currentCategories.any((cat) => cat['name'] == selectedCategory) 
+                                ? selectedCategory 
+                                : null,
+                            hint: Text(
+                              'Chọn danh mục',
+                              style: TextStyle(
+                                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                              ),
                             ),
-                      const SizedBox(height: 20), 
+                            dropdownColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                            icon: Icon(
+                              Icons.keyboard_arrow_down,
+                              color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            ),
+                            items: currentCategories.map((category) {
+                              return DropdownMenuItem<String>(
+                                value: category['name'],
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      category['icon'],
+                                      size: 20,
+                                      color: const Color(0xFF00CED1),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      category['name'],
+                                      style: TextStyle(
+                                        color: isDark ? Colors.white : Colors.black,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (String? newValue) {
+                              setState(() {
+                                selectedCategory = newValue;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
                       
                       // Amount
                       Text(
-                        'Amount',
+                        'Số tiền',
                         style: TextStyle(
                           fontSize: 14,
                           color: isDark ? Colors.grey[400] : Colors.grey[600],
@@ -704,22 +647,22 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter amount';
+                            return 'Vui lòng nhập số tiền';
                           }
                           if (double.tryParse(value) == null) {
-                            return 'Please enter valid number';
+                            return 'Số tiền không hợp lệ';
                           }
                           if (double.parse(value) <= 0) {
-                            return 'Amount must be greater than 0';
+                            return 'Số tiền phải lớn hơn 0';
                           }
                           return null;
                         },
                       ),
                       const SizedBox(height: 20),
                       
-                      // Expense Title
+                      // Title
                       Text(
-                        transactionType == 'income' ? 'Income Title' : 'Expense Title',
+                        'Tiêu đề',
                         style: TextStyle(
                           fontSize: 14,
                           color: isDark ? Colors.grey[400] : Colors.grey[600],
@@ -733,7 +676,7 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                           color: isDark ? Colors.white : Colors.black,
                         ),
                         decoration: InputDecoration(
-                          hintText: 'E.g., Dinner',
+                          hintText: 'VD: Ăn trưa',
                           hintStyle: TextStyle(
                             color: isDark ? Colors.grey[600] : Colors.grey[400],
                           ),
@@ -746,16 +689,16 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter title';
+                            return 'Vui lòng nhập tiêu đề';
                           }
                           return null;
                         },
                       ),
                       const SizedBox(height: 20),
                       
-                      // Enter Message (Optional)
+                      // Note
                       Text(
-                        'Enter Message (Optional)',
+                        'Ghi chú (Tùy chọn)',
                         style: TextStyle(
                           fontSize: 14,
                           color: isDark ? Colors.grey[400] : Colors.grey[600],
@@ -770,7 +713,7 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                           color: isDark ? Colors.white : Colors.black,
                         ),
                         decoration: InputDecoration(
-                          hintText: 'Add notes (optional)',
+                          hintText: 'Thêm ghi chú...',
                           hintStyle: TextStyle(
                             color: isDark ? Colors.grey[600] : Colors.grey[400],
                           ),
@@ -784,12 +727,12 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                       ),
                       const SizedBox(height: 30),
                       
-                      // Save Button
+                      // Update Button
                       SizedBox(
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          onPressed: isLoading ? null : _saveTransaction,
+                          onPressed: isLoading ? null : _updateTransaction,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF00CED1),
                             shape: RoundedRectangleBorder(
@@ -799,7 +742,7 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                           child: isLoading
                               ? const CircularProgressIndicator(color: Colors.white)
                               : const Text(
-                                  'Save',
+                                  'Cập nhật',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,

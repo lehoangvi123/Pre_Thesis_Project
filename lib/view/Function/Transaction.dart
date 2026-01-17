@@ -8,6 +8,8 @@ import './ProfileView.dart';
 import './AddExpenseView.dart';
 import '../notification/NotificationView.dart';
 import './transaction_widgets.dart';
+import '../TextVoice/AI_deep_analysis_view.dart';
+import 'EditTransactionView.dart';  // ✅ ADD THIS
 
 class TransactionView extends StatefulWidget {
   const TransactionView({Key? key}) : super(key: key);
@@ -220,20 +222,24 @@ class _TransactionViewState extends State<TransactionView> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const AddExpenseView(),
+              builder: (context) => const AIDeepAnalysisView(),
             ),
           );
-          if (result == true && mounted) {
-            setState(() {});
-          }
         },
         backgroundColor: const Color(0xFF00CED1),
-        child: const Icon(Icons.add, color: Colors.white),
+        icon: const Icon(Icons.psychology, color: Colors.white),
+        label: const Text(
+          'AI Phân tích',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
       bottomNavigationBar: _buildBottomNavBar(isDark),
     );
@@ -681,12 +687,21 @@ class _TransactionViewState extends State<TransactionView> {
             isDark: isDark,
             onDelete: () => _deleteTransaction(doc.id, data),
             onTap: () async {
-              // Navigate to edit (coming soon)
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Chức năng chỉnh sửa đang phát triển'),
+              // ✅ NAVIGATE TO EDIT SCREEN
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EditTransactionView(
+                    transactionId: doc.id,
+                    transactionData: data,
+                  ),
                 ),
               );
+              
+              // ✅ REFRESH LIST IF EDITED
+              if (result == true && mounted) {
+                setState(() {});
+              }
             },
           );
         }).toList(),
@@ -765,4 +780,4 @@ class _TransactionViewState extends State<TransactionView> {
       ),
     );
   }
-} 
+}
