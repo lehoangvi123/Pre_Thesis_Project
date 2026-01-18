@@ -7,13 +7,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class AIAssistantService {
   final FinancialContextService _financialContext = FinancialContextService();
   
-<<<<<<< HEAD
-  // IMPORTANT: Replace with your actual API key
-  static const String GEMINI_API_KEY = 'YOUR_GEMINI_API_KEY';
-  static const String GEMINI_API_URL = 
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
-=======
-  // ✅ CHATGPT API KEY - Thay bằng key của bạn
+  // ✅ CHATGPT API KEY - Lấy từ file .env
   static String get OPENAI_API_KEY => 
     dotenv.env['OPENAI_API_KEY'] ?? '';
   
@@ -27,11 +21,10 @@ class AIAssistantService {
   
   // Model hiện tại
   static int _currentModelIndex = 0;
-  static String get currentModel => MODELS[_currentModelIndex];           
+  static String get currentModel => MODELS[_currentModelIndex];
   
   // ✅ API URL của OpenAI
   static const String API_URL = 'https://api.openai.com/v1/chat/completions';
->>>>>>> d288d01 (Remove API key and use environment variables)
 
   // System prompt for AI personality
   final String systemPrompt = '''
@@ -64,51 +57,61 @@ Response format:
   // Send message to AI and get response
   Future<String> sendMessage(String userMessage, {List<ChatMessage>? chatHistory}) async {
     try {
+      // Kiểm tra API key
+      if (OPENAI_API_KEY.isEmpty) {
+        return 'Lỗi: API key chưa được cấu hình. Vui lòng thêm OPENAI_API_KEY vào file .env! 🔑';
+      }
+
       // Get user's financial context
       String financialContext = await _financialContext.buildFinancialContext();
 
-      // Build conversation history
-      String conversationHistory = _buildConversationHistory(chatHistory);
+      // Build messages array for ChatGPT
+      List<Map<String, String>> messages = [
+        {
+          'role': 'system',
+          'content': '$systemPrompt\n\n$financialContext'
+        }
+      ];
 
-      // Construct prompt
-      String fullPrompt = '''
-$systemPrompt
+      // Add conversation history
+      if (chatHistory != null && chatHistory.isNotEmpty) {
+        for (var msg in chatHistory.take(10)) {
+          messages.add({
+            'role': msg.isUser ? 'user' : 'assistant',
+            'content': msg.message
+          });
+        }
+      }
 
-$financialContext
+      // Add current user message
+      messages.add({
+        'role': 'user',
+        'content': userMessage
+      });
 
-Previous conversation:
-$conversationHistory
-
-User: $userMessage
-
-BuddyAI:
-''';
-
-      // Call Gemini API
+      // Call OpenAI API
       final response = await http.post(
-        Uri.parse('$GEMINI_API_URL?key=$GEMINI_API_KEY'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse(API_URL),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $OPENAI_API_KEY',
+        },
         body: jsonEncode({
-          'contents': [
-            {
-              'parts': [
-                {'text': fullPrompt}
-              ]
-            }
-          ],
-          'generationConfig': {
-            'temperature': 0.7,
-            'maxOutputTokens': 500,
-          }
+          'model': currentModel,
+          'messages': messages,
+          'temperature': 0.7,
+          'max_tokens': 500,
         }),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        String aiResponse = data['candidates'][0]['content']['parts'][0]['text'];
+        String aiResponse = data['choices'][0]['message']['content'];
         return aiResponse.trim();
+      } else if (response.statusCode == 401) {
+        return 'Lỗi: API key không hợp lệ. Vui lòng kiểm tra lại! 🔑';
       } else {
-        print('API Error: ${response.statusCode}');
+        print('API Error: ${response.statusCode} - ${response.body}');
         return 'Xin lỗi, tôi đang gặp sự cố kỹ thuật. Vui lòng thử lại sau! 😅';
       }
     } catch (e) {
@@ -117,14 +120,11 @@ BuddyAI:
     }
   }
 
-  // Build conversation history string
-  String _buildConversationHistory(List<ChatMessage>? messages) {
-    if (messages == null || messages.isEmpty) return 'No previous conversation.';
-    
-    return messages
-        .take(10) // Only last 10 messages to avoid token limit
-        .map((msg) => '${msg.isUser ? "User" : "BuddyAI"}: ${msg.message}')
-        .join('\n');
+  // Switch model (optional - để user chọn model nếu cần)
+  static void switchModel(int index) {
+    if (index >= 0 && index < MODELS.length) {
+      _currentModelIndex = index;
+    }
   }
 
   // Quick actions for AI
