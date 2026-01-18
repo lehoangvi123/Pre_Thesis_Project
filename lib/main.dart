@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'package:project1/view/login/WelcomeView.dart';
@@ -60,7 +61,12 @@ class MyApp extends StatelessWidget {
 }
 
 class AuthWrapper extends StatelessWidget {
-  const AuthWrapper({Key? key}) : super(key: key);
+  const AuthWrapper({Key? key}) : super(key: key); 
+
+  Future<void> main() async {
+  await dotenv.load(fileName: ".env");
+  runApp(MyApp());
+}
 
   @override
   Widget build(BuildContext context) {

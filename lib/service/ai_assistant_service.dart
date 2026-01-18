@@ -2,14 +2,36 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/chat_message_model.dart';
 import 'financial_context_service.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AIAssistantService {
   final FinancialContextService _financialContext = FinancialContextService();
   
+<<<<<<< HEAD
   // IMPORTANT: Replace with your actual API key
   static const String GEMINI_API_KEY = 'YOUR_GEMINI_API_KEY';
   static const String GEMINI_API_URL = 
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+=======
+  // ✅ CHATGPT API KEY - Thay bằng key của bạn
+  static String get OPENAI_API_KEY => 
+    dotenv.env['OPENAI_API_KEY'] ?? '';
+  
+  // ✅ MODELS ChatGPT - Từ rẻ đến đắt
+  static const List<String> MODELS = [
+    'gpt-4o-mini',        // Rẻ nhất, nhanh nhất (khuyến nghị cho chatbot)
+    'gpt-4o',             // Cân bằng giá/chất lượng
+    'gpt-4-turbo',        // Mạnh hơn
+    'gpt-3.5-turbo',      // Legacy, rẻ
+  ];
+  
+  // Model hiện tại
+  static int _currentModelIndex = 0;
+  static String get currentModel => MODELS[_currentModelIndex];
+  
+  // ✅ API URL của OpenAI
+  static const String API_URL = 'https://api.openai.com/v1/chat/completions';
+>>>>>>> d288d01 (Remove API key and use environment variables)
 
   // System prompt for AI personality
   final String systemPrompt = '''
