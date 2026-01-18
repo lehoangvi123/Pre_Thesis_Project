@@ -9,7 +9,9 @@ import './AddExpenseView.dart';
 import '../notification/NotificationView.dart';
 import './transaction_widgets.dart';
 import '../TextVoice/AI_deep_analysis_view.dart';
-import './EditTransactionView.dart';  // ✅ ADD THIS
+import './EditTransactionView.dart';
+// ✅ ADD THIS - Import AI Chatbot View
+import './AI_Chatbot/chatbot_view.dart';
 
 class TransactionView extends StatefulWidget {
   const TransactionView({Key? key}) : super(key: key);
@@ -169,6 +171,183 @@ class _TransactionViewState extends State<TransactionView> {
     );
   }
 
+  // ✅ NEW METHOD: Show AI Menu Bottom Sheet
+  void _showAIMenuBottomSheet(bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[600] : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              
+              const SizedBox(height: 20),
+              
+              // Title
+              Text(
+                'Trợ lý AI',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black,
+                ),
+              ),
+              
+              const SizedBox(height: 8),
+              
+              Text(
+                'Chọn tính năng AI bạn muốn sử dụng',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                ),
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Option 1: Deep Analysis
+              _buildAIMenuOption(
+                context: context,
+                isDark: isDark,
+                icon: Icons.analytics_outlined,
+                iconColor: const Color(0xFF00CED1),
+                title: 'Phân tích chi tiêu',
+                subtitle: 'Phân tích sâu về thói quen chi tiêu của bạn',
+                onTap: () {
+                  Navigator.pop(context); // Close bottom sheet
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AIDeepAnalysisView(),
+                    ),
+                  );
+                },
+              ),
+              
+              // Divider
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Divider(
+                  color: isDark ? Colors.grey[700] : Colors.grey[200],
+                  height: 1,
+                ),
+              ),
+              
+              // Option 2: AI Chatbot
+              _buildAIMenuOption(
+                context: context,
+                isDark: isDark,
+                icon: Icons.chat_bubble_outline,
+                iconColor: Colors.purple,
+                title: 'Chat với AI',
+                subtitle: 'Trò chuyện với trợ lý tài chính thông minh',
+                onTap: () {
+                  Navigator.pop(context); // Close bottom sheet
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ChatbotView(),
+                    ),
+                  );
+                },
+              ),
+              
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ✅ NEW METHOD: Build AI Menu Option
+  Widget _buildAIMenuOption({
+    required BuildContext context,
+    required bool isDark,
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            // Icon container
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                icon,
+                color: iconColor,
+                size: 28,
+              ),
+            ),
+            
+            const SizedBox(width: 16),
+            
+            // Text content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Arrow icon
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: isDark ? Colors.grey[600] : Colors.grey[400],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -223,23 +402,14 @@ class _TransactionViewState extends State<TransactionView> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const AIDeepAnalysisView(),
-            ),
-          );
-        },
+      // ✅ UPDATED: Menu button instead of direct Analysis button
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAIMenuBottomSheet(isDark),
         backgroundColor: const Color(0xFF00CED1),
-        icon: const Icon(Icons.psychology, color: Colors.white),
-        label: const Text(
-          'AI Phân tích',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
+        child: const Icon(
+          Icons.menu, // 3 horizontal lines icon
+          color: Colors.white,
+          size: 28,
         ),
       ),
       bottomNavigationBar: _buildBottomNavBar(isDark),
