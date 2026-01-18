@@ -27,7 +27,7 @@ class AIAssistantService {
   
   // Model hiện tại
   static int _currentModelIndex = 0;
-  static String get currentModel => MODELS[_currentModelIndex];
+  static String get currentModel => MODELS[_currentModelIndex];           
   
   // ✅ API URL của OpenAI
   static const String API_URL = 'https://api.openai.com/v1/chat/completions';
