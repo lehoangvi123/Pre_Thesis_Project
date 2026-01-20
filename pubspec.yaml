@@ -43,4 +43,5 @@ flutter:
   assets:
     - assets/images/
     - assets/images/Intro_screen-login/
-    - assets/fonts/ 
+    - assets/fonts/  
+    - .env
