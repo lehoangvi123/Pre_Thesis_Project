@@ -46,7 +46,7 @@ class MyApp extends StatelessWidget {
           darkTheme: themeProvider.darkTheme,
           themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
           
-          home: const AuthWrapper(),
+          home: const AuthWrapper(), 
           
           routes: {
             '/welcome': (context) => const WelcomeView(),
@@ -60,13 +60,14 @@ class MyApp extends StatelessWidget {
   }
 }
 
+
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({Key? key}) : super(key: key); 
 
   Future<void> main() async {
   await dotenv.load(fileName: ".env");
-  runApp(MyApp());
-}
+  runApp(MyApp()); 
+} 
 
   @override
   Widget build(BuildContext context) {
@@ -78,9 +79,9 @@ class AuthWrapper extends StatelessWidget {
           return Scaffold(
             backgroundColor: const Color(0xFF00BCD4),
             body: Center(
-              child: Column(
+              child: Column( 
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+                children: [ 
                   Container(
                     width: 120,
                     height: 120,
@@ -147,6 +148,7 @@ class AuthWrapper extends StatelessWidget {
             ),
           );
         }
+        
         
         // User Logged In
         if (snapshot.hasData && snapshot.data != null) {

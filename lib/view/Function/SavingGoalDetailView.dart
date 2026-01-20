@@ -322,7 +322,7 @@ class _SavingGoalDetailViewState extends State<SavingGoalDetailView> {
           ),
         ),
         actions: [
-          IconButton(
+          IconButton(  
             icon: Icon(
               Icons.edit,
               color: isDark ? Colors.white : Colors.black,
