@@ -9,12 +9,11 @@ class AIAssistantService {
   // ✅ URL BACKEND - Đổi sang backend của bạn
   static const String BACKEND_URL = "https://buddy-budget-system-backend.onrender.com";
   
-  // ✅ MODELS ChatGPT - Từ rẻ đến đắt 
+  // ✅ GEMINI MODELS - Từ nhanh đến mạnh
   static const List<String> MODELS = [  
-    'gpt-4o-mini',        // Rẻ nhất, nhanh nhất (khuyến nghị cho chatbot)
-    'gpt-4o',             // Cân bằng giá/chất lượng
-    'gpt-4-turbo',        // Mạnh hơn
-    'gpt-3.5-turbo',      // Legacy, rẻ
+    'gemini-1.5-flash-latest',      // Nhanh nhất, miễn phí (khuyến nghị)
+    'gemini-2.0-flash-exp',          // Model mới nhất, experimental
+    'gemini-1.5-pro-latest',         // Mạnh hơn, phân tích sâu
   ];
   
   // Model hiện tại
@@ -57,7 +56,7 @@ Response format:
       // Get user's financial context
       String financialContext = await _financialContext.buildFinancialContext();
 
-      // Build chat history
+      // Build chat history for Gemini format
       List<Map<String, String>> chatHistoryFormatted = [];
       
       if (chatHistory != null && chatHistory.isNotEmpty) {
@@ -65,14 +64,14 @@ Response format:
           // Validate message has content
           if (msg.message.trim().isNotEmpty) {
             chatHistoryFormatted.add({
-              'role': msg.isUser ? 'user' : 'assistant',
+              'role': msg.isUser ? 'user' : 'model',  // ✅ Gemini dùng 'model' thay vì 'assistant'
               'content': msg.message
             });
           }
         }
       }
 
-      // ✅ GỌI BACKEND THAY VÌ GỌI TRỰC TIẾP OPENAI
+      // ✅ GỌI BACKEND VỚI GEMINI API
       final response = await http.post(
         Uri.parse('$BACKEND_URL/api/chat'),
         headers: {
@@ -82,10 +81,10 @@ Response format:
           'message': userMessage,
           'chatHistory': chatHistoryFormatted,
           'financialContext': '$systemPrompt\n\n$financialContext',
-          'model': 'gpt-3.5-turbo',  // Chỉ định model cho backend
+          'model': currentModel,  // ✅ Dùng model Gemini
         }),
       ).timeout(
-        Duration(seconds: 120),  // Tăng timeout lên 120s cho cold start
+        Duration(seconds: 120),  // Timeout 120s cho cold start
         onTimeout: () {
           throw Exception('timeout');
         },
@@ -131,16 +130,22 @@ Response format:
       }
       return false;
     } catch (e) {
-      print('[AIAssistant] Warmup timeout');
+      print('[AIAssistant] ⚠️ Warmup timeout (server có thể đang ngủ)');
       return false;
     }
   }
 
-  // Switch model (optional - để user chọn model nếu cần)
+  // Switch model (để user chọn model nếu cần)
   static void switchModel(int index) {
     if (index >= 0 && index < MODELS.length) {
       _currentModelIndex = index;
+      print('[AIAssistant] Switched to model: ${MODELS[index]}');
     }
+  }
+
+  // Get current model name
+  static String getCurrentModelName() {
+    return MODELS[_currentModelIndex];
   }
 
   // Quick actions for AI
