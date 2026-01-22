@@ -6,65 +6,73 @@ import 'financial_context_service.dart';
 class AIAssistantService {
   final FinancialContextService _financialContext = FinancialContextService();
   
-  // ✅ URL BACKEND
   static const String BACKEND_URL = "https://buddy-budget-system-backend.onrender.com";
   
-  // ✅ GROQ MODELS - HOÀN TOÀN MIỄN PHÍ! 🎉
-  static const List<String> MODELS = [  
-    'llama-3.3-70b-versatile',       // Llama 3.3 70B - Mạnh nhất (khuyến nghị) ✅
-    'mixtral-8x7b-32768',            // Mixtral 8x7B - Nhanh & tốt ✅
-    'llama-3.1-8b-instant',          // Llama 3.1 8B - Cực nhanh ✅
-  ];
+  static const String PROVIDER_AUTO = 'auto';
+  static const String PROVIDER_GEMINI = 'gemini';
+  static const String PROVIDER_GROQ = 'groq';
   
-  // Model hiện tại
-  static int _currentModelIndex = 0;
-  static String get currentModel => MODELS[_currentModelIndex]; 
-
-  // System prompt for AI personality
+  static String _currentProvider = PROVIDER_AUTO;
+  
   final String systemPrompt = '''
-You are a friendly and professional Vietnamese financial advisor AI assistant named "BuddyAI" 
-integrated into a personal expense tracking app called "Budget Buddy". 
+BẠN LÀ AI:
+- Tên: BuddyAI - Trợ lý tài chính thông minh
+- Vai trò: Cố vấn tài chính cá nhân trong ứng dụng "Budget Buddy"
+- Tính cách: Thân thiện, nhiệt tình, chuyên nghiệp
 
-Your role:
-- Help users understand their spending habits
-- Provide personalized financial advice
-- Answer questions about their transactions, budget, and savings
-- Give encouragement and motivation for financial goals
-- Warn about overspending or risky financial behavior
-- Suggest ways to save money
+NHIỆM VỤ CHÍNH:
+1. Phân tích chi tiêu và đưa ra nhận xét cụ thể
+2. Tư vấn ngân sách và quản lý tiền bạc
+3. Động viên người dùng tiết kiệm và đạt mục tiêu tài chính
+4. Cảnh báo khi chi tiêu vượt mức
+5. Gợi ý cách tiết kiệm thông minh
 
-Guidelines:
-- Always respond in Vietnamese (unless user asks in English)
-- Be conversational and friendly, not robotic
-- Use emojis occasionally (💰 💡 ✅ ⚠️ 📊)
-- Keep responses concise (2-4 sentences usually)
-- When giving advice, provide specific numbers from their actual data
-- Ask clarifying questions if needed
-- Never make up financial data - only use provided context
+QUY TẮC TRẢ LỜI (QUAN TRỌNG):
+✅ LUÔN LUÔN trả lời bằng TIẾNG VIỆT (trừ khi user hỏi bằng tiếng Anh)
+✅ Ngắn gọn, súc tích (2-4 câu)
+✅ Dùng emoji phù hợp: 💰 💡 ✅ ⚠️ 📊 🎯 👍 ❌
+✅ Dựa vào DỮ LIỆU THỰC TẾ của user (đừng bịa số liệu)
+✅ Đưa ra con số cụ thể khi phân tích
+✅ Giọng điệu thân thiện như bạn bè, KHÔNG máy móc
+✅ Kết thúc bằng câu hỏi hoặc gợi ý hành động (nếu phù hợp)
 
-Response format:
-- Start with a greeting or acknowledgment
-- Provide analysis or answer
-- End with a question or action suggestion (optional)
+❌ TUYỆT ĐỐI KHÔNG:
+- Trả lời dài dòng, lan man
+- Sử dụng từ ngữ học thuật khó hiểu
+- Bịa đặt số liệu tài chính
+- Trả lời bằng tiếng Anh khi user hỏi tiếng Việt
+- Nói chung chung, không cụ thể
+
+MẪU TRẢ LỜI TốT:
+User: "Chi tiêu tháng này thế nào?"
+AI: "Tháng này bạn đã chi 5,2 triệu đồng, vượt ngân sách 700k đấy! 😅 Phần lớn là ăn uống (2,8tr) và mua sắm (1,5tr). Bạn có muốn mình gợi ý cách cắt giảm không?"
+
+VÍ DỤ CỤ THỂ VỀ PHONG CÁCH:
+- TỐT: "Tháng này bạn tiết kiệm được 2 triệu rồi đấy! 🎉 Giỏi quá!"
+- TỆ: "Theo dữ liệu phân tích, khoản tiết kiệm của bạn trong tháng hiện tại đạt mức 2.000.000 VND."
+
+LUÔN NHỚ: Bạn là BẠN BÈ tài chính, không phải ngân hàng hay kế toán viên!
 ''';
 
-  // Send message to AI and get response
+  // ✅ DEBUG: Print financial context
   Future<String> sendMessage(String userMessage, {List<ChatMessage>? chatHistory}) async {
     try {
-      print('[AIAssistant] Sending message to backend (Groq)...');
-      print('[AIAssistant] Message: ${userMessage.substring(0, userMessage.length > 50 ? 50 : userMessage.length)}...');
+      print('[AIAssistant] Sending message (Provider: $_currentProvider)...');
       
-      // Get user's financial context
+      // ✅ GET & PRINT CONTEXT
       String financialContext = await _financialContext.buildFinancialContext();
+      
+      print('═══════════════════════════════════════');
+      print('📊 FINANCIAL CONTEXT SENT TO AI:');
+      print('═══════════════════════════════════════');
+      print(financialContext);
+      print('═══════════════════════════════════════');
 
-      // Build chat history for Groq format (OpenAI-compatible)
       List<Map<String, String>> chatHistoryFormatted = [];
       
       if (chatHistory != null && chatHistory.isNotEmpty) {
         for (var msg in chatHistory.take(10)) {
-          if (msg.message.trim().isEmpty) {
-            continue;
-          }
+          if (msg.message.trim().isEmpty) continue;
           
           chatHistoryFormatted.add({
             'role': msg.isUser ? 'user' : 'assistant',
@@ -73,9 +81,6 @@ Response format:
         }
       }
 
-      print('[AIAssistant] Chat history: ${chatHistoryFormatted.length} messages');
-
-      // ✅ GỌI BACKEND VỚI GROQ API
       final response = await http.post(
         Uri.parse('$BACKEND_URL/api/chat'),
         headers: {
@@ -86,7 +91,7 @@ Response format:
           'message': userMessage.trim(),
           'chatHistory': chatHistoryFormatted,
           'financialContext': '$systemPrompt\n\n$financialContext',
-          'model': currentModel,
+          'provider': _currentProvider,
         }),
       ).timeout(
         Duration(seconds: 120),
@@ -97,65 +102,36 @@ Response format:
 
       print('[AIAssistant] Response status: ${response.statusCode}');
 
-      // ✅ Kiểm tra content type
       final contentType = response.headers['content-type'] ?? '';
       if (!contentType.contains('application/json')) {
-        print('[AIAssistant] ❌ Server trả về HTML thay vì JSON!');
-        
-        if (response.body.contains('error') || response.body.contains('Error')) {
-          return '❌ Server gặp lỗi. Vui lòng kiểm tra:\n\n'
-                 '1. GROQ_API_KEY đã được set chưa?\n'
-                 '2. API key có hợp lệ không?\n'
-                 '3. Lấy key miễn phí tại: https://console.groq.com\n'
-                 '4. Kiểm tra logs tại Render dashboard';
-        }
-        
-        return '❌ Server trả về định dạng không hợp lệ.\n\n'
-               'Vui lòng kiểm tra backend logs!';
+        return '❌ Server trả về định dạng không hợp lệ';
       }
 
-      // ✅ Parse JSON response
       dynamic jsonData;
       try {
         jsonData = jsonDecode(response.body);
       } catch (e) {
-        print('[AIAssistant] ❌ Lỗi parse JSON: $e');
-        return '❌ Không thể đọc phản hồi từ server.';
+        return '❌ Không thể đọc phản hồi từ server';
       }
 
-      // ✅ Xử lý response thành công
       if (response.statusCode == 200) {
         if (jsonData['message'] != null && jsonData['message'].toString().trim().isNotEmpty) {
           String aiResponse = jsonData['message'];
+          String provider = jsonData['provider'] ?? 'unknown';
           
-          // Log usage
-          if (jsonData['usage'] != null) {
-            print('[AIAssistant] Token usage: ${jsonData['usage']}');
-          }
+          print('[AIAssistant] ✅ Response from $provider');
           
           return aiResponse.trim();
         } else {
           return '❌ Server trả về response rỗng';
         }
-      } 
-      // ✅ Xử lý error response
-      else {
-        print('[AIAssistant] Error: ${response.statusCode} - $jsonData');
+      } else {
+        String errorMsg = jsonData['error']?.toString() ?? 'Xin lỗi, đã xảy ra lỗi';
         
-        String errorMsg = 'Xin lỗi, đã xảy ra lỗi';
-        
-        if (jsonData['error'] != null) {
-          errorMsg = jsonData['error'].toString();
-          
-          // Hướng dẫn fix
-          if (errorMsg.contains('API key')) {
-            errorMsg += '\n\n💡 Lấy API key MIỄN PHÍ tại:\n'
-                       'https://console.groq.com/keys\n\n'
-                       'Không cần credit card! 🎉';
-          } else if (errorMsg.contains('429')) {
-            errorMsg += '\n\n⏳ Đã hết quota miễn phí.\n'
-                       'Đợi 1 phút hoặc tạo account mới.';
-          }
+        if (errorMsg.contains('API key')) {
+          errorMsg += '\n\n💡 Vào Render Dashboard để set API key:\n'
+                     '- Gemini: https://aistudio.google.com/apikey\n'
+                     '- Groq: https://console.groq.com/keys (MIỄN PHÍ)';
         }
         
         return '❌ $errorMsg';
@@ -165,17 +141,26 @@ Response format:
       
       if (e is TimeoutException) {
         return '⏱️ Server đang khởi động (60-120s).\n\n'
-               '💡 Mở browser: https://buddy-budget-system-backend.onrender.com/health';
+               'Mở: https://buddy-budget-system-backend.onrender.com/health';
       } else if (e.toString().contains('SocketException')) {
-        return '🔌 Không thể kết nối với server.\n\n'
-               'Kiểm tra kết nối mạng!';
+        return '🔌 Không thể kết nối với server';
       } else {
         return '❌ Lỗi: ${e.toString()}';
       }
     }
   }
 
-  // Warm up server
+  static void setProvider(String provider) {
+    if (provider == PROVIDER_AUTO || 
+        provider == PROVIDER_GEMINI || 
+        provider == PROVIDER_GROQ) {
+      _currentProvider = provider;
+      print('[AIAssistant] Switched to provider: $provider');
+    }
+  }
+
+  static String getCurrentProvider() => _currentProvider;
+
   Future<bool> warmUpServer() async {
     try {
       print('[AIAssistant] 🔥 Warming up server...');
@@ -189,11 +174,9 @@ Response format:
         
         try {
           final data = jsonDecode(response.body);
-          print('[AIAssistant] Groq configured: ${data['groqConfigured']}');
-          
-          if (data['groqConfigured'] == false) {
-            print('[AIAssistant] ⚠️ GROQ_API_KEY chưa được cấu hình!');
-          }
+          print('[AIAssistant] Gemini: ${data['geminiConfigured']}');
+          print('[AIAssistant] Groq: ${data['groqConfigured']}');
+          print('[AIAssistant] Mode: ${data['mode']}');
         } catch (e) {
           print('[AIAssistant] Could not parse health check');
         }
@@ -207,19 +190,15 @@ Response format:
     }
   }
 
-  // Test connection
-  Future<Map<String, dynamic>> testConnection() async {
+  Future<Map<String, dynamic>> testGemini() async {
     try {
-      print('[AIAssistant] 🧪 Testing Groq connection...');
-      
       final response = await http.get(
-        Uri.parse('$BACKEND_URL/api/test-groq'),
+        Uri.parse('$BACKEND_URL/api/test-gemini'),
         headers: {'Accept': 'application/json'},
       ).timeout(Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('[AIAssistant] ✅ Groq test successful!');
         return {
           'success': true,
           'message': data['message'] ?? 'OK',
@@ -240,18 +219,35 @@ Response format:
     }
   }
 
-  // Switch model
-  static void switchModel(int index) {
-    if (index >= 0 && index < MODELS.length) {
-      _currentModelIndex = index;
-      print('[AIAssistant] Switched to model: ${MODELS[index]}');
+  Future<Map<String, dynamic>> testGroq() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$BACKEND_URL/api/test-groq'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          'success': true,
+          'message': data['message'] ?? 'OK',
+          'testResponse': data['testResponse'] ?? '',
+        };
+      } else {
+        final error = jsonDecode(response.body);
+        return {
+          'success': false,
+          'error': error['error'] ?? 'Unknown error',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
     }
   }
 
-  static String getCurrentModelName() => MODELS[_currentModelIndex];
-  static List<String> getAvailableModels() => MODELS;
-
-  // Quick actions
   Future<String> getSpendingAnalysis() => sendMessage('Phân tích chi tiêu của tôi tháng này');
   Future<String> getBudgetAdvice() => sendMessage('Tôi có đang chi tiêu quá ngân sách không?');
   Future<String> getSavingSuggestions() => sendMessage('Làm thế nào để tôi tiết kiệm được nhiều hơn?');

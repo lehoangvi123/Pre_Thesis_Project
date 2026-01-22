@@ -1,15 +1,58 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 
+// ✅ NEW: Custom formatter for thousand separator
+class ThousandsSeparatorInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+
+    // Remove all dots first
+    String newText = newValue.text.replaceAll('.', '');
+
+    // Format with dots
+    String formatted = _formatWithDots(newText);
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+
+  String _formatWithDots(String value) {
+    if (value.isEmpty) return '';
+    
+    // Reverse the string to add dots from right to left
+    String reversed = value.split('').reversed.join('');
+    String result = '';
+    
+    for (int i = 0; i < reversed.length; i++) {
+      if (i > 0 && i % 3 == 0) {
+        result += '.';
+      }
+      result += reversed[i];
+    }
+    
+    // Reverse back
+    return result.split('').reversed.join('');
+  }
+}
+
 class AddExpenseView extends StatefulWidget {
-  final String? initialType; // 'income' or 'expense'
-  final String? categoryName; // Pre-selected category
+  final String? initialType;
+  final String? categoryName;
   final IconData? categoryIcon;
   final Color? categoryColor;
-  final bool hideToggle; // ✅ NEW: Hide Income/Expense toggle
+  final bool hideToggle;
   
   const AddExpenseView({
     Key? key, 
@@ -17,7 +60,7 @@ class AddExpenseView extends StatefulWidget {
     this.categoryName,
     this.categoryIcon,
     this.categoryColor,
-    this.hideToggle = false, // ✅ Default: show toggle
+    this.hideToggle = false,
   }) : super(key: key);
 
   @override
@@ -30,12 +73,11 @@ class _AddExpenseViewState extends State<AddExpenseView> {
   final _titleController = TextEditingController();
   final _noteController = TextEditingController();
   
-  String transactionType = 'expense'; // 'income' or 'expense'
+  String transactionType = 'expense';
   String? selectedCategory;
   DateTime selectedDate = DateTime.now();
   bool isLoading = false;
   
-  // Categories
   final List<Map<String, dynamic>> expenseCategories = [
     {'name': 'Food', 'icon': Icons.restaurant},
     {'name': 'Transport', 'icon': Icons.directions_car},
@@ -60,7 +102,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
     super.initState();
     transactionType = widget.initialType ?? 'expense';
     
-    // ✅ Auto-detect type from category name
     if (widget.categoryName != null) {
       final incomeCategories = ['Salary', 'Business', 'Investment', 'Gift', 'Freelance'];
       
@@ -70,7 +111,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
         transactionType = 'expense';
       }
       
-      // Pre-select category
       selectedCategory = widget.categoryName;
     }
   }
@@ -83,9 +123,14 @@ class _AddExpenseViewState extends State<AddExpenseView> {
     super.dispose();
   }
 
-  // ✅ NEW: VALIDATE BALANCE
+  // ✅ HELPER: Parse amount from formatted string
+  double _parseAmount(String formattedAmount) {
+    // Remove dots and parse
+    String cleaned = formattedAmount.replaceAll('.', '');
+    return double.tryParse(cleaned) ?? 0;
+  }
+
   Future<bool> _validateBalance(double amount) async {
-    // Income doesn't need validation
     if (transactionType != 'expense') {
       return true;
     }
@@ -93,7 +138,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
     try {
       String userId = FirebaseAuth.instance.currentUser!.uid;
       
-      // Get current balance
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
@@ -102,7 +146,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
       var userData = userDoc.data() as Map<String, dynamic>? ?? {};
       double currentBalance = (userData['balance'] ?? 0).toDouble();
       
-      // ✅ CHECK: Enough money?
       if (amount > currentBalance) {
         _showInsufficientFundsDialog(currentBalance, amount);
         return false;
@@ -115,7 +158,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
     }
   }
 
-  // ✅ NEW: SHOW ERROR DIALOG
   void _showInsufficientFundsDialog(double balance, double amount) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
@@ -127,7 +169,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
           borderRadius: BorderRadius.circular(20),
         ),
         
-        // Title with icon
         title: Row(
           children: [
             Container(
@@ -147,7 +188,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
           ],
         ),
         
-        // Content
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,7 +202,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
             ),
             const SizedBox(height: 16),
             
-            // Balance info card
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -174,7 +213,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
               ),
               child: Column(
                 children: [
-                  // Current balance
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -194,7 +232,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                   ),
                   const SizedBox(height: 8),
                   
-                  // Requested amount
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -214,7 +251,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                   ),
                   const Divider(height: 24),
                   
-                  // Shortage
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -242,7 +278,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
           ],
         ),
         
-        // Actions
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -253,16 +288,10 @@ class _AddExpenseViewState extends State<AddExpenseView> {
     );
   }
 
-  // ✅ NEW: FORMAT CURRENCY
   String _formatCurrency(double amount) {
-    if (amount >= 1000000000) {
-      return '${(amount / 1000000000).toStringAsFixed(1)}B₫';
-    } else if (amount >= 1000000) {
-      return '${(amount / 1000000).toStringAsFixed(1)}M₫';
-    } else if (amount >= 1000) {
-      return '${(amount / 1000).toStringAsFixed(0)}K₫';
-    }
-    return '${amount.toStringAsFixed(0)}₫';
+    // ✅ Format with thousand separator
+    final formatter = NumberFormat('#,###', 'vi_VN');
+    return '${formatter.format(amount)}₫';
   }
 
   Future<void> _saveTransaction() async {
@@ -275,22 +304,20 @@ class _AddExpenseViewState extends State<AddExpenseView> {
       return;
     }
 
-    // ✅ Prevent double-tap
     if (isLoading) return;
 
-    // Parse amount
+    // ✅ Parse amount from formatted string
     double amount;
     try {
-      amount = double.parse(_amountController.text.trim()).abs(); // ✅ Always positive
+      amount = _parseAmount(_amountController.text.trim()).abs();
     } catch (e) {
       _showErrorSnackBar('Invalid amount');
       return;
     }
 
-    // ✅ VALIDATE BALANCE (NEW!)
     bool canProceed = await _validateBalance(amount);
     if (!canProceed) {
-      return; // Stop if not enough money
+      return;
     }
 
     setState(() {
@@ -301,9 +328,7 @@ class _AddExpenseViewState extends State<AddExpenseView> {
       String userId = FirebaseAuth.instance.currentUser!.uid;
       String transactionId = const Uuid().v4();
 
-      // ✅ OPTIMIZED: Use Firestore Transaction for atomic update
       await FirebaseFirestore.instance.runTransaction((transaction) async {
-        // 1. Get user document
         DocumentSnapshot userDoc = await transaction.get(
           FirebaseFirestore.instance.collection('users').doc(userId)
         );
@@ -312,7 +337,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
         double currentIncome = (userData['totalIncome'] ?? 0).toDouble();
         double currentExpense = (userData['totalExpense'] ?? 0).toDouble();
 
-        // 2. Calculate new values
         double newIncome = currentIncome;
         double newExpense = currentExpense;
 
@@ -324,7 +348,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
 
         double newBalance = newIncome - newExpense;
 
-        // 3. Add transaction document
         transaction.set(
           FirebaseFirestore.instance
               .collection('users')
@@ -343,7 +366,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
           },
         );
 
-        // 4. Update user totals
         transaction.update(
           FirebaseFirestore.instance.collection('users').doc(userId),
           {
@@ -357,7 +379,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
 
       if (mounted) {
         _showSuccessSnackBar('Transaction added successfully!');
-        // ✅ Small delay for better UX
         await Future.delayed(const Duration(milliseconds: 300));
         Navigator.pop(context, true);
       }
@@ -435,7 +456,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
       ),
       body: Column(
         children: [
-          // ✅ Type Toggle - ONLY show if hideToggle = false AND no categoryName
           if (!widget.hideToggle && widget.categoryName == null)
             Padding(
               padding: const EdgeInsets.all(20),
@@ -508,7 +528,6 @@ class _AddExpenseViewState extends State<AddExpenseView> {
               ),
             ),
           
-          // Form Container
           Expanded(
             child: Container(
               decoration: BoxDecoration(
@@ -562,7 +581,7 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                       ),
                       const SizedBox(height: 20),
                       
-                      // Category - Show as read-only if pre-selected
+                      // Category
                       widget.categoryName == null
                           ? Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -667,9 +686,9 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                                 ),
                               ],
                             ),
-                      const SizedBox(height: 20), 
+                      const SizedBox(height: 20),
                       
-                      // Amount
+                      // ✅ Amount - WITH THOUSAND SEPARATOR
                       Text(
                         'Amount',
                         style: TextStyle(
@@ -685,8 +704,13 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                           fontSize: 16,
                           color: isDark ? Colors.white : Colors.black,
                         ),
+                        // ✅ ADD FORMATTER HERE
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          ThousandsSeparatorInputFormatter(),
+                        ],
                         decoration: InputDecoration(
-                          hintText: '0.00',
+                          hintText: '0',
                           hintStyle: TextStyle(
                             color: isDark ? Colors.grey[600] : Colors.grey[400],
                           ),
@@ -706,11 +730,10 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                           if (value == null || value.isEmpty) {
                             return 'Please enter amount';
                           }
-                          if (double.tryParse(value) == null) {
-                            return 'Please enter valid number';
-                          }
-                          if (double.parse(value) <= 0) {
-                            return 'Amount must be greater than 0';
+                          // ✅ Parse formatted value
+                          double? amount = _parseAmount(value);
+                          if (amount == null || amount <= 0) {
+                            return 'Please enter valid amount';
                           }
                           return null;
                         },
@@ -753,7 +776,7 @@ class _AddExpenseViewState extends State<AddExpenseView> {
                       ),
                       const SizedBox(height: 20),
                       
-                      // Enter Message (Optional)
+                      // Enter Message
                       Text(
                         'Enter Message (Optional)',
                         style: TextStyle(
