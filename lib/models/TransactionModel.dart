@@ -13,7 +13,7 @@ class TransactionModel {
   final DateTime createdAt;
   final String? iconName;
   final String? colorHex;
-  final bool isIncome; // ✅ sửa thành bool
+  final bool isIncome; // ✅ sửa thành bool 
 
   TransactionModel({
     required this.id,
@@ -93,7 +93,7 @@ class TransactionModel {
       createdAt: createdAt,
       iconName: iconName,
       colorHex: colorHex,
-      isIncome: isIncome ?? this.isIncome,
+      isIncome: isIncome ?? this.isIncome, 
     );
   }
 }

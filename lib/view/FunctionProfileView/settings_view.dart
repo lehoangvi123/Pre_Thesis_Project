@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../ThemeProvider/ThemeProviderDark.dart'; 
 import '../FunctionProfileView/AboutUs.dart'; 
 import './TermOfCondition.dart'; 
-import './PrivacyPolicy.dart';
+import './PrivacyPolicy.dart';  
 
 class SettingsView extends StatefulWidget {
   const SettingsView({Key? key}) : super(key: key);
@@ -16,12 +16,12 @@ class SettingsView extends StatefulWidget {
 class _SettingsViewState extends State<SettingsView> {
   bool pushNotifications = true;
   bool emailNotifications = false;
-  bool budgetAlerts = true;
+  bool budgetAlerts = true; 
   bool expenseReminders = true;
 
   @override
   void initState() {
-    super.initState();
+    super.initState(); 
     _loadSettings();
   }
 
