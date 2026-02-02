@@ -34,7 +34,13 @@ android {
         
         versionCode = flutter.versionCode
         versionName = flutter.versionName 
-        multiDexEnabled = true
+        multiDexEnabled = true 
+
+
+        minSdk = flutter.minSdkVersion  // ✅ ĐÚNG
+        ndk {
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))  // ✅ ĐÚNG
+        }
     }
 
     buildTypes {
