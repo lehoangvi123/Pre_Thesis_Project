@@ -9,8 +9,8 @@ android {
     namespace = "com.example.project1"
     
     // ⭐ SỬA: Tăng compileSdk lên 34 (từ flutter.compileSdkVersion)
-    compileSdk = 36
-    ndkVersion = flutter.ndkVersion
+    compileSdk = 36  
+    ndkVersion = flutter.ndkVersion 
 
     // ⭐ SỬA: Nâng Java lên VERSION_17 (từ VERSION_11)
     compileOptions {
@@ -29,7 +29,7 @@ android {
         // ⭐ SỬA: Đảm bảo minSdk >= 21
         minSdk = flutter.minSdkVersion
         
-        // ⭐ SỬA: Tăng targetSdk lên 34
+        // ⭐ SỬA: Tăng targetSdk lên 34  
         targetSdk = 34
         
         versionCode = flutter.versionCode
