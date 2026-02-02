@@ -10,24 +10,27 @@ class BillScannerServiceSimple {
   final ImagePicker _picker = ImagePicker();
 
   /// Chụp ảnh từ camera
-  Future<File?> captureImage() async {
-    try {
-      final XFile? photo = await _picker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 85,
-        maxWidth: 1920,
-        maxHeight: 1920,
-      );
+ Future<File?> captureImage({
+  CameraDevice preferredCamera = CameraDevice.rear, // ✅ THÊM parameter
+}) async {
+  try {
+    final XFile? photo = await _picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 85,
+      maxWidth: 1920,
+      maxHeight: 1920,
+      preferredCameraDevice: preferredCamera, // ✅ THÊM dòng này
+    );
 
-      if (photo != null) {
-        return File(photo.path);
-      }
-      return null;
-    } catch (e) {
-      print('Error capturing image: $e');
-      return null;
+    if (photo != null) {
+      return File(photo.path);
     }
+    return null;
+  } catch (e) {
+    print('Error capturing image: $e');
+    return null;
   }
+}
 
   /// Chọn ảnh từ thư viện
   Future<File?> pickImageFromGallery() async {

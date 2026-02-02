@@ -3,6 +3,7 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import './Bill_scanner_service.dart';
 import './Bill_scanner_model.dart';
 import './Bill_manual_entry_view.dart';
@@ -16,14 +17,17 @@ class BillScannerViewSimple extends StatefulWidget {
 
 class _BillScannerViewSimpleState extends State<BillScannerViewSimple> {
   final BillScannerServiceSimple _scannerService = BillScannerServiceSimple();
-  bool _isLoading = false;
+  bool _isLoading = false; 
+  CameraDevice _selectedCamera = CameraDevice.rear;
 
   Future<void> _captureAndAddItems() async {
     setState(() => _isLoading = true);
 
     try {
       // Chụp ảnh
-      final imageFile = await _scannerService.captureImage();
+      final imageFile = await _scannerService.captureImage(
+  preferredCamera: _selectedCamera, // ✅ THÊM parameter
+);
       
       if (imageFile == null) {
         setState(() => _isLoading = false);
@@ -95,9 +99,19 @@ class _BillScannerViewSimpleState extends State<BillScannerViewSimple> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Thêm Bill'),
-        backgroundColor: const Color(0xFF00D09E),
+  title: const Text('Thêm Bill'),
+  backgroundColor: const Color(0xFF00D09E),
+  actions: [
+    IconButton(
+      icon: Icon(
+        _selectedCamera == CameraDevice.rear
+            ? Icons.camera_rear
+            : Icons.camera_front,
       ),
+      onPressed: _toggleCamera,
+    ),
+  ],
+),
       body: _isLoading ? _buildLoadingView() : _buildMainView(),
     );
   }
@@ -218,5 +232,24 @@ class _BillScannerViewSimpleState extends State<BillScannerViewSimple> {
         ],
       ),
     );
-  }
+  } 
+
+  void _toggleCamera() {
+  setState(() {
+    _selectedCamera = _selectedCamera == CameraDevice.rear
+        ? CameraDevice.front
+        : CameraDevice.rear;
+  });
+  
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        _selectedCamera == CameraDevice.front
+            ? '📷 Camera trước'
+            : '📷 Camera sau',
+      ),
+      duration: const Duration(seconds: 1),
+    ),
+  );
+}
 }
