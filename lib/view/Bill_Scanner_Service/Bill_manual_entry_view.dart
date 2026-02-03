@@ -1,11 +1,12 @@
 // lib/view/Bill_Scanner_Service/bill_manual_entry_view.dart
-// Màn hình nhập thủ công các món trong bill - VERSION CÓ OCR TỰ ĐỘNG
+// Màn hình nhập thủ công các món trong bill - FINAL VERSION
 
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import './Bill_scanner_model.dart';
-import 'package:flutter_tesseract_ocr/flutter_tesseract_ocr.dart';
 
 class BillManualEntryView extends StatefulWidget {
   final File billImage;
@@ -28,10 +29,6 @@ class _BillManualEntryViewState extends State<BillManualEntryView> {
   final _storeNameController = TextEditingController();
   final NumberFormat _currencyFormat = NumberFormat('#,###', 'vi_VN');
 
-  // ✅ OCR State
-  bool _isScanning = false;
-  bool _hasScanned = false;
-
   // ✅ Quick Add Suggestions (món ăn phổ biến Việt Nam)
   final List<Map<String, dynamic>> _quickSuggestions = [
     {'name': 'Cà phê', 'price': 45000, 'icon': '☕'},
@@ -42,14 +39,11 @@ class _BillManualEntryViewState extends State<BillManualEntryView> {
     {'name': 'Bún bò', 'price': 45000, 'icon': '🍲'},
     {'name': 'Nước ép', 'price': 30000, 'icon': '🥤'},
     {'name': 'Bánh ngọt', 'price': 35000, 'icon': '🍰'},
+    {'name': 'Sinh tố', 'price': 30000, 'icon': '🍹'},
+    {'name': 'Mì Ý', 'price': 65000, 'icon': '🍝'},
+    {'name': 'Pizza', 'price': 120000, 'icon': '🍕'},
+    {'name': 'Burger', 'price': 55000, 'icon': '🍔'},
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    // ✅ TỰ ĐỘNG QUÉT KHI VÀO MÀN HÌNH
-    _autoScanBill();
-  }
 
   @override
   void dispose() {
@@ -60,140 +54,6 @@ class _BillManualEntryViewState extends State<BillManualEntryView> {
   }
 
   double get _totalAmount => _items.fold(0, (sum, item) => sum + item.totalPrice);
-
-  // ==================== OCR METHODS ====================
-
-  // ✅ TỰ ĐỘNG QUÉT BILL
-  Future<void> _autoScanBill() async {
-    if (_hasScanned) return;
-    
-    setState(() => _isScanning = true);
-
-    try {
-      // Quét text từ ảnh
-      String text = await FlutterTesseractOcr.extractText(
-        widget.billImage.path,
-        language: 'eng+vie', // Hỗ trợ tiếng Anh và tiếng Việt
-        args: {
-          "preserve_interword_spaces": "1",
-        },
-      );
-
-      print('🔍 OCR Result: $text'); // Debug
-
-      // Parse text thành items
-      final extractedItems = _parseTextToItems(text);
-
-      if (extractedItems.isNotEmpty) {
-        setState(() {
-          _items = extractedItems;
-          _hasScanned = true;
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Text('✅ Quét thành công ${_items.length} món!'),
-                ],
-              ),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-      } else {
-        setState(() => _hasScanned = true);
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('⚠️ Không tìm thấy món nào. Vui lòng nhập thủ công.'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      print('❌ OCR Error: $e');
-      setState(() => _hasScanned = true);
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Không thể quét. Vui lòng nhập thủ công.'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isScanning = false);
-      }
-    }
-  }
-
-  // ✅ PARSE TEXT THÀNH ITEMS
-  List<BillItem> _parseTextToItems(String text) {
-    final List<BillItem> items = [];
-    final lines = text.split('\n');
-
-    // Regex tìm giá tiền (VD: 45,000 hoặc 45.000 hoặc 45000)
-    final pricePattern = RegExp(
-      r'(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)',
-      caseSensitive: false,
-    );
-
-    for (final line in lines) {
-      if (line.trim().isEmpty) continue;
-
-      final priceMatch = pricePattern.firstMatch(line);
-      
-      if (priceMatch != null) {
-        try {
-          // Lấy giá
-          String priceStr = priceMatch.group(1)!;
-          priceStr = priceStr.replaceAll('.', '').replaceAll(',', '');
-          
-          final price = double.tryParse(priceStr);
-          
-          // Chỉ lấy nếu giá >= 1000
-          if (price != null && price >= 1000) {
-            // Lấy tên món (phần còn lại của dòng)
-            String itemName = line
-                .replaceFirst(priceMatch.group(0)!, '')
-                .trim();
-            
-            // Làm sạch tên
-            itemName = itemName.replaceAll(RegExp(r'^[-*•\d\s.]+'), '');
-            itemName = itemName.replaceAll(RegExp(r'[xX]\s*\d+$'), '');
-            itemName = itemName.trim();
-
-            if (itemName.isNotEmpty && itemName.length > 2) {
-              // Viết hoa chữ đầu
-              if (itemName.isNotEmpty) {
-                itemName = itemName[0].toUpperCase() + 
-                          itemName.substring(1).toLowerCase();
-              }
-
-              items.add(BillItem(name: itemName, price: price));
-              print('✅ Found: $itemName - $price'); // Debug
-            }
-          }
-        } catch (e) {
-          print('⚠️ Parse error for line: $line - $e');
-          continue;
-        }
-      }
-    }
-
-    return items;
-  }
 
   // ==================== ITEM MANAGEMENT METHODS ====================
 
@@ -356,8 +216,8 @@ class _BillManualEntryViewState extends State<BillManualEntryView> {
     );
   }
 
-  // ✅ Save transactions
-  void _saveTransactions() {
+  // ✅ Save transactions to Firebase
+  Future<void> _saveTransactions() async {
     if (_items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -368,16 +228,115 @@ class _BillManualEntryViewState extends State<BillManualEntryView> {
       return;
     }
 
-    // TODO: Integrate với TransactionProvider
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('✅ Đã lưu ${_items.length} giao dịch'),
-        backgroundColor: Colors.green,
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF00D09E)),
       ),
     );
 
-    Navigator.pop(context); // Back to scanner
-    Navigator.pop(context); // Back to transaction
+    try {
+      // Get current user
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('Chưa đăng nhập');
+      }
+
+      // Get store name
+      final storeName = _storeNameController.text.isEmpty 
+          ? 'Bill' 
+          : _storeNameController.text;
+
+      // Save each item as a transaction
+      for (final item in _items) {
+        // Create transaction data
+        final transactionData = {
+          'userId': user.uid,
+          'amount': item.price,
+          'category': 'Food & Dining',
+          'type': 'expense',
+          'date': Timestamp.now(),
+          'title': item.name,
+          'note': storeName,
+          'createdAt': Timestamp.now(),
+        };
+
+        // Add to Firestore
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('transactions')
+            .add(transactionData);
+
+        // Update user balance
+        await _updateUserBalance(user.uid, item.price);
+      }
+
+      // Close loading
+      if (mounted) Navigator.pop(context);
+
+      // Show success
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text('✅ Đã lưu ${_items.length} giao dịch thành công!'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Navigate back
+      if (mounted) {
+        Navigator.pop(context); // Back to scanner
+        Navigator.pop(context); // Back to transaction view
+      }
+      
+    } catch (e) {
+      // Close loading
+      if (mounted) Navigator.pop(context);
+      
+      // Show error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Lỗi: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  // ✅ Update user balance
+  Future<void> _updateUserBalance(String userId, double amount) async {
+    final userRef = FirebaseFirestore.instance.collection('users').doc(userId);
+    
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      final userDoc = await transaction.get(userRef);
+      
+      if (userDoc.exists) {
+        final data = userDoc.data();
+        final currentBalance = (data?['balance'] ?? 0.0).toDouble();
+        final currentExpense = (data?['totalExpense'] ?? 0.0).toDouble();
+        
+        transaction.update(userRef, {
+          'balance': currentBalance - amount,
+          'totalExpense': currentExpense + amount,
+        });
+      }
+    });
   }
 
   // ==================== UI BUILD METHODS ====================
@@ -389,19 +348,6 @@ class _BillManualEntryViewState extends State<BillManualEntryView> {
         title: const Text('Nhập Thông Tin Bill'),
         backgroundColor: const Color(0xFF00D09E),
         actions: [
-          // ✅ NÚT QUÉT LẠI
-          if (_hasScanned)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () {
-                setState(() {
-                  _hasScanned = false;
-                  _items.clear();
-                });
-                _autoScanBill();
-              },
-              tooltip: 'Quét lại',
-            ),
           if (_items.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep),
@@ -416,137 +362,20 @@ class _BillManualEntryViewState extends State<BillManualEntryView> {
             ),
         ],
       ),
-      body: _isScanning ? _buildScanningView() : _buildMainView(),
-    );
-  }
-
-  // ✅ LOADING VIEW KHI ĐANG QUÉT
-  Widget _buildScanningView() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      body: Column(
         children: [
-          const SizedBox(
-            width: 70,
-            height: 70,
-            child: CircularProgressIndicator(
-              color: Color(0xFF00D09E),
-              strokeWidth: 6,
-            ),
-          ),
-          const SizedBox(height: 32),
-          const Text(
-            '🤖 AI đang quét bill...',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Vui lòng đợi 2-5 giây',
-            style: TextStyle(color: Colors.grey, fontSize: 14),
-          ),
-          const SizedBox(height: 24),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 40),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue[50],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue[200]!),
-            ),
-            child: const Column(
-              children: [
-                Icon(Icons.info_outline, color: Colors.blue, size: 24),
-                SizedBox(height: 8),
-                Text(
-                  'Đang phân tích ảnh bill\nvà trích xuất thông tin...',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: Colors.blue),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMainView() {
-    return Column(
-      children: [
-        _buildImagePreview(),
-        
-        // ✅ KẾT QUẢ QUÉT
-        if (_hasScanned && _items.isNotEmpty)
-          _buildScanResultBanner(),
-        
-        _buildStoreNameInput(),
-        if (_items.length < 5) _buildQuickAddSection(),
-        _buildAddItemForm(),
-        Expanded(
-          child: _items.isEmpty ? _buildEmptyState() : _buildItemsList(),
-        ),
-        _buildBottomSection(),
-      ],
-    );
-  }
-
-  // ✅ BANNER THÔNG BÁO KẾT QUẢ QUÉT
-  Widget _buildScanResultBanner() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.green[50]!, Colors.green[100]!],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green[300]!, width: 2),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.green,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.check,
-              color: Colors.white,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
+          _buildImagePreview(),
+          _buildStoreNameInput(),
+          if (_items.length < 8) _buildQuickAddSection(),
+          _buildAddItemForm(),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '✨ AI đã quét xong!',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: Colors.green,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Tìm thấy ${_items.length} món. Kiểm tra và chỉnh sửa nếu cần.',
-                  style: const TextStyle(fontSize: 12, color: Colors.black87),
-                ),
-              ],
-            ),
+            child: _items.isEmpty ? _buildEmptyState() : _buildItemsList(),
           ),
+          _buildBottomSection(),
         ],
       ),
     );
   }
-
-  // ==================== OTHER UI COMPONENTS ====================
-  // (Giữ nguyên tất cả các widget builders khác từ file gốc)
 
   Widget _buildImagePreview() {
     return GestureDetector(
@@ -554,14 +383,17 @@ class _BillManualEntryViewState extends State<BillManualEntryView> {
         showDialog(
           context: context,
           builder: (context) => Dialog(
+            backgroundColor: Colors.transparent,
             child: Stack(
               children: [
-                Image.file(widget.billImage, fit: BoxFit.contain),
+                Center(
+                  child: Image.file(widget.billImage, fit: BoxFit.contain),
+                ),
                 Positioned(
                   top: 10,
                   right: 10,
                   child: IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
+                    icon: const Icon(Icons.close, color: Colors.white, size: 30),
                     onPressed: () => Navigator.pop(context),
                     style: IconButton.styleFrom(
                       backgroundColor: Colors.black54,
