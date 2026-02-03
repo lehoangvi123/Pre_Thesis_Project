@@ -285,7 +285,7 @@ class _TransactionViewState extends State<TransactionView> {
               isDark: isDark,
               icon: Icons.receipt_long,
               iconColor: Colors.orange,
-              title: 'Chụp Ảnh Bill',
+              title: 'Chụp Ảnh Bill (đang trong quá trình phát triển)',
               subtitle: 'Chụp hóa đơn và thêm giao dịch nhanh chóng',
               onTap: () {
                 Navigator.pop(context); // Close bottom sheet
