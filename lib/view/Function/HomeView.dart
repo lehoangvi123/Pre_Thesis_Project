@@ -6,7 +6,10 @@ import '../notification/NotificationView.dart';
 import './AnalysisView.dart'; 
 import './Transaction.dart'; 
 import './CategorizeContent.dart'; 
-import './ProfileView.dart';
+import './ProfileView.dart'; 
+import './gamification_widgets.dart'; 
+import '../Achivement/Achievement_model.dart'; 
+import '../Achivement/Achievement_view.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({Key? key}) : super(key: key);
@@ -81,7 +84,11 @@ class _HomeViewState extends State<HomeView> {
               children: [
                 _buildHeader(),
                 const SizedBox(height: 24),
-                _buildBalanceCards(), // ✅ Now with real-time data
+                _buildBalanceCards(), // ✅ Now with real-time data 
+                // ✅ THÊM 3 DÒNG NÀY (Achievement cards)
+          const SizedBox(height: 16),
+          const AchievementProgressCard(),
+          const StreakTrackerCard(),
                 const SizedBox(height: 16),
                 _buildProgressBar(),
                 const SizedBox(height: 20),
