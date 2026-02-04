@@ -1,4 +1,4 @@
-// lib/widgets/gamification_widgets.dart
+// lib/view/Function/gamification_widgets.dart
 // Widgets để hiển thị gamification trong HomeView
 
 import 'package:flutter/material.dart';
@@ -6,6 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../Achivement/Achievement_service.dart';
 import '../Achivement/Achievement_view.dart';
 import '../Achivement/Achievement_model.dart';
+import './Streak_update/Login_streak_service.dart';
+
 // ✅ 1. ACHIEVEMENT PROGRESS CARD
 class AchievementProgressCard extends StatelessWidget {
   const AchievementProgressCard({Key? key}) : super(key: key);
@@ -367,7 +369,7 @@ class RecentAchievementsRow extends StatelessWidget {
   }
 }
 
-// ✅ 3. STREAK TRACKER
+// ✅ 3. STREAK TRACKER - UPDATED WITH LOGIN STREAK
 class StreakTrackerCard extends StatelessWidget {
   const StreakTrackerCard({Key? key}) : super(key: key);
 
@@ -378,19 +380,20 @@ class StreakTrackerCard extends StatelessWidget {
 
     if (user == null) return const SizedBox();
 
-    return FutureBuilder<Map<String, dynamic>>(
-      future: AchievementService().calculateProgress(user.uid),
+    return StreamBuilder<Map<String, int>>(
+      stream: LoginStreakService().streakStream(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const SizedBox();
         }
 
-        final progress = snapshot.data!;
-        final streakDays = progress['streakDays'] ?? 0;
+        final data = snapshot.data!;
+        final currentStreak = data['currentStreak'] ?? 0;
+        final maxStreak = data['maxStreak'] ?? 0;
 
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -402,63 +405,208 @@ class StreakTrackerCard extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: Colors.orange.withOpacity(0.3),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
-          child: Row(
+          child: Column(
             children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          '🔥',
+                          style: TextStyle(fontSize: 28),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Daily Login Streak',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Come back every day!',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Current & Max Streak
+              Row(
+                children: [
+                  // Current Streak
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '$currentStreak',
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            currentStreak == 1 ? 'day' : 'days',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Current',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Max Streak (Record)
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.amber.withOpacity(0.5),
+                          width: 2,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.emoji_events,
+                                color: Colors.amber,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$maxStreak',
+                                style: const TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            maxStreak == 1 ? 'day' : 'days',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withOpacity(0.4),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Best',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Motivational Text
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Text(
-                  '🔥',
-                  style: TextStyle(fontSize: 32),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
-                      'Current Streak',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white70,
-                      ),
+                    const Icon(
+                      Icons.info_outline,
+                      color: Colors.white,
+                      size: 16,
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Text(
-                          '$streakDays',
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        currentStreak >= maxStreak && currentStreak > 1
+                            ? '🎉 New record! Keep it up!'
+                            : currentStreak == 0
+                                ? 'Start your streak today!'
+                                : 'Come back tomorrow to continue!',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white,
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          streakDays == 1 ? 'day' : 'days',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Keep tracking expenses daily!',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withOpacity(0.8),
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ],

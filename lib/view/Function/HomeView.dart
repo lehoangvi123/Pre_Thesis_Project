@@ -1,15 +1,19 @@
-import 'package:firebase_auth/firebase_auth.dart'; 
-import 'package:cloud_firestore/cloud_firestore.dart'; 
-import 'package:flutter/material.dart'; 
-import '../login/LoginView.dart'; 
+// lib/view/HomeView.dart
+// COMPLETE VERSION - With Gamification & Login Streak
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import '../login/LoginView.dart';
 import '../notification/NotificationView.dart';
-import './AnalysisView.dart'; 
-import './Transaction.dart'; 
-import './CategorizeContent.dart'; 
-import './ProfileView.dart'; 
-import './gamification_widgets.dart'; 
-import '../Achivement/Achievement_model.dart'; 
+import './AnalysisView.dart';
+import './Transaction.dart';
+import './CategorizeContent.dart';
+import './ProfileView.dart';
+import './gamification_widgets.dart';
+import '../Achivement/Achievement_model.dart';
 import '../Achivement/Achievement_view.dart';
+import './Streak_update/Login_streak_service.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({Key? key}) : super(key: key);
@@ -19,22 +23,23 @@ class HomeView extends StatefulWidget {
 }
 
 class _HomeViewState extends State<HomeView> {
-  String selectedPeriod = 'Monthly'; 
-  String userName = 'User'; 
-  bool isLoadingUserName = true; 
+  String selectedPeriod = 'Monthly';
+  String userName = 'User';
+  bool isLoadingUserName = true;
   String? userId;
 
   @override
   void initState() {
-    super.initState(); 
+    super.initState();
     userId = FirebaseAuth.instance.currentUser?.uid;
     _loadUserName();
+    _checkLoginStreak(); // ✅ Check streak when app opens
   }
 
   Future<void> _loadUserName() async {
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
-      
+
       if (currentUser != null) {
         DocumentSnapshot userDoc = await FirebaseFirestore.instance
             .collection('users')
@@ -42,18 +47,23 @@ class _HomeViewState extends State<HomeView> {
             .get();
 
         if (userDoc.exists) {
-          Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
-          
+          Map<String, dynamic> userData =
+              userDoc.data() as Map<String, dynamic>;
+
           if (mounted) {
             setState(() {
-              userName = userData['name'] ?? currentUser.displayName ?? 'User';
+              userName = userData['name'] ??
+                  currentUser.displayName ??
+                  'User';
               isLoadingUserName = false;
             });
           }
         } else {
           if (mounted) {
             setState(() {
-              userName = currentUser.displayName ?? currentUser.email?.split('@')[0] ?? 'User';
+              userName = currentUser.displayName ??
+                  currentUser.email?.split('@')[0] ??
+                  'User';
               isLoadingUserName = false;
             });
           }
@@ -69,10 +79,46 @@ class _HomeViewState extends State<HomeView> {
     }
   }
 
+  // ✅ CHECK LOGIN STREAK
+  Future<void> _checkLoginStreak() async {
+    try {
+      final streakData = await LoginStreakService().checkAndUpdateStreak();
+      final currentStreak = streakData['currentStreak'] ?? 0;
+      final maxStreak = streakData['maxStreak'] ?? 0;
+
+      print('🔥 Streak updated! Current: $currentStreak, Max: $maxStreak');
+
+      // Show notification if streak increased
+      if (mounted && currentStreak > 1) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Text('🔥', style: TextStyle(fontSize: 20)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Login streak: $currentStreak days! Keep it up!',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange[600],
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error checking streak: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -84,11 +130,13 @@ class _HomeViewState extends State<HomeView> {
               children: [
                 _buildHeader(),
                 const SizedBox(height: 24),
-                _buildBalanceCards(), // ✅ Now with real-time data 
-                // ✅ THÊM 3 DÒNG NÀY (Achievement cards)
-          const SizedBox(height: 16),
-          const AchievementProgressCard(),
-          const StreakTrackerCard(),
+                _buildBalanceCards(),
+                
+                // ✅ GAMIFICATION WIDGETS
+                const SizedBox(height: 16),
+                const AchievementProgressCard(),
+                const StreakTrackerCard(),
+                
                 const SizedBox(height: 16),
                 _buildProgressBar(),
                 const SizedBox(height: 20),
@@ -96,33 +144,29 @@ class _HomeViewState extends State<HomeView> {
                 const SizedBox(height: 20),
                 _buildPeriodSelector(),
                 const SizedBox(height: 16),
-                _buildTransactionList(), // ✅ Now with real-time transactions
+                _buildTransactionList(),
               ],
             ),
           ),
-        ),  
-
-        
-      ), 
-      // ⭐ THÊM DÒNG NÀY - NÚT TEST VOICE
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: () {
-        Navigator.pushNamed(context, '/test-voice');
-      },
-      icon: Icon(Icons.mic),
-      label: Text('Test Voice'),
-      backgroundColor: Colors.deepPurple,
-      heroTag: 'testVoiceBtn',
-    ),
-    floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-    
-       bottomNavigationBar: _buildBottomNavBar(),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.pushNamed(context, '/test-voice');
+        },
+        icon: const Icon(Icons.mic),
+        label: const Text('Test Voice'),
+        backgroundColor: Colors.deepPurple,
+        heroTag: 'testVoiceBtn',
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      bottomNavigationBar: _buildBottomNavBar(),
     );
   }
 
   Widget _buildHeader() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -176,7 +220,9 @@ class _HomeViewState extends State<HomeView> {
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.red[900]?.withOpacity(0.3) : Colors.red[50],
+                  color: isDark
+                      ? Colors.red[900]?.withOpacity(0.3)
+                      : Colors.red[50],
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -194,7 +240,7 @@ class _HomeViewState extends State<HomeView> {
 
   void _showLogoutDialog() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -257,78 +303,72 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  // ✅ LAYOUT MỚI: Income + Expense trên, Balance dưới
-Widget _buildBalanceCards() {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  
-  if (userId == null) {
-    return const Center(child: Text('Please login'));
-  }
-  
-  return StreamBuilder<DocumentSnapshot>(
-    stream: FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
-        .snapshots(),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      
-      if (!snapshot.hasData || !snapshot.data!.exists) {
-        return _buildEmptyBalanceCards(isDark);
-      }
-      
-      var userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
-      double balance = (userData['balance'] ?? 0).toDouble();
-      double totalIncome = (userData['totalIncome'] ?? 0).toDouble();
-      double totalExpense = (userData['totalExpense'] ?? 0).toDouble();
-      
-      return Column(
-        children: [
-          // ✅ HÀNG 1: Income + Expense
-          Row(
-            children: [
-              // Total Income (Xanh lá)
-              Expanded(
-                child: _buildBalanceCard(
-                  icon: Icons.trending_up,
-                  label: 'Total Income',
-                  amount: totalIncome,
-                  color: Colors.green[600]!, // Xanh lá
-                  isDark: isDark,
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Total Expense (Đỏ)
-              Expanded(
-                child: _buildBalanceCard(
-                  icon: Icons.trending_down,
-                  label: 'Total Expenses',
-                  amount: totalExpense,
-                  color: Colors.red[600]!, // Đỏ
-                  isDark: isDark,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // ✅ HÀNG 2: Balance (Xanh dương - Full width)
-          _buildBalanceCard(
-            icon: Icons.account_balance_wallet_outlined,
-            label: 'Total Balance',
-            amount: balance,
-            color: Colors.blue[600]!, // Xanh dương
-            isDark: isDark,
-            isFullWidth: true,
-          ),
-        ],
-      );
-    },
-  );
-}
+  Widget _buildBalanceCards() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-  // ✅ Helper method để build balance card
+    if (userId == null) {
+      return const Center(child: Text('Please login'));
+    }
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return _buildEmptyBalanceCards(isDark);
+        }
+
+        var userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
+        double balance = (userData['balance'] ?? 0).toDouble();
+        double totalIncome = (userData['totalIncome'] ?? 0).toDouble();
+        double totalExpense = (userData['totalExpense'] ?? 0).toDouble();
+
+        return Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _buildBalanceCard(
+                    icon: Icons.trending_up,
+                    label: 'Total Income',
+                    amount: totalIncome,
+                    color: Colors.green[600]!,
+                    isDark: isDark,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildBalanceCard(
+                    icon: Icons.trending_down,
+                    label: 'Total Expenses',
+                    amount: totalExpense,
+                    color: Colors.red[600]!,
+                    isDark: isDark,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildBalanceCard(
+              icon: Icons.account_balance_wallet_outlined,
+              label: 'Total Balance',
+              amount: balance,
+              color: Colors.blue[600]!,
+              isDark: isDark,
+              isFullWidth: true,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildBalanceCard({
     required IconData icon,
     required String label,
@@ -424,7 +464,7 @@ Widget _buildBalanceCards() {
                 color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
               ),
             ),
-            child: Column( 
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
@@ -439,9 +479,8 @@ Widget _buildBalanceCards() {
                       'Total Balance',
                       style: TextStyle(
                         fontSize: 12,
-               
                         color: isDark ? Colors.grey[400] : Colors.grey[600],
-                      ),       
+                      ),
                     ),
                   ],
                 ),
@@ -508,7 +547,7 @@ Widget _buildBalanceCards() {
 
   Widget _buildProgressBar() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -560,7 +599,8 @@ Widget _buildBalanceCards() {
                     color: Colors.white.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.track_changes, color: Colors.white, size: 28),
+                  child: const Icon(Icons.track_changes,
+                      color: Colors.white, size: 28),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -584,7 +624,8 @@ Widget _buildBalanceCards() {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.shopping_bag_outlined, size: 16, color: Colors.grey[700]),
+                    Icon(Icons.shopping_bag_outlined,
+                        size: 16, color: Colors.grey[700]),
                     const SizedBox(width: 6),
                     Text(
                       'Groceries Last Week',
@@ -642,7 +683,7 @@ Widget _buildBalanceCards() {
   Widget _buildPeriodButton(String period) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     bool isSelected = selectedPeriod == period;
-    
+
     return Expanded(
       child: GestureDetector(
         onTap: () {
@@ -675,12 +716,11 @@ Widget _buildBalanceCards() {
     );
   }
 
-  // ✅ REAL-TIME TRANSACTION LIST
   Widget _buildTransactionList() {
     if (userId == null) {
       return const Center(child: Text('Please login'));
     }
-    
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('users')
@@ -693,7 +733,7 @@ Widget _buildBalanceCards() {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        
+
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return Center(
             child: Padding(
@@ -716,12 +756,13 @@ Widget _buildBalanceCards() {
             ),
           );
         }
-        
+
         return Column(
           children: snapshot.data!.docs.map((doc) {
             var txData = doc.data() as Map<String, dynamic>;
-            bool isIncome = txData['type']?.toString().toLowerCase() == 'income';
-            
+            bool isIncome =
+                txData['type']?.toString().toLowerCase() == 'income';
+
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: _buildTransactionItem(
@@ -730,7 +771,8 @@ Widget _buildBalanceCards() {
                 title: txData['title'] ?? 'No title',
                 date: _formatDate(txData['date']),
                 category: txData['category'] ?? 'Other',
-                amount: '${isIncome ? '+' : '-'}${_formatCurrency(txData['amount']?.toDouble() ?? 0)} đ',
+                amount:
+                    '${isIncome ? '+' : '-'}${_formatCurrency(txData['amount']?.toDouble() ?? 0)} đ',
                 isPositive: isIncome,
               ),
             );
@@ -761,7 +803,7 @@ Widget _buildBalanceCards() {
 
   String _formatDate(dynamic timestamp) {
     if (timestamp == null) return 'Unknown date';
-    
+
     try {
       if (timestamp is Timestamp) {
         DateTime date = timestamp.toDate();
@@ -775,9 +817,9 @@ Widget _buildBalanceCards() {
 
   String _formatCurrency(double amount) {
     return amount.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    );
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]},',
+        );
   }
 
   Widget _buildTransactionItem({
@@ -790,7 +832,7 @@ Widget _buildBalanceCards() {
     required bool isPositive,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -866,7 +908,7 @@ Widget _buildBalanceCards() {
 
   Widget _buildBottomNavBar() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
@@ -884,7 +926,8 @@ Widget _buildBalanceCards() {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(Icons.home, true, const Color(0xFF00CED1), onTap: () {}),
+              _buildNavItem(Icons.home, true, const Color(0xFF00CED1),
+                  onTap: () {}),
               _buildNavItem(
                 Icons.search,
                 false,
@@ -892,7 +935,8 @@ Widget _buildBalanceCards() {
                 onTap: () {
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (context) => const AnalysisView()),
+                    MaterialPageRoute(
+                        builder: (context) => const AnalysisView()),
                   );
                 },
               ),
@@ -903,7 +947,8 @@ Widget _buildBalanceCards() {
                 onTap: () {
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (context) => const TransactionView()),
+                    MaterialPageRoute(
+                        builder: (context) => const TransactionView()),
                   );
                 },
               ),
@@ -914,7 +959,8 @@ Widget _buildBalanceCards() {
                 onTap: () {
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (context) => const CategoriesView()),
+                    MaterialPageRoute(
+                        builder: (context) => const CategoriesView()),
                   );
                 },
               ),
@@ -925,7 +971,8 @@ Widget _buildBalanceCards() {
                 onTap: () {
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (context) => const ProfileView()),
+                    MaterialPageRoute(
+                        builder: (context) => const ProfileView()),
                   );
                 },
               ),
