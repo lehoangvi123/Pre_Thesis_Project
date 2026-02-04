@@ -1,10 +1,10 @@
-// ✅ STREAK TRACKER CARD - UPDATED VERSION
-// Thay thế trong gamification_widgets.dart
+// ✅ STREAK TRACKER CARD - OPTION A REFINED
+// File: lib/view/Streak_update/StreakTrackerCard.dart
+// Thay thế file cũ
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import './Login_streak_service.dart';
-import '../../Achivement/Achievement_view.dart';
 
 class StreakTrackerCard extends StatelessWidget {
   const StreakTrackerCard({Key? key}) : super(key: key);
@@ -79,7 +79,7 @@ class StreakTrackerCard extends StatelessWidget {
                           ),
                           SizedBox(height: 2),
                           Text(
-                            'Come back every day!',
+                            'Login every day!',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.white70,
@@ -215,7 +215,7 @@ class StreakTrackerCard extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Motivational Text
+              // ✅ IMPROVED DYNAMIC MOTIVATIONAL MESSAGES
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -225,22 +225,19 @@ class StreakTrackerCard extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
-                      Icons.info_outline,
+                    Icon(
+                      _getMessageIcon(currentStreak, maxStreak),
                       color: Colors.white,
                       size: 16,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        currentStreak >= maxStreak && currentStreak > 1
-                            ? '🎉 New record! Keep it up!'
-                            : currentStreak == 0
-                                ? 'Start your streak today!'
-                                : 'Come back tomorrow to continue!',
+                        _getMotivationalMessage(currentStreak, maxStreak),
                         style: const TextStyle(
                           fontSize: 12,
                           color: Colors.white,
+                          fontWeight: FontWeight.w500,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -253,5 +250,64 @@ class StreakTrackerCard extends StatelessWidget {
         );
       },
     );
+  }
+
+  // ✅ DYNAMIC MESSAGES BASED ON STREAK
+  String _getMotivationalMessage(int current, int max) {
+    // First day ever
+    if (current == 1 && max == 1) {
+      return 'Great start! Come back tomorrow! 🚀';
+    }
+    
+    // Breaking record or at record
+    if (current >= max && current > 1) {
+      return '🎉 New record! Amazing! Keep going!';
+    }
+    
+    // Lost streak, restarting
+    if (current == 1 && max > 1) {
+      return 'Back on track! Let\'s beat $max days! 💪';
+    }
+    
+    // Week+ progress
+    if (current >= 7 && current < max) {
+      final remaining = max - current;
+      return 'Awesome! $remaining days to beat your record!';
+    }
+    
+    // Good progress (3-6 days)
+    if (current >= 3 && current < 7) {
+      return 'You\'re on fire! Keep the momentum! 🔥';
+    }
+    
+    // Day 2
+    if (current == 2) {
+      return '2 days! Building a habit! 👏';
+    }
+    
+    // Default
+    return 'Come back tomorrow to continue! ⭐';
+  }
+
+  // ✅ DYNAMIC ICONS BASED ON CONTEXT
+  IconData _getMessageIcon(int current, int max) {
+    // First day
+    if (current == 1 && max == 1) {
+      return Icons.rocket_launch;
+    }
+    // Breaking record
+    if (current >= max && current > 1) {
+      return Icons.celebration;
+    }
+    // Week+ streak
+    if (current >= 7) {
+      return Icons.local_fire_department;
+    }
+    // Comeback
+    if (current == 1 && max > 1) {
+      return Icons.refresh;
+    }
+    // Default
+    return Icons.info_outline;
   }
 }

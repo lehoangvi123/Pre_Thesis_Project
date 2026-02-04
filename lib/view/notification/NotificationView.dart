@@ -1,5 +1,5 @@
 // lib/notification/NotificationView.dart
-// UPDATED VERSION - Real-time notifications từ Firebase
+// FIXED VERSION - Const-compatible
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,7 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 
 class NotificationView extends StatefulWidget {
-  const NotificationView({Key? key}) : super(key: key);
+  const NotificationView({super.key}); // ✅ FIXED: super.key
 
   @override
   State<NotificationView> createState() => _NotificationViewState();
@@ -45,9 +45,9 @@ class _NotificationViewState extends State<NotificationView> {
         actions: [
           // Mark all as read button
           IconButton(
-            icon: Icon(
+            icon: const Icon(
               Icons.done_all,
-              color: const Color(0xFF00CED1),
+              color: Color(0xFF00CED1),
             ),
             onPressed: _markAllAsRead,
             tooltip: 'Mark all as read',

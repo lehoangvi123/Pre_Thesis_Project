@@ -1,5 +1,5 @@
-// lib/service/login_streak_service.dart
-// Service xử lý login streak
+// lib/view/Streak_update/Login_streak_service.dart
+// Service xử lý login streak - UPDATED WITH BETTER MESSAGES
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -25,6 +25,7 @@ class LoginStreakService {
           'lastLoginDate': Timestamp.now(),
         }, SetOptions(merge: true));
 
+        print('🎉 Welcome! First login - Streak: 1');
         return {'currentStreak': 1, 'maxStreak': 1};
       }
 
@@ -58,6 +59,9 @@ class LoginStreakService {
           // Update max streak nếu vượt qua
           if (currentStreak > maxStreak) {
             maxStreak = currentStreak;
+            print('🎉 NEW RECORD! Current: $currentStreak, Max: $maxStreak');
+          } else {
+            print('🔥 Streak increased! Current: $currentStreak, Max: $maxStreak');
           }
 
           await userRef.update({
@@ -66,10 +70,10 @@ class LoginStreakService {
             'lastLoginDate': Timestamp.now(),
           });
 
-          print('🔥 Streak increased! Current: $currentStreak, Max: $maxStreak');
           return {'currentStreak': currentStreak, 'maxStreak': maxStreak};
         } else {
           // ❌ BỎ QUA >=2 NGÀY - Reset về 1
+          print('💔 Streak lost! Resetting to 1. Previous max: $maxStreak');
           currentStreak = 1;
 
           // Max streak không thay đổi
@@ -79,7 +83,6 @@ class LoginStreakService {
             'lastLoginDate': Timestamp.now(),
           });
 
-          print('💔 Streak reset! Current: 1, Max: $maxStreak');
           return {'currentStreak': 1, 'maxStreak': maxStreak};
         }
       } else {
@@ -196,5 +199,7 @@ class LoginStreakService {
       'maxStreak': 0,
       'lastLoginDate': null,
     });
+    
+    print('🔄 Streak reset to 0');
   }
 }
