@@ -53,13 +53,36 @@ class TransactionModel {
   // Alias cho chắc chắn bạn gọi ở UI/service không bị đỏ
   Map<String, dynamic> toJson() => toMap(); // ✅ trỏ lại toMap()
 
+  // ✅ CRITICAL FIX: Smart detection cho isIncome
   factory TransactionModel.fromMap(Map<String, dynamic> map) {
+    // ✅ CRITICAL FIX: Detect isIncome thông minh
+    bool isIncome = false;
+    
+    // Kiểm tra field 'isIncome' trước
+    if (map.containsKey('isIncome') && map['isIncome'] != null) {
+      isIncome = map['isIncome'] == true;
+      print('[TransactionModel] ✅ From isIncome field: $isIncome');
+    } 
+    // Fallback: Kiểm tra field 'type'
+    else if (map.containsKey('type')) {
+      String type = (map['type'] ?? '').toString().toLowerCase();
+      isIncome = type == 'income';
+      print('[TransactionModel] ⚠️ Fallback from type field: $type → $isIncome');
+    }
+    
+    String transactionType = map['type'] ?? 'expense';
+    
+    print('[TransactionModel] 📊 Transaction: ${map['title']}');
+    print('[TransactionModel]    - type field: $transactionType');
+    print('[TransactionModel]    - isIncome field: ${map['isIncome']}');
+    print('[TransactionModel]    - Final isIncome: $isIncome');
+    
     return TransactionModel(
       id: map['id'] ?? '',
       userId: map['userId'] ?? '',
       categoryId: map['categoryId'] ?? '',
       categoryName: map['categoryName'] ?? '',
-      type: map['type'] ?? 'expense',
+      type: transactionType,
       amount: (map['amount'] as num?)?.toDouble() ?? 0,
       title: map['title'] ?? '',
       message: map['message'],
@@ -67,7 +90,7 @@ class TransactionModel {
       colorHex: map['colorHex'],
       date: (map['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      isIncome: map['isIncome'] ?? false, // ✅ đọc theo bool
+      isIncome: isIncome, // ✅ Dùng biến đã detect
     );
   }
 
