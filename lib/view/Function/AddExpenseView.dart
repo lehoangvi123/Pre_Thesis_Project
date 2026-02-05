@@ -356,7 +356,8 @@ class _AddExpenseViewState extends State<AddExpenseView> {
               .doc(transactionId),
           {
             'id': transactionId,
-            'type': transactionType,
+            'type': transactionType, 
+            'isIncome': transactionType == 'income',
             'amount': amount,
             'category': selectedCategory,
             'title': _titleController.text.trim(),

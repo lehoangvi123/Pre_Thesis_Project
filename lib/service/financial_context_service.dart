@@ -25,7 +25,7 @@ class FinancialContextService {
       // Get transactions for current month
       DateTime now = DateTime.now();
       DateTime startOfMonth = DateTime(now.year, now.month, 1);
-      DateTime endOfMonth = DateTime(now.year, now.month + 1, 0);
+      DateTime endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
 
       QuerySnapshot transactionSnapshot = await _firestore
           .collection('users')
@@ -36,13 +36,13 @@ class FinancialContextService {
           .get(); 
          
          
-print('[DEBUG] ════════════════════════════════');
-print('[DEBUG] 🔍 RAW FIRESTORE DATA:');
-for (var doc in transactionSnapshot.docs) {
-  var data = doc.data() as Map<String, dynamic>;
-  print('[DEBUG] ${doc.id}: $data');
-}
-print('[DEBUG] ════════════════════════════════');
+      print('[DEBUG] ════════════════════════════════');
+      print('[DEBUG] 🔍 RAW FIRESTORE DATA:');
+      for (var doc in transactionSnapshot.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+        print('[DEBUG] ${doc.id}: $data');
+      }
+      print('[DEBUG] ════════════════════════════════');
 
       List<TransactionModel> transactions = transactionSnapshot.docs
           .map((doc) => TransactionModel.fromMap(
@@ -64,20 +64,27 @@ print('[DEBUG] ═════════════════════�
         // ✅ FIX: Convert to double safely
         double amount = _toDouble(transaction.amount);
         
+        // ✅ CRITICAL FIX: Đảm bảo amount luôn là SỐ DƯƠNG khi tính tổng
+        // Vì đã có field isIncome để phân biệt rồi
+        double absAmount = amount.abs();
+        
         // ✅ DEBUG: Print each transaction
         print('[FinancialContext] Transaction: ${transaction.title}');
         print('[FinancialContext]   - Type: ${transaction.isIncome ? "INCOME ✅" : "EXPENSE ❌"}');
-        print('[FinancialContext]   - Amount: $amount');
+        print('[FinancialContext]   - Original Amount: $amount');
+        print('[FinancialContext]   - Absolute Amount: $absAmount');
         print('[FinancialContext]   - Category: ${transaction.categoryName}');
             
         if (transaction.isIncome) {
-          totalIncome += amount;
+          // ✅ THU NHẬP: Luôn cộng số dương
+          totalIncome += absAmount;
           incomeByCategory[transaction.categoryName] =
-              (incomeByCategory[transaction.categoryName] ?? 0) + amount;
+              (incomeByCategory[transaction.categoryName] ?? 0) + absAmount;
         } else {
-          totalExpense += amount;
+          // ✅ CHI TIÊU: Luôn cộng số dương (vì đã có isIncome = false để phân biệt)
+          totalExpense += absAmount;
           expenseByCategory[transaction.categoryName] =
-              (expenseByCategory[transaction.categoryName] ?? 0) + amount;
+              (expenseByCategory[transaction.categoryName] ?? 0) + absAmount;
         }
       }
 
@@ -91,6 +98,8 @@ print('[DEBUG] ═════════════════════�
       print('[FinancialContext]   - Total Income: $totalIncome');
       print('[FinancialContext]   - Total Expense: $totalExpense');
       print('[FinancialContext]   - Current Balance: $currentBalance');
+      print('[FinancialContext]   - Income Categories: $incomeByCategory');
+      print('[FinancialContext]   - Expense Categories: $expenseByCategory');
       print('[FinancialContext] ════════════════════════════════');
 
       return {
@@ -271,10 +280,11 @@ Sau đó tôi sẽ giúp bạn phân tích chi tiêu! 😊
       context.writeln('═══════════════════════════════════════════════════');
       context.writeln('');
       
-      // ✅ PHẦN 1: SỐ DƯ HIỆN TẠI
+      // ✅ PHẦN 1: SỐ DƯ HIỆN TẠI (In đậm để AI dễ thấy)
+      double currentBalance = _toDouble(summary['currentBalance']);
       context.writeln('💰 SỐ DƯ HIỆN TẠI TRONG TÀI KHOẢN:');
-      context.writeln('   ${_formatMoney(_toDouble(summary['currentBalance']))}');
-      context.writeln('   (Đây là số tiền còn lại trong tài khoản)');
+      context.writeln('   ${_formatMoney(currentBalance)}');
+      context.writeln('   ⚠️ ĐÂY LÀ SỐ TIỀN CÒN LẠI TRONG TÀI KHOẢN, KHÔNG PHẢI TỔNG CHI TIÊU!');
       context.writeln('');
       
       context.writeln('📅 DỮ LIỆU THÁNG $monthName/${now.year}:');
@@ -285,6 +295,7 @@ Sau đó tôi sẽ giúp bạn phân tích chi tiêu! 😊
       double totalIncome = _toDouble(summary['totalIncome']);
       if (totalIncome > 0) {
         context.writeln('   ${_formatMoney(totalIncome)}');
+        context.writeln('   (Tổng số tiền ĐÃ NHẬN được trong tháng ${now.month})');
         context.writeln('');
         
         Map<String, double> incomeByCategory = summary['incomeByCategory'] ?? {};
@@ -295,18 +306,20 @@ Sau đó tôi sẽ giúp bạn phân tích chi tiêu! 😊
           });
         }
       } else {
-        context.writeln('   CHƯA CÓ THU NHẬP NÀO trong tháng này');
+        context.writeln('   0 đồng');
+        context.writeln('   (CHƯA CÓ THU NHẬP NÀO trong tháng này)');
       }
       context.writeln('');
       
-      // ✅ PHẦN 3: CHI TIÊU
-      context.writeln('📉 TỔNG CHI TIÊU THÁNG NÀY:');
+      // ✅ PHẦN 3: CHI TIÊU (Làm rõ nhất có thể)
+      context.writeln('📉 ⭐ TỔNG CHI TIÊU THÁNG NÀY (QUAN TRỌNG):');
       double totalExpense = _toDouble(summary['totalExpense']);
+      context.writeln('   ${_formatMoney(totalExpense)}');
+      context.writeln('   ⚠️ ĐÂY MỚI LÀ TỔNG SỐ TIỀN ĐÃ CHI TRONG THÁNG ${now.month}!');
+      context.writeln('   ⚠️ ĐỪNG NHẦm VỚI SỐ DƯ (${_formatMoney(currentBalance)})!');
+      
       if (totalExpense > 0) {
-        context.writeln('   ${_formatMoney(totalExpense)}');
-        context.writeln('   (Đây là tổng số tiền đã CHI trong tháng ${now.month})');
         context.writeln('');
-        
         Map<String, double> expenseByCategory = summary['expenseByCategory'] ?? {};
         if (expenseByCategory.isNotEmpty) {
           context.writeln('   Chi tiết chi tiêu theo danh mục:');
@@ -318,9 +331,15 @@ Sau đó tôi sẽ giúp bạn phân tích chi tiêu! 😊
             double percentage = (entry.value / totalExpense) * 100;
             context.writeln('   • ${entry.key}: ${_formatMoney(entry.value)} (${percentage.toStringAsFixed(1)}%)');
           }
+          
+          context.writeln('');
+          context.writeln('   👉 Ví dụ phân tích ĐÚNG:');
+          var topExpense = sortedExpenses.first;
+          context.writeln('   "Tháng này bạn chi ${_formatMoney(totalExpense)},');
+          context.writeln('    trong đó ${topExpense.key} chiếm nhiều nhất (${_formatMoney(topExpense.value)})"');
         }
       } else {
-        context.writeln('   CHƯA CÓ CHI TIÊU NÀO trong tháng này');
+        context.writeln('   (CHƯA CÓ CHI TIÊU NÀO trong tháng này)');
       }
       context.writeln('');
       
@@ -329,10 +348,10 @@ Sau đó tôi sẽ giúp bạn phân tích chi tiêu! 😊
       context.writeln('📊 THAY ĐỔI RÒNG THÁNG NÀY:');
       if (netChange > 0) {
         context.writeln('   +${_formatMoney(netChange)} ✅');
-        context.writeln('   (Thu nhiều hơn chi → Tích cực!)');
+        context.writeln('   (Thu ${_formatMoney(totalIncome)} - Chi ${_formatMoney(totalExpense)} = Tích cực!)');
       } else if (netChange < 0) {
         context.writeln('   ${_formatMoney(netChange)} ⚠️');
-        context.writeln('   (Chi nhiều hơn thu → Cần chú ý!)');
+        context.writeln('   (Thu ${_formatMoney(totalIncome)} - Chi ${_formatMoney(totalExpense)} = Cần chú ý!)');
       } else {
         context.writeln('   ${_formatMoney(netChange)}');
         context.writeln('   (Thu chi cân bằng)');
@@ -348,7 +367,7 @@ Sau đó tôi sẽ giúp bạn phân tích chi tiêu! 😊
         double budgetRemaining = _toDouble(summary['budgetRemaining']);
         double budgetUsage = _toDouble(summary['budgetUsage']);
         
-        context.writeln('   Đã dùng: ${budgetUsage.toStringAsFixed(1)}%');
+        context.writeln('   Đã dùng: ${budgetUsage.toStringAsFixed(1)}% (${_formatMoney(totalExpense)})');
         context.writeln('   Còn lại: ${_formatMoney(budgetRemaining)}');
         
         if (budgetRemaining < 0) {
@@ -384,7 +403,8 @@ Sau đó tôi sẽ giúp bạn phân tích chi tiêu! 😊
         context.writeln('📝 5 GIAO DỊCH GẦN NHẤT:');
         for (var tx in recentTx.take(5)) {
           String type = tx.isIncome ? '📈 Thu' : '📉 Chi';
-          context.writeln('   $type: ${tx.title} - ${_formatMoney(_toDouble(tx.amount))} (${tx.categoryName})');
+          double txAmount = _toDouble(tx.amount).abs(); // ✅ Luôn dùng giá trị tuyệt đối
+          context.writeln('   $type: ${tx.title} - ${_formatMoney(txAmount)} (${tx.categoryName})');
         }
         context.writeln('');
       }
@@ -400,21 +420,28 @@ Sau đó tôi sẽ giúp bạn phân tích chi tiêu! 😊
       
       context.writeln('═══════════════════════════════════════════════════');
       context.writeln('');
-      context.writeln('⚠️ LƯU Ý CỰC KỲ QUAN TRỌNG CHO AI:');
+      context.writeln('⚠️⚠️⚠️ HƯỚNG DẪN QUAN TRỌNG CHO AI ⚠️⚠️⚠️');
       context.writeln('');
-      context.writeln('1. SỐ DƯ HIỆN TẠI ≠ TỔNG CHI TIÊU');
-      context.writeln('   • Số dư = Tiền còn lại trong tài khoản NGAY LÚC NÀY');
-      context.writeln('   • Tổng chi tiêu = Tổng số tiền đã CHI trong THÁNG ${now.month}');
-      context.writeln('   • ĐỪNG BAO GIỜ NÓI: "Bạn đã chi [số dư]"');
+      context.writeln('1. ❌ ĐỪNG BAO GIỜ NÓI:');
+      context.writeln('   "Bạn đã chi ${_formatMoney(currentBalance)}"');
+      context.writeln('   "Chi tiêu của bạn là ${_formatMoney(currentBalance)}"');
+      context.writeln('   ➡️ ĐÂY LÀ SAI! Đó là SỐ DƯ, không phải chi tiêu!');
       context.writeln('');
-      context.writeln('2. KHI PHÂN TÍCH:');
-      context.writeln('   • Dựa vào TỔNG CHI TIÊU, KHÔNG phải số dư');
-      context.writeln('   • Nói rõ danh mục chi nhiều (%, số tiền cụ thể)');
-      context.writeln('   • Đưa ra lời khuyên CỤ THỂ, có SỐ LIỆU');
+      context.writeln('2. ✅ NÓI ĐÚNG NHƯ NÀY:');
+      context.writeln('   "Tháng này bạn đã chi ${_formatMoney(totalExpense)}"');
+      context.writeln('   "Chi tiêu của bạn là ${_formatMoney(totalExpense)}"');
+      context.writeln('   "Số dư còn lại ${_formatMoney(currentBalance)}"');
       context.writeln('');
-      context.writeln('3. GIỌNG ĐIỆU:');
-      context.writeln('   • Thân thiện như BẠN BÈ, không máy móc');
-      context.writeln('   • Ngắn gọn (2-4 câu), dùng emoji phù hợp');
+      context.writeln('3. PHÂN BIỆT RÕ:');
+      context.writeln('   • SỐ DƯ = ${_formatMoney(currentBalance)} (Tiền CÒN LẠI)');
+      context.writeln('   • CHI TIÊU = ${_formatMoney(totalExpense)} (Tiền ĐÃ CHI)');
+      context.writeln('   • THU NHẬP = ${_formatMoney(totalIncome)} (Tiền ĐÃ NHẬN)');
+      context.writeln('');
+      context.writeln('4. GIỌNG ĐIỆU:');
+      context.writeln('   • Thân thiện như BẠN BÈ');
+      context.writeln('   • Ngắn gọn (2-4 câu)');
+      context.writeln('   • Dùng emoji phù hợp: 💰 📊 ✅ ⚠️ 🎯');
+      context.writeln('   • Đưa ra con số CỤ THỂ và lời khuyên THỰC TẾ');
       context.writeln('');
       context.writeln('═══════════════════════════════════════════════════');
       

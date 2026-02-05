@@ -121,7 +121,8 @@ class _AddIncomeViewState extends State<AddIncomeView> {
           'category': widget.categoryName ?? 'Other',
           'note': _messageController.text.trim(),
           'date': Timestamp.fromDate(_selectedDate),
-          'type': 'income',
+          'type': 'income', 
+          'isIncome': true,  
           'createdAt': FieldValue.serverTimestamp(),
         });
 

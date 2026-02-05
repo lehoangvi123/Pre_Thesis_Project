@@ -563,4 +563,7 @@ class _NotificationViewState extends State<NotificationView> {
       child: Icon(icon, color: color, size: 26),
     );
   }
-}
+} 
+
+
+
