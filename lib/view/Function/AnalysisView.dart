@@ -1,5 +1,5 @@
 // lib/view/AnalysisView.dart
-// FIXED - Added mounted checks to prevent setState after dispose
+// SIMPLIFIED - Only show Income vs Expense overview pie chart (no category details)
 
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -14,7 +14,7 @@ import './SavingGoalsService.dart';
 import './AddSavingGoalView.dart';
 import './analysis_widgets.dart';
 import './Chart/bar_chart_widgets.dart';
-import './Chart/pie_chart_widget.dart';
+import './Chart/income_expense_pie_chart.dart';
 
 class AnalysisView extends StatefulWidget {
   const AnalysisView({Key? key}) : super(key: key);
@@ -28,99 +28,18 @@ class _AnalysisViewState extends State<AnalysisView> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final SavingGoalService _goalService = SavingGoalService();
 
-  String selectedPeriod = 'Weekly';
   String chartType = 'bar';
-  String pieChartType = 'expense';
   String? userId;
-  
-  Map<String, double> expenseByCategory = {};
-  Map<String, double> incomeByCategory = {};
-  bool isLoadingChartData = false;
 
   @override
   void initState() {
     super.initState();
     userId = _auth.currentUser?.uid;
-    _loadChartData();
   }
 
   @override
   void dispose() {
-    // Clean up any resources if needed
     super.dispose();
-  }
-
-  Future<void> _loadChartData() async {
-    if (userId == null) return;
-    
-    // ✅ CHECK mounted before setState
-    if (!mounted) return;
-    setState(() {
-      isLoadingChartData = true;
-    });
-
-    expenseByCategory = await _getExpenseByCategory();
-    incomeByCategory = await _getIncomeByCategory();
-
-    // ✅ CHECK mounted before setState
-    if (!mounted) return;
-    setState(() {
-      isLoadingChartData = false;
-    });
-  }
-
-  Future<Map<String, double>> _getExpenseByCategory() async {
-    try {
-      final snapshot = await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('transactions')
-          .where('type', isEqualTo: 'expense')
-          .get();
-
-      Map<String, double> categoryTotals = {};
-
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        String categoryName = data['categoryName'] ?? 'Khác';
-        double amount = (data['amount'] as num).abs().toDouble();
-
-        categoryTotals[categoryName] = 
-            (categoryTotals[categoryName] ?? 0) + amount;
-      }
-
-      return categoryTotals;
-    } catch (e) {
-      print('Error: $e');
-      return {};
-    }
-  }
-
-  Future<Map<String, double>> _getIncomeByCategory() async {
-    try {
-      final snapshot = await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('transactions')
-          .where('type', isEqualTo: 'income')
-          .get();
-
-      Map<String, double> categoryTotals = {};
-
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        String categoryName = data['categoryName'] ?? 'Khác';
-        double amount = (data['amount'] as num).abs().toDouble();
-
-        categoryTotals[categoryName] = 
-            (categoryTotals[categoryName] ?? 0) + amount;
-      }
-
-      return categoryTotals;
-    } catch (e) {
-      print('Error: $e');
-      return {};
-    }
   }
 
   String _formatCurrency(double amount) {
@@ -163,8 +82,6 @@ class _AnalysisViewState extends State<AnalysisView> {
                     children: [
                       _buildBalanceCard(
                           balance, totalIncome, totalExpense, isDark),
-                      const SizedBox(height: 20),
-                      _buildPeriodSelector(),
                       const SizedBox(height: 20),
                       _buildChartCard(totalIncome, totalExpense, isDark),
                       const SizedBox(height: 24),
@@ -231,7 +148,6 @@ class _AnalysisViewState extends State<AnalysisView> {
       color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
       onSelected: (value) {
         if (value == 'bar' || value == 'pie') {
-          // ✅ CHECK mounted before setState
           if (!mounted) return;
           setState(() => chartType = value);
         }
@@ -415,69 +331,6 @@ class _AnalysisViewState extends State<AnalysisView> {
     );
   }
 
-  Widget _buildPeriodSelector() {
-    return Row(
-      children: [
-        _buildPeriodButton('Ngày'),
-        const SizedBox(width: 8),
-        _buildPeriodButton('Tuần'),
-        const SizedBox(width: 8),
-        _buildPeriodButton('Tháng'),
-        const SizedBox(width: 8),
-        _buildPeriodButton('Năm'),
-      ],
-    );
-  }
-
-  Widget _buildPeriodButton(String period) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    bool isSelected = (selectedPeriod == 'Daily' && period == 'Ngày') ||
-        (selectedPeriod == 'Weekly' && period == 'Tuần') ||
-        (selectedPeriod == 'Monthly' && period == 'Tháng') ||
-        (selectedPeriod == 'Year' && period == 'Năm');
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          // ✅ CHECK mounted before setState
-          if (!mounted) return;
-          setState(() {
-            if (period == 'Ngày') {
-              selectedPeriod = 'Daily';
-            } else if (period == 'Tuần') {
-              selectedPeriod = 'Weekly';
-            } else if (period == 'Tháng') {
-              selectedPeriod = 'Monthly';
-            } else if (period == 'Năm') {
-              selectedPeriod = 'Year';
-            }
-          });
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? const Color(0xFF00CED1)
-                : (isDark ? Colors.grey[800] : Colors.grey[100]),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Center(
-            child: Text(
-              period,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected
-                    ? Colors.white
-                    : (isDark ? Colors.grey[400] : Colors.grey[700]),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildChartCard(
       double totalIncome, double totalExpense, bool isDark) {
     return Container(
@@ -522,75 +375,13 @@ class _AnalysisViewState extends State<AnalysisView> {
                     totalExpense: totalExpense,
                     isDark: isDark,
                   )
-                : _buildPieChart(isDark),
+                : IncomeExpensePieChart(
+                    totalIncome: totalIncome,
+                    totalExpense: totalExpense,
+                    isDark: isDark,
+                  ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildPieChart(bool isDark) {
-    return Column(
-      children: [
-        _buildPieChartTypeSelector(isDark),
-        const SizedBox(height: 16),
-        Expanded(
-          child: isLoadingChartData
-              ? const Center(child: CircularProgressIndicator())
-              : CustomPieChartWidget(
-                  categoryData: pieChartType == 'expense'
-                      ? expenseByCategory
-                      : incomeByCategory,
-                  type: pieChartType,
-                  isDark: isDark,
-                ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPieChartTypeSelector(bool isDark) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _buildTypeButton('Chi tiêu', 'expense', Colors.red, isDark),
-        const SizedBox(width: 12),
-        _buildTypeButton('Thu nhập', 'income', const Color(0xFF00CED1), isDark),
-      ],
-    );
-  }
-
-  Widget _buildTypeButton(
-      String label, String type, Color color, bool isDark) {
-    bool isSelected = pieChartType == type;
-    return GestureDetector(
-      onTap: () {
-        // ✅ CHECK mounted before setState
-        if (!mounted) return;
-        setState(() => pieChartType = type);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? color.withOpacity(0.15)
-              : (isDark ? Colors.grey[800] : Colors.grey[100]),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? color : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected
-                ? color
-                : (isDark ? Colors.grey[400] : Colors.grey[600]),
-          ),
-        ),
       ),
     );
   }
@@ -791,7 +582,6 @@ class _AnalysisViewState extends State<AnalysisView> {
                     userId: userId,
                     firestore: _firestore,
                     onGoalUpdated: () {
-                      // ✅ CHECK mounted before setState
                       if (!mounted) return;
                       setState(() {});
                     },

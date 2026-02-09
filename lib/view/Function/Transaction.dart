@@ -1,3 +1,6 @@
+// ✅ SOLUTION: Remove orderBy to avoid index requirement
+// Filter transactions in code instead of in query
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,7 +14,6 @@ import './transaction_widgets.dart';
 import '../TextVoice/AI_deep_analysis_view.dart';
 import './EditTransactionView.dart'; 
 import '../../view/Bill_Scanner_Service/Bill_scanner_view.dart';
-// ✅ ADD THIS - Import AI Chatbot View
 import './AI_Chatbot/chatbot_view.dart';
 
 class TransactionView extends StatefulWidget {
@@ -48,11 +50,9 @@ class _TransactionViewState extends State<TransactionView> {
 
   Future<void> _deleteTransaction(String transactionId, Map<String, dynamic> data) async {
     try {
-      // ✅ Get absolute value
       double amount = ((data['amount'] ?? 0) as num).abs().toDouble();
       String type = (data['type'] ?? 'expense').toString().toLowerCase();
 
-      // Delete transaction
       await _firestore
           .collection('users')
           .doc(userId)
@@ -60,7 +60,6 @@ class _TransactionViewState extends State<TransactionView> {
           .doc(transactionId)
           .delete();
 
-      // Update user balance
       DocumentReference userRef = _firestore.collection('users').doc(userId);
 
       await _firestore.runTransaction((transaction) async {
@@ -188,7 +187,6 @@ class _TransactionViewState extends State<TransactionView> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle bar
             Container(
               margin: const EdgeInsets.only(top: 12),
               width: 40,
@@ -201,7 +199,6 @@ class _TransactionViewState extends State<TransactionView> {
             
             const SizedBox(height: 20),
             
-            // Title
             Text(
               'Tính năng phân tích nhanh bao gồm',
               style: TextStyle(
@@ -223,7 +220,6 @@ class _TransactionViewState extends State<TransactionView> {
             
             const SizedBox(height: 24),
             
-            // Option 1: Deep Analysis
             _buildAIMenuOption(
               context: context,
               isDark: isDark,
@@ -232,7 +228,7 @@ class _TransactionViewState extends State<TransactionView> {
               title: 'Phân tích chi tiêu',
               subtitle: 'Phân tích sâu về thói quen chi tiêu của bạn',
               onTap: () {
-                Navigator.pop(context); // Close bottom sheet
+                Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -242,7 +238,6 @@ class _TransactionViewState extends State<TransactionView> {
               },
             ),
             
-            // Divider
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Divider(
@@ -251,7 +246,6 @@ class _TransactionViewState extends State<TransactionView> {
               ),
             ),
             
-            // Option 2: AI Chatbot
             _buildAIMenuOption(
               context: context,
               isDark: isDark,
@@ -260,7 +254,7 @@ class _TransactionViewState extends State<TransactionView> {
               title: 'Chat với AI',
               subtitle: 'Trò chuyện với trợ lý tài chính thông minh',
               onTap: () {
-                Navigator.pop(context); // Close bottom sheet
+                Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -270,7 +264,6 @@ class _TransactionViewState extends State<TransactionView> {
               },
             ),
             
-            // Divider
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Divider(
@@ -279,7 +272,6 @@ class _TransactionViewState extends State<TransactionView> {
               ),
             ),
             
-            // ✅ Option 3: Chụp Ảnh Bill (NEW!)
             _buildAIMenuOption(
               context: context,
               isDark: isDark,
@@ -288,7 +280,7 @@ class _TransactionViewState extends State<TransactionView> {
               title: 'Chụp Ảnh Bill (đang trong quá trình phát triển)',
               subtitle: 'Chụp hóa đơn và thêm giao dịch nhanh chóng',
               onTap: () {
-                Navigator.pop(context); // Close bottom sheet
+                Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -306,7 +298,6 @@ class _TransactionViewState extends State<TransactionView> {
   );
 }
 
-  // ✅ NEW METHOD: Build AI Menu Option
   Widget _buildAIMenuOption({
     required BuildContext context,
     required bool isDark,
@@ -322,7 +313,6 @@ class _TransactionViewState extends State<TransactionView> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
           children: [
-            // Icon container
             Container(
               width: 56,
               height: 56,
@@ -339,7 +329,6 @@ class _TransactionViewState extends State<TransactionView> {
             
             const SizedBox(width: 16),
             
-            // Text content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,7 +353,6 @@ class _TransactionViewState extends State<TransactionView> {
               ),
             ),
             
-            // Arrow icon
             Icon(
               Icons.arrow_forward_ios,
               size: 16,
@@ -430,7 +418,6 @@ class _TransactionViewState extends State<TransactionView> {
           ],
         ),
       ),
-      // ✅ UPDATED: Menu button instead of direct Analysis button
      floatingActionButton: FloatingActionButton.extended(
   onPressed: () => _showAIMenuBottomSheet(isDark),
   backgroundColor: const Color(0xFF00CED1),
@@ -781,19 +768,49 @@ class _TransactionViewState extends State<TransactionView> {
           );
         }
 
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                children: [
+                  const Icon(Icons.error, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Lỗi: ${snapshot.error}',
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return TransactionWidgets.buildEmptyState(isDark, selectedFilter);
         }
 
-        // Filter by search query
-        List<DocumentSnapshot> filteredDocs = snapshot.data!.docs.where((doc) {
-          if (searchQuery.isEmpty) return true;
-
+        // ✅ FILTER IN CODE instead of query
+        List<DocumentSnapshot> allDocs = snapshot.data!.docs;
+        List<DocumentSnapshot> filteredDocs = allDocs.where((doc) {
           var data = doc.data() as Map<String, dynamic>;
-          String title = (data['title'] ?? '').toString().toLowerCase();
-          String category = (data['category'] ?? '').toString().toLowerCase();
-
-          return title.contains(searchQuery) || category.contains(searchQuery);
+          String type = (data['type'] ?? '').toString().toLowerCase();
+          
+          // Apply filter
+          if (selectedFilter == 'Income' && type != 'income') return false;
+          if (selectedFilter == 'Expense' && type != 'expense') return false;
+          
+          // Apply search
+          if (searchQuery.isNotEmpty) {
+            String title = (data['title'] ?? '').toString().toLowerCase();
+            String category = (data['category'] ?? '').toString().toLowerCase();
+            if (!title.contains(searchQuery) && !category.contains(searchQuery)) {
+              return false;
+            }
+          }
+          
+          return true;
         }).toList();
 
         if (filteredDocs.isEmpty) {
@@ -804,7 +821,7 @@ class _TransactionViewState extends State<TransactionView> {
         double totalAmount = 0;
         for (var doc in filteredDocs) {
           var data = doc.data() as Map<String, dynamic>;
-          totalAmount += (data['amount'] ?? 0).toDouble();
+          totalAmount += (data['amount'] ?? 0).toDouble().abs();
         }
 
         // Group by month
@@ -850,20 +867,14 @@ class _TransactionViewState extends State<TransactionView> {
     );
   }
 
+  // ✅ SIMPLIFIED: No filter in query - just get all and sort
   Stream<QuerySnapshot> _getTransactionsStream() {
-    var query = _firestore
+    return _firestore
         .collection('users')
         .doc(userId)
         .collection('transactions')
-        .orderBy('date', descending: true);
-
-    if (selectedFilter == 'Income') {
-      query = query.where('type', isEqualTo: 'income');
-    } else if (selectedFilter == 'Expense') {
-      query = query.where('type', isEqualTo: 'expense');
-    }
-
-    return query.snapshots();
+        .orderBy('date', descending: true)
+        .snapshots();
   }
 
   Widget _buildMonthSection(
@@ -890,7 +901,6 @@ class _TransactionViewState extends State<TransactionView> {
             isDark: isDark,
             onDelete: () => _deleteTransaction(doc.id, data),
             onTap: () async {
-              // ✅ NAVIGATE TO EDIT SCREEN
               final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -901,7 +911,6 @@ class _TransactionViewState extends State<TransactionView> {
                 ),
               );
               
-              // ✅ REFRESH LIST IF EDITED
               if (result == true && mounted) {
                 setState(() {});
               }
