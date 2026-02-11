@@ -10,7 +10,7 @@ pluginManagement {
 
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
-    repositories {
+    repositories { 
         google()
         mavenCentral()
         gradlePluginPortal()
