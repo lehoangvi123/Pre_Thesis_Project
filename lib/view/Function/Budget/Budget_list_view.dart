@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import './budget_model.dart';
 import './budget_service.dart';
-import 'create_budget_view.dart';
-import 'budget_detail_view.dart';
+import './Create_budget_view.dart';
+import './Budget_detail_view.dart';
 
 class BudgetListView extends StatefulWidget {
   const BudgetListView({Key? key}) : super(key: key);
