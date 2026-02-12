@@ -1,9 +1,10 @@
 // lib/view/HomeView.dart
-// COMPLETE VERSION - With Gamification & Login Streak & Calendar
+// UPDATED VERSION - With Budget Integration
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../login/LoginView.dart';
 import '../notification/NotificationView.dart';
 import './AnalysisView.dart';
@@ -15,6 +16,9 @@ import '../Achivement/Achievement_model.dart';
 import '../Achivement/Achievement_view.dart';
 import './Streak_update/Login_streak_service.dart';
 import '../Calender_Part/Calender.dart';
+import './Budget/budget_list_view.dart';  // ← IMPORT BUDGET
+import '../Function/Budget/Budget_service.dart';   // ← IMPORT BUDGET SERVICE
+import '../Function/Budget/budget_model.dart';      // ← IMPORT BUDGET MODEL
 
 class HomeView extends StatefulWidget {
   const HomeView({Key? key}) : super(key: key);
@@ -28,6 +32,8 @@ class _HomeViewState extends State<HomeView> {
   String userName = 'User';
   bool isLoadingUserName = true;
   String? userId;
+  final BudgetService _budgetService = BudgetService();  // ← BUDGET SERVICE
+  final NumberFormat _currencyFormat = NumberFormat("#,##0", "vi_VN");
 
   @override
   void initState() {
@@ -138,11 +144,9 @@ class _HomeViewState extends State<HomeView> {
                 const SizedBox(height: 16),
                 _buildProgressBar(),
                 const SizedBox(height: 20),
-                _buildSpendingCards(),
-                const SizedBox(height: 20),
-                _buildPeriodSelector(),
-                const SizedBox(height: 16),
-                _buildTransactionList(),
+                
+                // ✅ THAY THẾ: Budget Overview thay vì Transaction List
+                _buildBudgetSection(isDark),
               ],
             ),
           ),
@@ -162,7 +166,6 @@ class _HomeViewState extends State<HomeView> {
     );
   } 
 
-  // ✅ HEADER WITH CALENDAR BUTTON
   Widget _buildHeader() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -192,7 +195,6 @@ class _HomeViewState extends State<HomeView> {
         ),
         Row(
           children: [
-            // ✅ CALENDAR BUTTON
             GestureDetector(
               onTap: () {
                 Navigator.push(
@@ -215,7 +217,6 @@ class _HomeViewState extends State<HomeView> {
               ),
             ),
             const SizedBox(width: 8),
-            // NOTIFICATION BUTTON
             GestureDetector(
               onTap: () {
                 Navigator.push(
@@ -238,7 +239,6 @@ class _HomeViewState extends State<HomeView> {
               ),
             ),
             const SizedBox(width: 8),
-            // LOGOUT BUTTON
             GestureDetector(
               onTap: _showLogoutDialog,
               child: Container(
@@ -604,201 +604,317 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  Widget _buildSpendingCards() {
-    return Row(
+  // ✅ NEW: BUDGET SECTION
+  Widget _buildBudgetSection(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF7FFFD4),
-              borderRadius: BorderRadius.circular(20),
+        // Section Header
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Ngân sách',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(12),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const BudgetListView(),
                   ),
-                  child: const Icon(Icons.track_changes,
-                      color: Colors.white, size: 28),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'On Goals',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                );
+              },
+              child: const Text('Xem tất cả'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Budget Overview Card
+        _buildBudgetOverviewCard(isDark),
+        
+        const SizedBox(height: 12),
+        
+        // Budget List Preview
+        _buildBudgetListPreview(isDark),
+      ],
+    );
+  }
+
+  // ✅ Budget Overview Card
+  Widget _buildBudgetOverviewCard(bool isDark) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _budgetService.getBudgetStatistics(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            height: 100,
+            alignment: Alignment.center,
+            child: const CircularProgressIndicator(),
+          );
+        }
+
+        final stats = snapshot.data ?? {};
+        final totalBudget = stats['totalBudget'] ?? 0.0;
+        final totalSpent = stats['totalSpent'] ?? 0.0;
+        final averageUsage = stats['averageUsage'] ?? 0.0;
+        final exceededCount = stats['exceededCount'] ?? 0;
+        final warningCount = stats['warningCount'] ?? 0;
+        final budgetCount = stats['budgetCount'] ?? 0;
+
+        if (budgetCount == 0) {
+          return _buildEmptyBudgetCard(isDark);
+        }
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const BudgetListView(),
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: exceededCount > 0
+                    ? [Colors.red[400]!, Colors.red[600]!]
+                    : averageUsage >= 80
+                        ? [Colors.orange[400]!, Colors.orange[600]!]
+                        : [Colors.teal[400]!, Colors.teal[600]!],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: (exceededCount > 0 ? Colors.red : Colors.teal)
+                      .withOpacity(0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
               ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF7FFFD4),
-              borderRadius: BorderRadius.circular(20),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(Icons.shopping_bag_outlined,
-                        size: 16, color: Colors.grey[700]),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Groceries Last Week',
-                      style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                    const Text(
+                      'Tổng quan ngân sách',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Icon(
+                      exceededCount > 0
+                          ? Icons.error
+                          : averageUsage >= 80
+                              ? Icons.warning
+                              : Icons.check_circle,
+                      color: Colors.white,
+                      size: 24,
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                const Text(
-                  '4,000,000 VND',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Tổng ngân sách',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${_currencyFormat.format(totalBudget)}đ',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text(
+                          'Đã chi',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${_currencyFormat.format(totalSpent)}đ',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: averageUsage / 100,
+                    minHeight: 8,
+                    backgroundColor: Colors.white30,
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(Icons.restaurant, size: 16, color: Colors.grey[700]),
-                    const SizedBox(width: 6),
                     Text(
-                      'Food Last Week',
-                      style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                      'Sử dụng: ${averageUsage.toStringAsFixed(1)}%',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
                     ),
+                    if (exceededCount > 0)
+                      Text(
+                        '$exceededCount vượt mức',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    else if (warningCount > 0)
+                      Text(
+                        '$warningCount cảnh báo',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                   ],
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  '100,000 VND',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
-  Widget _buildPeriodSelector() {
-    return Row(
-      children: [
-        _buildPeriodButton('Daily'),
-        const SizedBox(width: 8),
-        _buildPeriodButton('Weekly'),
-        const SizedBox(width: 8),
-        _buildPeriodButton('Monthly'),
-      ],
-    );
-  }
-
-  Widget _buildPeriodButton(String period) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    bool isSelected = selectedPeriod == period;
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            selectedPeriod = period;
-          });
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? const Color(0xFF00CED1)
-                : (isDark ? Colors.grey[800] : Colors.grey[100]),
-            borderRadius: BorderRadius.circular(12),
+  // ✅ Empty Budget Card
+  Widget _buildEmptyBudgetCard(bool isDark) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const BudgetListView(),
           ),
-          child: Center(
-            child: Text(
-              period,
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.grey[800] : Colors.grey[100],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.account_balance_wallet_outlined,
+              size: 48,
+              color: isDark ? Colors.grey[600] : Colors.grey[400],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Chưa có ngân sách',
               style: TextStyle(
-                fontSize: 14,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected
-                    ? Colors.white
-                    : (isDark ? Colors.grey[400] : Colors.grey[700]),
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.grey[300] : Colors.grey[700],
               ),
             ),
-          ),
+            const SizedBox(height: 4),
+            Text(
+              'Tạo ngân sách để kiểm soát chi tiêu',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.grey[500] : Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const BudgetListView(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Tạo ngân sách'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildTransactionList() {
-    if (userId == null) {
-      return const Center(child: Text('Please login'));
-    }
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .collection('transactions')
-          .orderBy('date', descending: true)
-          .limit(5)
-          .snapshots(),
+  // ✅ Budget List Preview (Top 3)
+  Widget _buildBudgetListPreview(bool isDark) {
+    return StreamBuilder<List<BudgetModel>>(
+      stream: _budgetService.getActiveBudgets(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const SizedBox();
         }
 
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Column(
-                children: [
-                  Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No transactions yet',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Add your first transaction to get started',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
-                  ),
-                ],
-              ),
-            ),
-          );
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox();
         }
+
+        final budgets = snapshot.data!.take(3).toList();
 
         return Column(
-          children: snapshot.data!.docs.map((doc) {
-            var txData = doc.data() as Map<String, dynamic>;
-            bool isIncome =
-                txData['type']?.toString().toLowerCase() == 'income';
-
+          children: budgets.map((budget) {
             return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _buildTransactionItem(
-                icon: _getCategoryIcon(txData['category'] ?? 'Other'),
-                iconColor: isIncome ? Colors.green[400]! : Colors.blue[400]!,
-                title: txData['title'] ?? 'No title',
-                date: _formatDate(txData['date']),
-                category: txData['category'] ?? 'Other',
-                amount:
-                    '${isIncome ? '+' : '-'}${_formatCurrency(txData['amount']?.toDouble() ?? 0)} đ',
-                isPositive: isIncome,
-              ),
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _buildBudgetPreviewCard(budget, isDark),
             );
           }).toList(),
         );
@@ -806,37 +922,92 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  IconData _getCategoryIcon(String category) {
-    switch (category.toLowerCase()) {
-      case 'food':
-        return Icons.restaurant;
-      case 'transport':
-        return Icons.directions_car;
-      case 'groceries':
-        return Icons.shopping_cart;
-      case 'rent':
-        return Icons.home;
-      case 'salary':
-        return Icons.attach_money;
-      case 'entertainment':
-        return Icons.movie;
-      default:
-        return Icons.category;
-    }
-  }
-
-  String _formatDate(dynamic timestamp) {
-    if (timestamp == null) return 'Unknown date';
-
-    try {
-      if (timestamp is Timestamp) {
-        DateTime date = timestamp.toDate();
-        return '${date.day}-${date.month}-${date.year}';
-      }
-      return 'Unknown date';
-    } catch (e) {
-      return 'Unknown date';
-    }
+  // ✅ Budget Preview Card (Compact)
+  Widget _buildBudgetPreviewCard(BudgetModel budget, bool isDark) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const BudgetListView(),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.grey[850] : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: budget.statusColor.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: budget.statusColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                budget.categoryIcon,
+                color: budget.statusColor,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    budget.categoryName,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: budget.percentage / 100,
+                      minHeight: 4,
+                      backgroundColor: isDark ? Colors.grey[700] : Colors.grey[200],
+                      valueColor: AlwaysStoppedAnimation<Color>(budget.statusColor),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${budget.percentage.toStringAsFixed(0)}%',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: budget.statusColor,
+                  ),
+                ),
+                Text(
+                  '${_currencyFormat.format(budget.remainingAmount)}đ',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String _formatCurrency(double amount) {
@@ -844,90 +1015,6 @@ class _HomeViewState extends State<HomeView> {
           RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (Match m) => '${m[1]},',
         );
-  }
-
-  Widget _buildTransactionItem({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String date,
-    required String category,
-    required String amount,
-    required bool isPositive,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[800] : Colors.grey[50],
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: iconColor, size: 24),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : Colors.black,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  date,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? Colors.grey[400] : Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[700] : Colors.grey[200],
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  category,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.grey[300] : Colors.grey[700],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                amount,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isPositive ? Colors.green[600] : Colors.red[600],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildBottomNavBar() {
