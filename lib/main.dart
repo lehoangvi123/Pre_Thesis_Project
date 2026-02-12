@@ -10,14 +10,18 @@ import 'package:project1/view/Function/HomeView.dart';
 import './view/ThemeProvider/ThemeProviderDark.dart';
 import './view/Function/Language/MultiLanguage.dart'; 
 import './provider/TransactionProvider.dart';
-import 'package:project1/view/TextVoice/test_voice.dart';
+import 'package:project1/view/TextVoice/test_voice.dart'; 
+import './service/backend_keepalive_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
-  );
+  ); 
+
+  // ✅ Start keep-alive
+  BackendKeepAliveService.start();
 
   await AppLocalizations.loadLanguage();
 

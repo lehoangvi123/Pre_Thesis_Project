@@ -212,7 +212,7 @@ class _TransactionViewState extends State<TransactionView> {
               const SizedBox(height: 8),
               
               Text(
-                'Chọn tính năng bạn muốn sử dụng',
+                'Chọn tính năng bạn muốn sử dụng (beta version)',
                 style: TextStyle(
                   fontSize: 14,
                   color: isDark ? Colors.grey[400] : Colors.grey[600],
@@ -278,7 +278,7 @@ class _TransactionViewState extends State<TransactionView> {
                 isDark: isDark,
                 icon: Icons.receipt_long,
                 iconColor: Colors.orange,
-                title: 'Chụp Ảnh Bill (đang trong quá trình phát triển)',
+                title: 'Chụp Ảnh Bill',
                 subtitle: 'Chụp hóa đơn và thêm giao dịch nhanh chóng',
                 onTap: () {
                   Navigator.pop(context);
