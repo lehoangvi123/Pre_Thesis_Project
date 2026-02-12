@@ -1,5 +1,5 @@
 // lib/view/HomeView.dart
-// COMPLETE VERSION - With Gamification & Login Streak
+// COMPLETE VERSION - With Gamification & Login Streak & Calendar
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -14,6 +14,7 @@ import './gamification_widgets.dart';
 import '../Achivement/Achievement_model.dart';
 import '../Achivement/Achievement_view.dart';
 import './Streak_update/Login_streak_service.dart';
+import '../Calender_Part/Calender.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({Key? key}) : super(key: key);
@@ -33,7 +34,7 @@ class _HomeViewState extends State<HomeView> {
     super.initState();
     userId = FirebaseAuth.instance.currentUser?.uid;
     _loadUserName();
-    _checkLoginStreak(); // ✅ Check streak when app opens
+    _checkLoginStreak();
   }
 
   Future<void> _loadUserName() async {
@@ -79,7 +80,6 @@ class _HomeViewState extends State<HomeView> {
     }
   }
 
-  // ✅ CHECK LOGIN STREAK
   Future<void> _checkLoginStreak() async {
     try {
       final streakData = await LoginStreakService().checkAndUpdateStreak();
@@ -88,7 +88,6 @@ class _HomeViewState extends State<HomeView> {
 
       print('🔥 Streak updated! Current: $currentStreak, Max: $maxStreak');
 
-      // Show notification if streak increased
       if (mounted && currentStreak > 1) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -132,7 +131,6 @@ class _HomeViewState extends State<HomeView> {
                 const SizedBox(height: 24),
                 _buildBalanceCards(),
                 
-                // ✅ GAMIFICATION WIDGETS
                 const SizedBox(height: 16),
                 const AchievementProgressCard(),
                 const StreakTrackerCard(),
@@ -164,6 +162,7 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
+  // ✅ HEADER WITH CALENDAR BUTTON
   Widget _buildHeader() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -193,6 +192,30 @@ class _HomeViewState extends State<HomeView> {
         ),
         Row(
           children: [
+            // ✅ CALENDAR BUTTON
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CalendarView(),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[800] : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.calendar_month,
+                  color: isDark ? Colors.grey[400] : Colors.grey[700],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // NOTIFICATION BUTTON
             GestureDetector(
               onTap: () {
                 Navigator.push(
@@ -215,6 +238,7 @@ class _HomeViewState extends State<HomeView> {
               ),
             ),
             const SizedBox(width: 8),
+            // LOGOUT BUTTON
             GestureDetector(
               onTap: _showLogoutDialog,
               child: Container(
