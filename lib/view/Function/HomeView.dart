@@ -160,7 +160,7 @@ class _HomeViewState extends State<HomeView> {
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: _buildBottomNavBar(),
     );
-  }
+  } 
 
   // ✅ HEADER WITH CALENDAR BUTTON
   Widget _buildHeader() {

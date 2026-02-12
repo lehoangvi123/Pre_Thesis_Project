@@ -24,6 +24,8 @@ class ProfileView extends StatefulWidget {
 class _ProfileViewState extends State<ProfileView> {
   String userName = 'User';
   String userEmail = 'user@example.com';
+  String phoneNumber = '';
+  String bio = '';
   bool isLoading = true;
 
   @override
@@ -34,7 +36,6 @@ class _ProfileViewState extends State<ProfileView> {
 
   @override
   void dispose() {
-    // Clean up any resources if needed
     super.dispose();
   }
 
@@ -52,12 +53,13 @@ class _ProfileViewState extends State<ProfileView> {
           Map<String, dynamic> userData =
               userDoc.data() as Map<String, dynamic>;
 
-          // ✅ CHECK mounted before setState
           if (!mounted) return;
           setState(() {
             userName = userData['name'] ?? currentUser.displayName ?? 'User';
             userEmail =
                 userData['email'] ?? currentUser.email ?? 'user@example.com';
+            phoneNumber = userData['phoneNumber'] ?? '';
+            bio = userData['bio'] ?? '';
             isLoading = false;
           });
 
@@ -65,7 +67,6 @@ class _ProfileViewState extends State<ProfileView> {
           await prefs.setString('user_name', userName);
           await prefs.setString('user_email', userEmail);
         } else {
-          // ✅ CHECK mounted before setState
           if (!mounted) return;
           setState(() {
             userName =
@@ -78,7 +79,6 @@ class _ProfileViewState extends State<ProfileView> {
         }
       } else {
         final prefs = await SharedPreferences.getInstance();
-        // ✅ CHECK mounted before setState
         if (!mounted) return;
         setState(() {
           userName = prefs.getString('user_name') ?? 'User';
@@ -90,7 +90,6 @@ class _ProfileViewState extends State<ProfileView> {
       print('Error loading user data: $e');
       try {
         final prefs = await SharedPreferences.getInstance();
-        // ✅ CHECK mounted before setState
         if (!mounted) return;
         setState(() {
           userName = prefs.getString('user_name') ?? 'User';
@@ -98,7 +97,6 @@ class _ProfileViewState extends State<ProfileView> {
           isLoading = false;
         });
       } catch (e) {
-        // ✅ CHECK mounted before setState
         if (!mounted) return;
         setState(() {
           isLoading = false;
@@ -214,7 +212,6 @@ class _ProfileViewState extends State<ProfileView> {
                                 },
                               ),
                               const SizedBox(height: 12),
-                              // ✅ NEW: FIX DATA BUTTON
                               _buildMenuItem(
                                 icon: Icons.build_circle,
                                 iconColor: Colors.orange[400]!,
@@ -318,87 +315,118 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   Widget _buildProfileHeader() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    return Column(
-      children: [
-        Stack(
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isDark ? Colors.grey[700] : Colors.grey[300],
-                border: Border.all(
-                  color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-                  width: 4,
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  return Column(
+    children: [
+      Stack(
+        children: [
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isDark ? Colors.grey[700] : Colors.grey[300],
+              border: Border.all(
+                color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                width: 4,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.person,
-                size: 50,
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
-              ),
+              ],
             ),
-            Positioned(
-              bottom: 0,
-              right: 0,
-              child: GestureDetector(
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Change profile picture coming soon'),
-                    ),
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF00CED1),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-                      width: 2,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.camera_alt,
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+            child: Icon(
+              Icons.person,
+              size: 50,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Text(
-          userName,
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black,
           ),
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: GestureDetector(
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Change profile picture coming soon'),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00CED1),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                    width: 2,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.camera_alt,
+                  size: 16,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      
+      // Name
+      Text(
+        userName,
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: isDark ? Colors.white : Colors.black,
         ),
-        const SizedBox(height: 4),
-        Text(
-          userEmail,
-          style: TextStyle(
-            fontSize: 14,
-            color: isDark ? Colors.grey[400] : Colors.grey[600],
+      ),
+      const SizedBox(height: 4),
+      
+      // Email
+      Text(
+        userEmail,
+        style: TextStyle(
+          fontSize: 14,
+          color: isDark ? Colors.grey[400] : Colors.grey[600],
+        ),
+      ),
+      
+      // ✅ BIO - NEW
+      if (bio.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          decoration: BoxDecoration(
+            color: isDark 
+                ? const Color(0xFF2C2C2C).withOpacity(0.5)
+                : Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            bio,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? Colors.grey[300] : Colors.grey[700],
+              fontStyle: FontStyle.italic,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
-    );
-  }
+    ],
+  );
+}
+
+
 
   Widget _buildMenuItem({
     required IconData icon,
@@ -458,118 +486,345 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
+  // ✅ NEW BEAUTIFUL EDIT PROFILE DIALOG
   void _showEditProfileDialog() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final TextEditingController nameController = TextEditingController(
-      text: userName,
-    );
+    
+    final nameController = TextEditingController(text: userName);
+    final emailController = TextEditingController(text: userEmail);
+    final phoneController = TextEditingController(text: phoneNumber);
+    final bioController = TextEditingController(text: bio);
 
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
+      builder: (context) {
+        return Dialog(
           backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
           ),
-          title: Text(
-            'Edit Profile',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Colors.black,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.edit,
+                        color: const Color(0xFF00CED1),
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Edit Profile',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Avatar Section
+                  Center(
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isDark ? Colors.grey[700] : Colors.grey[300],
+                            border: Border.all(
+                              color: const Color(0xFF00CED1),
+                              width: 3,
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.person,
+                            size: 50,
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: GestureDetector(
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('📸 Change avatar (Coming soon)'),
+                                  backgroundColor: Color(0xFF00CED1),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00CED1),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                                  width: 2,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 24),
+
+                  // Name Field
+                  _buildTextField(
+                    controller: nameController,
+                    label: 'Full Name',
+                    icon: Icons.person_outline,
+                    isDark: isDark,
+                  ),
+                  
+                  const SizedBox(height: 16),
+
+                  // Email Field
+                  _buildTextField(
+                    controller: emailController,
+                    label: 'Email',
+                    icon: Icons.email_outlined,
+                    isDark: isDark,
+                    enabled: false,
+                  ),
+                  
+                  const SizedBox(height: 16),
+
+                  // Phone Field
+                  _buildTextField(
+                    controller: phoneController,
+                    label: 'Phone Number',
+                    icon: Icons.phone_outlined,
+                    isDark: isDark,
+                    keyboardType: TextInputType.phone,
+                    hint: 'Enter your phone number',
+                  ),
+                  
+                  const SizedBox(height: 16),
+
+                  // Bio Field
+                  _buildTextField(
+                    controller: bioController,
+                    label: 'Bio',
+                    icon: Icons.info_outline,
+                    isDark: isDark,
+                    maxLines: 3,
+                    hint: 'Tell us about yourself...',
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                        },
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: () async {
+                          await _updateProfile(
+                            name: nameController.text,
+                            phone: phoneController.text,
+                            bio: bioController.text,
+                          );
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00CED1),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 32,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Save',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-          content: TextField(
-            controller: nameController,
-            style: TextStyle(
-              color: isDark ? Colors.white : Colors.black,
-            ),
-            decoration: InputDecoration(
-              labelText: 'Name',
-              labelStyle: TextStyle(
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: isDark ? Colors.grey[400] : Colors.grey[600],
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                String newName = nameController.text.trim();
-                if (newName.isNotEmpty && newName != userName) {
-                  await _updateUserProfile(newName);
-                }
-                Navigator.of(context).pop();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00CED1),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Save',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
         );
       },
     );
   }
 
-  Future<void> _updateUserProfile(String newName) async {
+  // Helper: Build Text Field
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required bool isDark,
+    bool enabled = true,
+    int maxLines = 1,
+    String? hint,
+    TextInputType? keyboardType,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.grey[300] : Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          enabled: enabled,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black,
+          ),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(
+              color: isDark ? Colors.grey[600] : Colors.grey[400],
+            ),
+            prefixIcon: Icon(
+              icon,
+              color: const Color(0xFF00CED1),
+            ),
+            filled: true,
+            fillColor: isDark ? Colors.grey[800] : Colors.grey[100],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Color(0xFF00CED1),
+                width: 2,
+              ),
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Update Profile Function
+  Future<void> _updateProfile({
+    required String name,
+    required String phone,
+    required String bio,
+  }) async {
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
 
-      if (currentUser != null) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .update({
-              'name': newName,
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
+      // Update Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .update({
+        'name': name,
+        'phoneNumber': phone,
+        'bio': bio,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
-        await currentUser.updateDisplayName(newName);
+      // Update Auth
+      await currentUser.updateDisplayName(name);
 
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user_name', newName);
+      // Update SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_name', name);
 
-        // ✅ CHECK mounted before setState
-        if (!mounted) return;
-        setState(() {
-          userName = newName;
-        });
+      // Update local state
+      if (!mounted) return;
+      setState(() {
+        userName = name;
+        phoneNumber = phone;
+        this.bio = bio;
+      });
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Profile updated successfully'),
-              backgroundColor: Colors.green,
+      // Show success
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Profile updated successfully!'),
+              ],
             ),
-          );
-        }
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Update failed: $e'),
+            content: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text('Error: ${e.toString()}')),
+              ],
+            ),
             backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -761,4 +1016,4 @@ class _ProfileViewState extends State<ProfileView> {
       ),
     );
   }
-}
+} 
