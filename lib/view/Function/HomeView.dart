@@ -19,6 +19,9 @@ import '../Calender_Part/Calender.dart';
 import './Budget/budget_list_view.dart';
 import './AddTransactionView.dart';
 import './CategorizeContent.dart';
+import '../TextVoice/AI_deep_analysis_view.dart';
+import './AI_Chatbot/chatbot_view.dart';
+import '../../view/Bill_Scanner_Service/Bill_scanner_view.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({Key? key}) : super(key: key);
@@ -130,11 +133,12 @@ class _HomeViewState extends State<HomeView> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'testVoiceBtn',
-        onPressed: () => Navigator.pushNamed(context, '/test-voice'),
-        backgroundColor: Colors.deepPurple,
-        icon: const Icon(Icons.mic, color: Colors.white),
-        label: const Text('Test Voice', style: TextStyle(color: Colors.white)),
+        heroTag: 'quickAnalysisBtn',
+        onPressed: () => _showAIMenuBottomSheet(Theme.of(context).brightness == Brightness.dark),
+        backgroundColor: const Color(0xFF00CED1),
+        icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 22),
+        label: const Text('Phân tích nhanh',
+            style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: _buildBottomNavBar(),
@@ -204,6 +208,131 @@ class _HomeViewState extends State<HomeView> {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(icon, color: isDark ? Colors.grey[400] : Colors.grey[700]),
+      ),
+    );
+  }
+
+  // ✅ Phân tích nhanh bottom sheet
+  void _showAIMenuBottomSheet(bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+          borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(24), topRight: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[600] : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 20),
+            Text('Tính năng phân tích nhanh bao gồm',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black)),
+            const SizedBox(height: 8),
+            Text('Chọn tính năng bạn muốn sử dụng (beta version)',
+                style: TextStyle(fontSize: 14,
+                    color: isDark ? Colors.grey[400] : Colors.grey[600])),
+            const SizedBox(height: 24),
+            _buildAIMenuOption(
+              isDark: isDark,
+              icon: Icons.analytics_outlined,
+              iconColor: const Color(0xFF00CED1),
+              title: 'Phân tích chi tiêu',
+              subtitle: 'Phân tích sâu về thói quen chi tiêu của bạn',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => const AIDeepAnalysisView()));
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Divider(color: isDark ? Colors.grey[700] : Colors.grey[200], height: 1),
+            ),
+            _buildAIMenuOption(
+              isDark: isDark,
+              icon: Icons.chat_bubble_outline,
+              iconColor: Colors.purple,
+              title: 'Chat với AI',
+              subtitle: 'Trò chuyện với trợ lý tài chính thông minh',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => const ChatbotView()));
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Divider(color: isDark ? Colors.grey[700] : Colors.grey[200], height: 1),
+            ),
+            _buildAIMenuOption(
+              isDark: isDark,
+              icon: Icons.receipt_long,
+              iconColor: Colors.orange,
+              title: 'Chụp Ảnh Bill',
+              subtitle: 'Chụp hóa đơn và thêm giao dịch nhanh chóng',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => const BillScannerViewSimple()));
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAIMenuOption({
+    required bool isDark,
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            Container(
+              width: 56, height: 56,
+              decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16)),
+              child: Icon(icon, color: iconColor, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : Colors.black)),
+                  const SizedBox(height: 4),
+                  Text(subtitle,
+                      style: TextStyle(fontSize: 13,
+                          color: isDark ? Colors.grey[400] : Colors.grey[600])),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, size: 16,
+                color: isDark ? Colors.grey[600] : Colors.grey[400]),
+          ],
+        ),
       ),
     );
   }
