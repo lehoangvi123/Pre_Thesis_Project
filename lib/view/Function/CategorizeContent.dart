@@ -251,6 +251,24 @@ class _CategoriesViewState extends State<CategoriesView> {
                   ),
                 ),
                 const SizedBox(width: 8),
+                // ✅ Transaction icon
+                GestureDetector(
+                  onTap: () => Navigator.pushReplacement(context,
+                      MaterialPageRoute(builder: (_) => const TransactionView())),
+                  child: Container(
+                    width: 46, height: 46,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [BoxShadow(
+                          color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+                          blurRadius: 8, offset: const Offset(0, 2))],
+                    ),
+                    child: Icon(Icons.swap_horiz_rounded,
+                        color: isDark ? Colors.grey[300] : Colors.grey[700], size: 22),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Container(
                   width: 46, height: 46,
                   decoration: BoxDecoration(
@@ -730,25 +748,26 @@ class _CategoriesViewState extends State<CategoriesView> {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(Icons.home_rounded, false,
                   isDark ? Colors.grey[400]! : Colors.grey[500]!,
+                  label: 'Home',
                   onTap: () => Navigator.pushReplacement(context,
                       MaterialPageRoute(builder: (_) => const HomeView()))),
               _buildNavItem(Icons.search_rounded, false,
                   isDark ? Colors.grey[400]! : Colors.grey[500]!,
+                  label: 'Analysis',
                   onTap: () => Navigator.pushReplacement(context,
                       MaterialPageRoute(builder: (_) => const AnalysisView()))),
-              _buildNavItem(Icons.swap_horiz_rounded, false,
-                  isDark ? Colors.grey[400]! : Colors.grey[500]!,
-                  onTap: () => Navigator.pushReplacement(context,
-                      MaterialPageRoute(builder: (_) => const TransactionView()))),
-              _buildNavItem(Icons.layers_rounded, true, const Color(0xFF00CED1), onTap: () {}),
+              _buildVoiceNavItem(),
+              _buildNavItem(Icons.layers_rounded, true, const Color(0xFF00CED1),
+                  label: 'Category', onTap: () {}),
               _buildNavItem(Icons.person_outline_rounded, false,
                   isDark ? Colors.grey[400]! : Colors.grey[500]!,
+                  label: 'Profile',
                   onTap: () => Navigator.pushReplacement(context,
                       MaterialPageRoute(builder: (_) => const ProfileView()))),
             ],
@@ -758,16 +777,63 @@ class _CategoriesViewState extends State<CategoriesView> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, bool isActive, Color color, {VoidCallback? onTap}) {
+  Widget _buildVoiceNavItem() {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, '/test-voice'),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 52, height: 52,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF00CED1), Color(0xFF8B5CF6)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF00CED1).withOpacity(0.45),
+                  blurRadius: 12, offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.mic_rounded, color: Colors.white, size: 26),
+          ),
+          const SizedBox(height: 4),
+          const Text('Voice',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
+                  color: Color(0xFF00CED1))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, bool isActive, Color color,
+      {VoidCallback? onTap, String label = ''}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: isActive ? color.withOpacity(0.12) : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Icon(icon, color: color, size: 26),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isActive ? color.withOpacity(0.12) : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: isActive ? color : color, size: 24),
+          ),
+          if (label.isNotEmpty)
+            Text(label,
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                    color: isActive ? color
+                        : isDark ? Colors.grey[500]! : Colors.grey[400]!)),
+        ],
       ),
     );
   }
