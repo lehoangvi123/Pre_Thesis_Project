@@ -18,6 +18,7 @@ import './Streak_update/Login_streak_service.dart';
 import '../Calender_Part/Calender.dart';
 import './Budget/budget_list_view.dart';
 import './AddTransactionView.dart';
+import './CategorizeContent.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({Key? key}) : super(key: key);
@@ -738,141 +739,77 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  // ── Quick Action Buttons (Income / Expense) ──────────────────
   Widget _buildQuickActions() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF2C2C2C)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.07),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const CategoriesView()),
       ),
-      child: Row(
-        children: [
-          // ── Income Button ──
-          Expanded(
-            child: GestureDetector(
-              onTap: () async {
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        const AddTransactionView(initialType: 'income'),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 24),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF00CED1), Color(0xFF009999)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF00CED1).withOpacity(0.35),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                );
-                if (result == true) setState(() {});
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.green[400]!, Colors.green[600]!],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
+                  child: const Icon(Icons.swap_horiz_rounded,
+                      color: Colors.white, size: 24),
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                const SizedBox(width: 14),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.add, color: Colors.white, size: 22),
-                    ),
-                    const SizedBox(height: 8),
                     const Text(
-                      'Thu nhập',
+                      'Quản lý Thu Chi',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 2),
                     Text(
-                      'Thêm thu nhập mới',
+                      'Thêm thu nhập & chi tiêu',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: 11,
-                      ),
+                          color: Colors.white.withOpacity(0.8), fontSize: 12),
                     ),
                   ],
                 ),
-              ),
+              ],
             ),
-          ),
-
-          const SizedBox(width: 8),
-
-          // ── Expense Button ──
-          Expanded(
-            child: GestureDetector(
-              onTap: () async {
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        const AddTransactionView(initialType: 'expense'),
-                  ),
-                );
-                if (result == true) setState(() {});
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.red[400]!, Colors.red[600]!],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.remove, color: Colors.white, size: 22),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Chi tiêu',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Thêm chi tiêu mới',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
               ),
+              child: const Icon(Icons.arrow_forward_ios_rounded,
+                  color: Colors.white, size: 16),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

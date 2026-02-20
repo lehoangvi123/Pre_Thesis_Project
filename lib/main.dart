@@ -3,22 +3,26 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/date_symbol_data_local.dart'; // ✅ THÊM
 import 'firebase_options.dart';
 import 'package:project1/view/login/WelcomeView.dart';
 import 'package:project1/view/login/OnboardingView.dart';
 import 'package:project1/view/Function/HomeView.dart';
 import './view/ThemeProvider/ThemeProviderDark.dart';
-import './view/Function/Language/MultiLanguage.dart'; 
+import './view/Function/Language/MultiLanguage.dart';
 import './provider/TransactionProvider.dart';
-import 'package:project1/view/TextVoice/test_voice.dart'; 
+import 'package:project1/view/TextVoice/test_voice.dart';
 import './service/backend_keepalive_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ✅ THÊM: Init locale tiếng Việt trước khi chạy app
+  await initializeDateFormatting('vi', null);
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
-  ); 
+  );
 
   // ✅ Start keep-alive
   BackendKeepAliveService.start();
@@ -49,29 +53,26 @@ class MyApp extends StatelessWidget {
           theme: themeProvider.lightTheme,
           darkTheme: themeProvider.darkTheme,
           themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-          
-          home: const AuthWrapper(), 
-          
+          home: const AuthWrapper(),
           routes: {
             '/welcome': (context) => const WelcomeView(),
             '/onboarding': (context) => const OnboardingView(),
             '/home': (context) => const HomeView(),
             '/test-voice': (context) => TestVoiceView(),
           },
-        ); 
+        );
       },
     );
   }
 }
 
-
 class AuthWrapper extends StatelessWidget {
-  const AuthWrapper({Key? key}) : super(key: key); 
+  const AuthWrapper({Key? key}) : super(key: key);
 
   Future<void> main() async {
-  await dotenv.load(fileName: ".env");
-  runApp(MyApp()); 
-} 
+    await dotenv.load(fileName: ".env");
+    runApp(MyApp());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,12 +81,12 @@ class AuthWrapper extends StatelessWidget {
       builder: (context, snapshot) {
         // Loading State
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold( 
+          return Scaffold(
             backgroundColor: const Color(0xFF00BCD4),
             body: Center(
-              child: Column( 
+              child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [ 
+                children: [
                   Container(
                     width: 120,
                     height: 120,
@@ -116,15 +117,13 @@ class AuthWrapper extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const CircularProgressIndicator(
-                    color: Colors.white,
-                  ),
+                  const CircularProgressIndicator(color: Colors.white),
                 ],
               ),
             ),
           );
         }
-        
+
         // Error State
         if (snapshot.hasError) {
           return Scaffold(
@@ -134,17 +133,13 @@ class AuthWrapper extends StatelessWidget {
                 children: [
                   const Icon(Icons.error_outline, size: 80, color: Colors.red),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Something went wrong',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
+                  const Text('Something went wrong',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 24),
                   ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (_) => const MyApp()),
-                      );
-                    },
+                    onPressed: () => Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => const MyApp()),
+                    ),
                     child: const Text('Retry'),
                   ),
                 ],
@@ -152,16 +147,15 @@ class AuthWrapper extends StatelessWidget {
             ),
           );
         }
-        
-        
+
         // User Logged In
         if (snapshot.hasData && snapshot.data != null) {
           return const HomeView();
         }
-        
+
         // No User
         return const WelcomeView();
       },
     );
   }
-} 
+}
