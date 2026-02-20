@@ -77,7 +77,7 @@ class _AchievementsViewState extends State<AchievementsView> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
+    return Scaffold(         
       backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: const Text('🏆 Thành Tích'),

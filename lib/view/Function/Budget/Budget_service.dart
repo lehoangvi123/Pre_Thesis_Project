@@ -1,5 +1,5 @@
 // lib/service/budget_service.dart
-// Budget Service - CRUD operations và tính toán
+// Budget Service - FIXED: Không cần composite index
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -11,11 +11,10 @@ class BudgetService {
 
   String get _userId => _auth.currentUser?.uid ?? '';
 
-  // Collection reference
   CollectionReference get _budgetsCollection =>
       _firestore.collection('budgets');
 
-  // CREATE: Tạo budget mới
+  // CREATE
   Future<String> createBudget(BudgetModel budget) async {
     try {
       final docRef = await _budgetsCollection.add(budget.toMap());
@@ -25,91 +24,95 @@ class BudgetService {
     }
   }
 
-  // READ: Lấy tất cả budgets của user
-  Stream<List<BudgetModel>> getBudgets() {
-    return _budgetsCollection
-        .where('userId', isEqualTo: _userId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .asyncMap((snapshot) async {
-      List<BudgetModel> budgets = [];
-      
-      for (var doc in snapshot.docs) {
-        final budget = BudgetModel.fromMap(
-          doc.id,
-          doc.data() as Map<String, dynamic>,
-        );
-        
-        // Tính spent amount real-time
-        final spent = await _calculateSpentAmount(
-          budget.categoryId,
-          budget.startDate,
-          budget.endDate,
-        );
-        
-        budgets.add(budget.copyWith(spentAmount: spent));
-      }
-      
-      return budgets;
-    });
-  }
-
-  // READ: Lấy active budgets (chưa hết hạn)
+  // READ: Active budgets - FIX: bỏ orderBy để tránh lỗi index
   Stream<List<BudgetModel>> getActiveBudgets() {
     final now = DateTime.now();
-    
+
     return _budgetsCollection
         .where('userId', isEqualTo: _userId)
         .where('endDate', isGreaterThanOrEqualTo: Timestamp.fromDate(now))
-        .orderBy('endDate')
+        // ❌ Bỏ .orderBy('endDate') để tránh lỗi Firestore index
         .snapshots()
         .asyncMap((snapshot) async {
       List<BudgetModel> budgets = [];
-      
+
       for (var doc in snapshot.docs) {
         final budget = BudgetModel.fromMap(
           doc.id,
           doc.data() as Map<String, dynamic>,
         );
-        
+
         final spent = await _calculateSpentAmount(
           budget.categoryId,
           budget.startDate,
           budget.endDate,
         );
-        
+
         budgets.add(budget.copyWith(spentAmount: spent));
       }
-      
+
+      // ✅ Sort ở client thay vì Firestore
+      budgets.sort((a, b) => a.endDate.compareTo(b.endDate));
+
       return budgets;
     });
   }
 
-  // READ: Lấy budget theo ID
+  // READ: Tất cả budgets
+  Stream<List<BudgetModel>> getBudgets() {
+    return _budgetsCollection
+        .where('userId', isEqualTo: _userId)
+        // ❌ Bỏ .orderBy('createdAt') để tránh lỗi index
+        .snapshots()
+        .asyncMap((snapshot) async {
+      List<BudgetModel> budgets = [];
+
+      for (var doc in snapshot.docs) {
+        final budget = BudgetModel.fromMap(
+          doc.id,
+          doc.data() as Map<String, dynamic>,
+        );
+
+        final spent = await _calculateSpentAmount(
+          budget.categoryId,
+          budget.startDate,
+          budget.endDate,
+        );
+
+        budgets.add(budget.copyWith(spentAmount: spent));
+      }
+
+      // ✅ Sort ở client
+      budgets.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      return budgets;
+    });
+  }
+
+  // READ by ID
   Future<BudgetModel?> getBudgetById(String budgetId) async {
     try {
       final doc = await _budgetsCollection.doc(budgetId).get();
-      
       if (!doc.exists) return null;
-      
+
       final budget = BudgetModel.fromMap(
         doc.id,
         doc.data() as Map<String, dynamic>,
       );
-      
+
       final spent = await _calculateSpentAmount(
         budget.categoryId,
         budget.startDate,
         budget.endDate,
       );
-      
+
       return budget.copyWith(spentAmount: spent);
     } catch (e) {
       throw Exception('Không thể lấy ngân sách: $e');
     }
   }
 
-  // UPDATE: Cập nhật budget
+  // UPDATE
   Future<void> updateBudget(String budgetId, BudgetModel budget) async {
     try {
       await _budgetsCollection.doc(budgetId).update(
@@ -120,7 +123,7 @@ class BudgetService {
     }
   }
 
-  // DELETE: Xóa budget
+  // DELETE
   Future<void> deleteBudget(String budgetId) async {
     try {
       await _budgetsCollection.doc(budgetId).delete();
@@ -129,51 +132,62 @@ class BudgetService {
     }
   }
 
-  // CALCULATE: Tính tổng chi tiêu trong khoảng thời gian
+  // CALCULATE spent amount
   Future<double> _calculateSpentAmount(
     String categoryId,
     DateTime startDate,
     DateTime endDate,
   ) async {
     try {
+      // ✅ Chỉ dùng where đơn giản, không orderBy
       final snapshot = await _firestore
           .collection('transactions')
           .where('userId', isEqualTo: _userId)
           .where('categoryId', isEqualTo: categoryId)
           .where('type', isEqualTo: 'expense')
-          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
-          .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
           .get();
 
       double total = 0.0;
       for (var doc in snapshot.docs) {
-        final amount = (doc.data()['amount'] ?? 0.0) as num;
-        total += amount.toDouble();
+        final data = doc.data();
+        final date = (data['date'] as Timestamp).toDate();
+
+        // ✅ Filter theo ngày ở client
+        if (date.isAfter(startDate.subtract(const Duration(seconds: 1))) &&
+            date.isBefore(endDate.add(const Duration(seconds: 1)))) {
+          final amount = (data['amount'] ?? 0.0) as num;
+          total += amount.toDouble();
+        }
       }
 
       return total;
     } catch (e) {
-      print('Error calculating spent amount: $e');
+      print('Error calculating spent: $e');
       return 0.0;
     }
   }
 
-  // GET: Lấy budget cho category cụ thể (nếu có)
+  // GET by category
   Future<BudgetModel?> getBudgetByCategory(String categoryId) async {
     try {
       final now = DateTime.now();
       final snapshot = await _budgetsCollection
           .where('userId', isEqualTo: _userId)
           .where('categoryId', isEqualTo: categoryId)
-          .where('endDate', isGreaterThanOrEqualTo: Timestamp.fromDate(now))
-          .limit(1)
           .get();
 
-      if (snapshot.docs.isEmpty) return null;
+      // ✅ Filter ở client
+      final activeDocs = snapshot.docs.where((doc) {
+        final endDate = (doc.data() as Map<String, dynamic>)['endDate'];
+        if (endDate == null) return false;
+        return (endDate as Timestamp).toDate().isAfter(now);
+      }).toList();
+
+      if (activeDocs.isEmpty) return null;
 
       final budget = BudgetModel.fromMap(
-        snapshot.docs.first.id,
-        snapshot.docs.first.data() as Map<String, dynamic>,
+        activeDocs.first.id,
+        activeDocs.first.data() as Map<String, dynamic>,
       );
 
       final spent = await _calculateSpentAmount(
@@ -189,20 +203,16 @@ class BudgetService {
     }
   }
 
-  // CHECK: Kiểm tra budget khi thêm transaction mới
+  // CHECK budget khi thêm transaction
   Future<Map<String, dynamic>> checkBudgetStatus(
     String categoryId,
     double newExpenseAmount,
   ) async {
     try {
       final budget = await getBudgetByCategory(categoryId);
-      
+
       if (budget == null) {
-        return {
-          'hasBudget': false,
-          'exceeded': false,
-          'warning': false,
-        };
+        return {'hasBudget': false, 'exceeded': false, 'warning': false};
       }
 
       final newSpentAmount = budget.spentAmount + newExpenseAmount;
@@ -223,48 +233,11 @@ class BudgetService {
     }
   }
 
-  // AUTO RESET: Reset budgets hết hạn (chạy định kỳ)
-  Future<void> autoResetExpiredBudgets() async {
-    try {
-      final now = DateTime.now();
-      final snapshot = await _budgetsCollection
-          .where('userId', isEqualTo: _userId)
-          .where('autoReset', isEqualTo: true)
-          .where('endDate', isLessThan: Timestamp.fromDate(now))
-          .get();
-
-      for (var doc in snapshot.docs) {
-        final budget = BudgetModel.fromMap(
-          doc.id,
-          doc.data() as Map<String, dynamic>,
-        );
-
-        // Tạo budget mới cho kỳ tiếp theo
-        final newStartDate = budget.endDate;
-        final newEndDate = calculateEndDate(newStartDate, budget.period);
-
-        final newBudget = budget.copyWith(
-          startDate: newStartDate,
-          endDate: newEndDate,
-          spentAmount: 0.0,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-
-        // Xóa budget cũ và tạo mới
-        await _budgetsCollection.doc(doc.id).delete();
-        await createBudget(newBudget);
-      }
-    } catch (e) {
-      print('Error auto-resetting budgets: $e');
-    }
-  }
-
-  // STATISTICS: Thống kê tổng quan
+  // STATISTICS
   Future<Map<String, dynamic>> getBudgetStatistics() async {
     try {
       final budgets = await getActiveBudgets().first;
-      
+
       if (budgets.isEmpty) {
         return {
           'totalBudget': 0.0,
@@ -273,6 +246,7 @@ class BudgetService {
           'averageUsage': 0.0,
           'exceededCount': 0,
           'warningCount': 0,
+          'budgetCount': 0,
         };
       }
 
@@ -284,9 +258,8 @@ class BudgetService {
       for (var budget in budgets) {
         totalBudget += budget.limitAmount;
         totalSpent += budget.spentAmount;
-        
         if (budget.status == BudgetStatus.exceeded) exceededCount++;
-        if (budget.status == BudgetStatus.warning || 
+        if (budget.status == BudgetStatus.warning ||
             budget.status == BudgetStatus.danger) warningCount++;
       }
 
@@ -300,7 +273,7 @@ class BudgetService {
         'budgetCount': budgets.length,
       };
     } catch (e) {
-      print('Error getting budget statistics: $e');
+      print('Error getting statistics: $e');
       return {};
     }
   }

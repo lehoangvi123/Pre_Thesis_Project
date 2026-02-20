@@ -284,7 +284,7 @@ Widget _buildHeader() {
                           builder: (context) => const NotificationView(),
                         ),
                       );
-                    },
+                    }, 
                     borderRadius: BorderRadius.circular(12),
                     child: Center(
                       child: Icon(

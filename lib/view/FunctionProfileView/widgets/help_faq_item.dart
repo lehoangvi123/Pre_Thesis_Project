@@ -20,7 +20,7 @@ class HelpFAQItem extends StatelessWidget {
         child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          title: Text(
+          title: Text( 
             faq.question,
             style: const TextStyle(
               fontSize: 14,
