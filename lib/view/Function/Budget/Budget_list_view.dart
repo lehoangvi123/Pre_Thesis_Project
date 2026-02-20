@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import './budget_model.dart';
 import './Create_budget_view.dart';
 import './Budget_detail_view.dart';
+import './Budget_detail_view.dart';
 
 class BudgetListView extends StatefulWidget {
   const BudgetListView({Key? key}) : super(key: key);
@@ -157,6 +158,18 @@ class _BudgetListViewState extends State<BudgetListView> {
     );
   }
 
+  void _goToDetail(Map<String, dynamic> budget) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BudgetDetailView(
+          budget: budget,
+          budgetId: budget['id'] ?? '',
+        ),
+      ),
+    ).then((_) => setState(() {}));
+  }
+
   void _goToCreate() {
     Navigator.push(
       context,
@@ -272,10 +285,7 @@ class _BudgetListViewState extends State<BudgetListView> {
                 : 'Tốt';
 
     return GestureDetector(
-      onTap: () {
-        // Navigate to detail nếu có BudgetModel
-        // Navigator.push(context, MaterialPageRoute(builder: (_) => BudgetDetailView(...)));
-      },
+      onTap: () => _goToDetail(data),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
