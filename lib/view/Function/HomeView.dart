@@ -43,7 +43,7 @@ class _HomeViewState extends State<HomeView> {
     userId = FirebaseAuth.instance.currentUser?.uid;
     _loadUserName();
     _checkLoginStreak();
-  }
+  } 
 
   Future<void> _loadUserName() async {
     try {
