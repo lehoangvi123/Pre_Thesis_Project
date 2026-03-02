@@ -12,7 +12,7 @@ import './Bill_manual_entry_view.dart';
 
 enum ScanMode {
   manual,    // Chụp ảnh → Nhập tay
-  autoOCR,   // Chụp ảnh → OCR tự động
+  autoOCR,   // Chụp ảnh → OCR tự động 
 }
 
 class BillScannerViewSimple extends StatefulWidget {

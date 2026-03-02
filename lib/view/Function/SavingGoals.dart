@@ -34,7 +34,7 @@ class SavingGoal {
   // Remaining amount
   double get remainingAmount {
     return (targetAmount - currentAmount).clamp(0, double.infinity);
-  }
+  } 
 
   // Is goal completed?
   bool get isCompleted => currentAmount >= targetAmount;
@@ -43,9 +43,9 @@ class SavingGoal {
   Map<String, dynamic> toMap() {
     return {
       'title': title,
-      'targetAmount': targetAmount,
-      'currentAmount': currentAmount,
-      'icon': icon,
+      'targetAmount': targetAmount, 
+      'currentAmount': currentAmount, 
+      'icon': icon, 
       'color': color,
       'createdAt': Timestamp.fromDate(createdAt),
       'targetDate': targetDate != null ? Timestamp.fromDate(targetDate!) : null,

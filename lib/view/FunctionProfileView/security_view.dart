@@ -12,7 +12,7 @@ class SecurityView extends StatefulWidget {
 
   @override
   State<SecurityView> createState() => _SecurityViewState();
-}
+}  
 
 class _SecurityViewState extends State<SecurityView> {
   bool isTwoFactorEnabled = false;

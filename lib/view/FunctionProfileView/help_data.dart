@@ -12,8 +12,8 @@ class HelpCategory {
     required this.title,
     required this.icon,
     required this.color,
-    required this.faqs,
-  });
+    required this.faqs,  
+  });  
 }
 
 class HelpFAQ {

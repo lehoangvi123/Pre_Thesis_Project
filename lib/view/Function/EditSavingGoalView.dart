@@ -11,7 +11,7 @@ class EditSavingGoalView extends StatefulWidget {
 
   @override
   State<EditSavingGoalView> createState() => _EditSavingGoalViewState();
-}
+} 
 
 class _EditSavingGoalViewState extends State<EditSavingGoalView> {
   final _formKey = GlobalKey<FormState>();
