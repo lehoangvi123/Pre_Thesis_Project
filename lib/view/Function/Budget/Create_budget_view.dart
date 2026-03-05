@@ -1,5 +1,6 @@
 // lib/view/Budget/create_budget_view.dart
 // Create Budget View - Tạo ngân sách mới
+// UPDATED: Added income warning dialog
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,7 +9,7 @@ import './budget_model.dart';
 import './budget_service.dart';
 
 class CreateBudgetView extends StatefulWidget {
-  final BudgetModel? budgetToEdit; // Null nếu tạo mới, có giá trị nếu edit
+  final BudgetModel? budgetToEdit;
 
   const CreateBudgetView({Key? key, this.budgetToEdit}) : super(key: key);
 
@@ -30,10 +31,13 @@ class _CreateBudgetViewState extends State<CreateBudgetView> {
   bool _autoReset = true;
   bool _alertEnabled = true;
   double _alertThreshold = 80.0;
-
   bool _isLoading = false;
 
-  // Predefined categories (giống với expense categories)
+  // ✅ NEW: Income tracking
+  double _totalIncome = 0;
+  double _currentTotalBudget = 0;
+  double _enteredAmount = 0;
+
   final List<Map<String, dynamic>> _categories = [
     {'id': 'food', 'name': 'Ăn uống', 'icon': Icons.restaurant},
     {'id': 'transport', 'name': 'Đi lại', 'icon': Icons.directions_car},
@@ -52,6 +56,7 @@ class _CreateBudgetViewState extends State<CreateBudgetView> {
     if (widget.budgetToEdit != null) {
       _loadBudgetData();
     }
+    _loadIncomeData(); // ✅ NEW
   }
 
   void _loadBudgetData() {
@@ -65,6 +70,226 @@ class _CreateBudgetViewState extends State<CreateBudgetView> {
     _autoReset = budget.autoReset;
     _alertEnabled = budget.alertEnabled;
     _alertThreshold = budget.alertThreshold;
+    _enteredAmount = budget.limitAmount;
+  }
+
+  // ✅ NEW: Load income and existing budget total
+  Future<void> _loadIncomeData() async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0);
+
+      // Get total income this month
+      final incomeSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('transactions')
+          .where('type', isEqualTo: 'income')
+          .where('date',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
+          .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
+          .get();
+
+      double totalIncome = 0;
+      for (var doc in incomeSnapshot.docs) {
+        totalIncome += (doc.data()['amount'] as num).toDouble();
+      }
+
+      // Get total existing budgets
+      final budgetSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('budgets')
+          .get();
+
+      double totalBudget = 0;
+      for (var doc in budgetSnapshot.docs) {
+        if (widget.budgetToEdit != null && doc.id == widget.budgetToEdit!.id)
+          continue;
+        totalBudget += (doc.data()['limitAmount'] as num).toDouble();
+      }
+
+      if (mounted) {
+        setState(() {
+          _totalIncome = totalIncome;
+          _currentTotalBudget = totalBudget;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading income: $e');
+    }
+  }
+
+  // ✅ NEW: Format VND
+  String _formatVND(double amount) {
+    return amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(
+            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},') +
+        'đ';
+  }
+
+  // ✅ NEW: Computed helpers
+  double get _projectedTotal => _currentTotalBudget + _enteredAmount;
+  bool get _exceedsIncome =>
+      _totalIncome > 0 && _projectedTotal > _totalIncome;
+  double get _remainingBudgetable =>
+      (_totalIncome - _currentTotalBudget).clamp(0, double.infinity);
+  double get _projectedPercent => _totalIncome > 0
+      ? (_projectedTotal / _totalIncome * 100).clamp(0, 150)
+      : 0;
+  Color get _progressColor {
+    if (_projectedPercent >= 100) return Colors.red;
+    if (_projectedPercent >= 90) return Colors.deepOrange;
+    if (_projectedPercent >= 80) return Colors.orange;
+    return Colors.teal;
+  }
+
+  // ✅ NEW: Track amount as user types
+  void _onAmountChanged(String value) {
+    final amount = double.tryParse(value.replaceAll(',', '')) ?? 0;
+    setState(() => _enteredAmount = amount);
+  }
+
+  // ✅ NEW: Show warning dialog when budget exceeds income
+  Future<bool> _showIncomeWarningDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.warning_amber_rounded,
+                      color: Colors.red, size: 40),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Vượt quá thu nhập!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Tổng ngân sách của bạn sẽ vượt quá thu nhập hàng tháng.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 16),
+                // Summary table
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      _dialogRow('💰 Thu nhập tháng',
+                          _formatVND(_totalIncome), Colors.green),
+                      const SizedBox(height: 8),
+                      _dialogRow('📊 Đã ngân sách',
+                          _formatVND(_currentTotalBudget), Colors.blue),
+                      const SizedBox(height: 8),
+                      _dialogRow('➕ Ngân sách mới',
+                          _formatVND(_enteredAmount), Colors.orange),
+                      const Divider(height: 16),
+                      _dialogRow('⚠️ Tổng cộng',
+                          _formatVND(_projectedTotal), Colors.red),
+                      const SizedBox(height: 8),
+                      _dialogRow('✅ Tối đa còn lại',
+                          _formatVND(_remainingBudgetable), Colors.teal),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Progress bar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: (_projectedPercent / 100).clamp(0.0, 1.0),
+                    backgroundColor: Colors.grey[300],
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(Colors.red),
+                    minHeight: 10,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Tổng ngân sách chiếm ${_projectedPercent.toStringAsFixed(1)}% thu nhập',
+                  style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.red,
+                      fontWeight: FontWeight.w500),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              // Cancel - go back and fix
+              OutlinedButton(
+                onPressed: () => Navigator.pop(context, false),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.teal),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 12),
+                ),
+                child: const Text('Sửa lại',
+                    style: TextStyle(color: Colors.teal)),
+              ),
+              const SizedBox(width: 8),
+              // Force save anyway
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 12),
+                ),
+                child: const Text('Vẫn lưu',
+                    style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Widget _dialogRow(String label, String value, Color color) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 13)),
+        Text(value,
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: color)),
+      ],
+    );
   }
 
   @override
@@ -91,27 +316,50 @@ class _CreateBudgetViewState extends State<CreateBudgetView> {
             TextFormField(
               controller: _amountController,
               keyboardType: TextInputType.number,
+              onChanged: _onAmountChanged, // ✅ NEW
               decoration: InputDecoration(
                 hintText: 'Nhập số tiền',
                 suffixText: 'đ',
                 prefixIcon: const Icon(Icons.attach_money),
+                // ✅ NEW: Red border when exceeds income
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: _exceedsIncome
+                        ? Colors.red
+                        : Colors.grey.shade400,
+                    width: _exceedsIncome ? 2 : 1,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: _exceedsIncome ? Colors.red : Colors.teal,
+                    width: 2,
+                  ),
                 ),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Vui lòng nhập số tiền';
                 }
-                if (double.tryParse(value) == null) {
+                if (double.tryParse(value.replaceAll(',', '')) == null) {
                   return 'Số tiền không hợp lệ';
                 }
-                if (double.parse(value) <= 0) {
+                if (double.parse(value.replaceAll(',', '')) <= 0) {
                   return 'Số tiền phải lớn hơn 0';
                 }
                 return null;
               },
             ),
+
+            // ✅ NEW: Live warning banner below input
+            if (_enteredAmount > 0 && _totalIncome > 0)
+              _buildLiveWarningBanner(),
+
             const SizedBox(height: 24),
 
             // Period Selection
@@ -194,6 +442,11 @@ class _CreateBudgetViewState extends State<CreateBudgetView> {
             ElevatedButton(
               onPressed: _isLoading ? null : _submitForm,
               style: ElevatedButton.styleFrom(
+                // ✅ NEW: Orange when warning, red when exceeded
+                backgroundColor: _exceedsIncome
+                    ? Colors.red.shade400
+                    : Colors.teal,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -203,15 +456,109 @@ class _CreateBudgetViewState extends State<CreateBudgetView> {
                   ? const SizedBox(
                       height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(strokeWidth: 2,
+                          color: Colors.white),
                     )
-                  : Text(
-                      isEditing ? 'Cập nhật' : 'Tạo ngân sách',
-                      style: const TextStyle(fontSize: 16),
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (_exceedsIncome)
+                          const Icon(Icons.warning_amber_rounded,
+                              color: Colors.white, size: 20),
+                        if (_exceedsIncome) const SizedBox(width: 8),
+                        Text(
+                          isEditing ? 'Cập nhật' : 'Tạo ngân sách',
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      ],
                     ),
             ),
+            const SizedBox(height: 20),
           ],
         ),
+      ),
+    );
+  }
+
+  // ✅ NEW: Live warning banner under amount field
+  Widget _buildLiveWarningBanner() {
+    final color = _progressColor;
+    final String statusText;
+    final IconData statusIcon;
+
+    if (_exceedsIncome) {
+      statusText =
+          '🚫 Vượt thu nhập ${_formatVND(_projectedTotal - _totalIncome)} — nhấn "Tạo ngân sách" để xem chi tiết';
+      statusIcon = Icons.block;
+    } else if (_projectedPercent >= 90) {
+      statusText =
+          '🔴 Rất cao (${_projectedPercent.toStringAsFixed(1)}%) — ít dư để tiết kiệm';
+      statusIcon = Icons.warning_amber_rounded;
+    } else if (_projectedPercent >= 80) {
+      statusText =
+          '🟡 Đang tiếp cận giới hạn (${_projectedPercent.toStringAsFixed(1)}%)';
+      statusIcon = Icons.info_outline;
+    } else {
+      statusText =
+          '🟢 Hợp lý — còn lại ${_formatVND(_totalIncome - _projectedTotal)}';
+      statusIcon = Icons.check_circle_outline;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.4), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(statusIcon, color: color, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(statusText,
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        color: color,
+                        fontWeight: FontWeight.w500)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Progress bar
+          Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: (_projectedPercent / 100).clamp(0.0, 1.0),
+                    backgroundColor: color.withOpacity(0.15),
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                    minHeight: 8,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${_projectedPercent.toStringAsFixed(0)}%',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: color,
+                    fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Thu nhập: ${_formatVND(_totalIncome)}  •  Đã phân bổ: ${_formatVND(_projectedTotal)}',
+            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+          ),
+        ],
       ),
     );
   }
@@ -244,7 +591,8 @@ class _CreateBudgetViewState extends State<CreateBudgetView> {
             });
           },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: isSelected
                   ? Colors.teal
@@ -282,7 +630,6 @@ class _CreateBudgetViewState extends State<CreateBudgetView> {
   Widget _buildPeriodSelector(bool isDark) {
     return Column(
       children: BudgetPeriod.values.map((period) {
-        final isSelected = _selectedPeriod == period;
         return RadioListTile<BudgetPeriod>(
           title: Text(periodToString(period)),
           value: period,
@@ -323,13 +670,20 @@ class _CreateBudgetViewState extends State<CreateBudgetView> {
       return;
     }
 
+    // ✅ NEW: Show warning dialog if exceeds income
+    if (_exceedsIncome) {
+      final shouldContinue = await _showIncomeWarningDialog();
+      if (!shouldContinue) return; // User chose "Sửa lại"
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
       final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-      final amount = double.parse(_amountController.text);
+      final amount =
+          double.parse(_amountController.text.replaceAll(',', ''));
       final endDate = calculateEndDate(_startDate, _selectedPeriod);
 
       final budget = BudgetModel(
