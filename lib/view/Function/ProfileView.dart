@@ -740,7 +740,7 @@ class _ProfileViewState extends State<ProfileView> {
                         ? color
                         : isDark ? Colors.grey[500]! : Colors.grey[400]!)),
         ],
-      ),
+      ), 
     );
   }
 }

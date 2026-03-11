@@ -20,9 +20,19 @@ class CustomBarChartWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     // Get max value để tính maxY
     double maxValue = totalIncome > totalExpense ? totalIncome : totalExpense;
-    
+
+    // ✅ FIX: Nếu cả hai đều = 0, dùng giá trị mặc định để tránh lỗi
+    if (maxValue == 0) maxValue = 1;
+
     // MaxY với buffer 10%
     double maxY = maxValue * 1.1;
+
+    // ✅ FIX: interval không được = 0
+    double leftInterval = maxValue / 5;
+    if (leftInterval <= 0) leftInterval = 1;
+
+    double gridInterval = maxY / 5;
+    if (gridInterval <= 0) gridInterval = 1;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -50,10 +60,10 @@ class CustomBarChartWidget extends StatelessWidget {
               },
             ),
           ),
-          
+
           titlesData: FlTitlesData(
             show: true,
-            
+
             // ✅ BOTTOM TITLES - Thu / Chi
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
@@ -89,18 +99,18 @@ class CustomBarChartWidget extends StatelessWidget {
                 },
               ),
             ),
-            
+
             // ✅ LEFT TITLES - Amounts
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 65,
-                interval: maxY / 5,
+                interval: leftInterval, // ✅ FIXED
                 getTitlesWidget: (value, meta) {
                   if (value < maxY * 0.01) {
                     return const SizedBox();
                   }
-                  
+
                   return Padding(
                     padding: const EdgeInsets.only(right: 4),
                     child: Text(
@@ -116,7 +126,7 @@ class CustomBarChartWidget extends StatelessWidget {
                 },
               ),
             ),
-            
+
             topTitles: AxisTitles(
               sideTitles: SideTitles(showTitles: false),
             ),
@@ -124,12 +134,12 @@ class CustomBarChartWidget extends StatelessWidget {
               sideTitles: SideTitles(showTitles: false),
             ),
           ),
-          
+
           // ✅ GRID LINES
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
-            horizontalInterval: maxY / 5,
+            horizontalInterval: gridInterval, // ✅ FIXED
             getDrawingHorizontalLine: (value) {
               return FlLine(
                 color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
@@ -138,7 +148,7 @@ class CustomBarChartWidget extends StatelessWidget {
               );
             },
           ),
-          
+
           borderData: FlBorderData(
             show: true,
             border: Border(
@@ -152,7 +162,7 @@ class CustomBarChartWidget extends StatelessWidget {
               ),
             ),
           ),
-          
+
           // ✅ CHỈ 2 CỘT
           barGroups: [
             // Cột 1: Thu nhập

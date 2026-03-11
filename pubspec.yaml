@@ -34,7 +34,8 @@ dependencies:
   confetti: ^0.8.0 
   camera: ^0.10.5
   timezone: ^0.9.2 
-  table_calendar: ^3.0.9
+  table_calendar: ^3.0.9 
+  
 
 
   

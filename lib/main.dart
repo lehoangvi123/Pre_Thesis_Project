@@ -61,7 +61,7 @@ class MyApp extends StatelessWidget {
             '/test-voice': (context) => TestVoiceView(),
           },
         );
-      },
+      },    
     );
   }
 }
@@ -155,7 +155,7 @@ class AuthWrapper extends StatelessWidget {
 
         // No User
         return const WelcomeView();
-      },
+      }, 
     );
   }
-}
+} 
