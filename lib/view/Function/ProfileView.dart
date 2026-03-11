@@ -13,6 +13,7 @@ import '../FunctionProfileView/converting_currency_view.dart';
 import '../FunctionProfileView//security_view.dart';
 import '../FunctionProfileView/settings_view.dart';
 import './FixDataScript.dart';
+import '../Function/Reset_data/Reset_data_service.dart'; // ✅ THÊM MỚI
 
 class ProfileView extends StatefulWidget {
   const ProfileView({Key? key}) : super(key: key);
@@ -27,6 +28,8 @@ class _ProfileViewState extends State<ProfileView> {
   String phoneNumber = '';
   String bio = '';
   bool isLoading = true;
+  bool _isResetting = false; // ✅ THÊM MỚI
+  final ResetDataService _resetService = ResetDataService(); // ✅ THÊM MỚI
 
   @override
   void initState() {
@@ -91,6 +94,106 @@ class _ProfileViewState extends State<ProfileView> {
         if (!mounted) return;
         setState(() { isLoading = false; });
       }
+    }
+  }
+
+  // ✅ THÊM MỚI: Hàm hiện dialog xác nhận reset
+  void _showResetDataDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            SizedBox(width: 8),
+            Text(
+              'Xóa toàn bộ dữ liệu',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Text(
+          'Hành động này sẽ xóa toàn bộ:\n\n'
+          '• Tất cả giao dịch thu/chi\n'
+          '• Tất cả ngân sách\n'
+          '• Tất cả mục tiêu tiết kiệm\n'
+          '• Reset số dư, thu nhập, chi tiêu về 0\n\n'
+          'Dữ liệu sẽ không thể khôi phục. Bạn có chắc chắn không?',
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.5,
+            color: isDark ? Colors.grey[300] : Colors.black87,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Hủy',
+              style: TextStyle(
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                fontSize: 15,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _performReset();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Xóa tất cả',
+              style: TextStyle(color: Colors.white, fontSize: 15),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ THÊM MỚI: Hàm thực hiện reset
+  Future<void> _performReset() async {
+    setState(() => _isResetting = true);
+    try {
+      await _resetService.resetAllUserData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Đã xóa toàn bộ dữ liệu thành công!'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isResetting = false);
     }
   }
 
@@ -177,6 +280,45 @@ class _ProfileViewState extends State<ProfileView> {
                                     MaterialPageRoute(builder: (_) => const FixDataScreen())),
                               ),
                               const SizedBox(height: 12),
+
+                              // ✅ THÊM MỚI: Nút Reset Data
+                              _isResetting
+                                  ? Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red[50],
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: const Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          SizedBox(
+                                            width: 20, height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.red,
+                                            ),
+                                          ),
+                                          SizedBox(width: 12),
+                                          Text(
+                                            'Đang xóa dữ liệu...',
+                                            style: TextStyle(
+                                              color: Colors.red,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  : _buildMenuItem(
+                                      icon: Icons.delete_forever_rounded,
+                                      iconColor: Colors.red[400]!,
+                                      iconBackground: Colors.red[50]!,
+                                      title: 'Xóa toàn bộ dữ liệu',
+                                      onTap: _showResetDataDialog,
+                                    ),
+
+                              const SizedBox(height: 12),
                               _buildMenuItem(
                                 icon: Icons.logout,
                                 iconColor: Colors.red[400]!,
@@ -198,14 +340,12 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  // ✅ UPDATED AppBar - thêm Transaction icon
   Widget _buildAppBar() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // Back button
           GestureDetector(
             onTap: () => Navigator.pushReplacement(context,
                 MaterialPageRoute(builder: (_) => const HomeView())),
@@ -222,16 +362,12 @@ class _ProfileViewState extends State<ProfileView> {
                   color: isDark ? Colors.grey[300] : Colors.grey[700], size: 18),
             ),
           ),
-
-          // Title
           const Expanded(
             child: Center(
               child: Text('Profile',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             ),
           ),
-
-          // ✅ Transaction icon (MỚI)
           GestureDetector(
             onTap: () => Navigator.pushReplacement(context,
                 MaterialPageRoute(builder: (_) => const TransactionView())),
@@ -249,8 +385,6 @@ class _ProfileViewState extends State<ProfileView> {
             ),
           ),
           const SizedBox(width: 8),
-
-          // Notification icon
           GestureDetector(
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const NotificationView())),
@@ -642,7 +776,6 @@ class _ProfileViewState extends State<ProfileView> {
     }
   }
 
-  // ✅ UPDATED: Nav bar với Voice ở giữa, bỏ Transaction tab
   Widget _buildBottomNavBar() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
@@ -668,7 +801,6 @@ class _ProfileViewState extends State<ProfileView> {
                   label: 'Analysis',
                   onTap: () => Navigator.pushReplacement(context,
                       MaterialPageRoute(builder: (_) => const AnalysisView()))),
-              // ✅ Voice button ở giữa
               _buildVoiceNavItem(),
               _buildNavItem(Icons.layers_rounded, false,
                   isDark ? Colors.grey[500]! : Colors.grey[400]!,
@@ -740,7 +872,7 @@ class _ProfileViewState extends State<ProfileView> {
                         ? color
                         : isDark ? Colors.grey[500]! : Colors.grey[400]!)),
         ],
-      ), 
+      ),
     );
   }
 }
