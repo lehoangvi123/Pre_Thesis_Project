@@ -13,6 +13,7 @@ import './AddSavingGoalView.dart';
 import './analysis_widgets.dart';
 import './Chart/bar_chart_widgets.dart';
 import './Chart/income_expense_pie_chart.dart';
+import './Spend_rule_view.dart';
 
 class AnalysisView extends StatefulWidget {
   const AnalysisView({Key? key}) : super(key: key);
@@ -66,28 +67,39 @@ class _AnalysisViewState extends State<AnalysisView> {
           double totalIncome = (userData['totalIncome'] ?? 0).toDouble();
           double totalExpense = (userData['totalExpense'] ?? 0).toDouble();
 
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                _buildHeader(isDark),
-                Padding(
-                  padding: const EdgeInsets.all(20.0),
+          // ✅ FIX: Dùng Column bọc ngoài để nút 50/30/20 cố định phía trên navbar
+          return Column(
+            children: [
+              // Phần nội dung cuộn được
+              Expanded(
+                child: SingleChildScrollView(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildBalanceCard(balance, totalIncome, totalExpense, isDark),
-                      const SizedBox(height: 20),
-                      _buildChartCard(totalIncome, totalExpense, isDark),
-                      const SizedBox(height: 24),
-                      _buildSummaryCards(totalIncome, totalExpense, isDark),
-                      const SizedBox(height: 24),
-                      _buildMyTargetsSection(totalExpense, isDark),
-                      const SizedBox(height: 80),
+                      _buildHeader(isDark),
+                      Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildBalanceCard(balance, totalIncome, totalExpense, isDark),
+                            const SizedBox(height: 20),
+                            _buildChartCard(totalIncome, totalExpense, isDark),
+                            const SizedBox(height: 24),
+                            _buildSummaryCards(totalIncome, totalExpense, isDark),
+                            const SizedBox(height: 24),
+                            _buildMyTargetsSection(totalExpense, isDark),
+                            const SizedBox(height: 20),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+
+              // ✅ NEW: Nút 50/30/20 cố định phía trên bottomNavigationBar
+              _buildSpendRuleButton(isDark),
+            ],
           );
         },
       ),
@@ -95,7 +107,46 @@ class _AnalysisViewState extends State<AnalysisView> {
     );
   }
 
-  // ✅ UPDATED HEADER - Thêm icon Transaction góc trên phải
+  // ✅ NEW: Nút 50/30/20 cố định
+  Widget _buildSpendRuleButton(bool isDark) {
+    return Container(
+      color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8F9FA),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      child: SizedBox(
+        width: double.infinity,
+        height: 50,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SpendingRuleView()),
+            );
+          },
+          icon: const Icon(
+            Icons.pie_chart_rounded,
+            color: Colors.white,
+            size: 20,
+          ),
+          label: const Text(
+            'Quy tắc 50/30/20',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF00CED1),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader(bool isDark) {
     return SafeArea(
       child: Padding(
@@ -103,7 +154,6 @@ class _AnalysisViewState extends State<AnalysisView> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Title
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -119,11 +169,8 @@ class _AnalysisViewState extends State<AnalysisView> {
                         color: isDark ? Colors.grey[400] : Colors.grey[600])),
               ],
             ),
-
-            // ✅ Transaction icon + Chart menu
             Row(
               children: [
-                // Nút Transaction
                 GestureDetector(
                   onTap: () => Navigator.pushReplacement(context,
                       MaterialPageRoute(builder: (_) => const TransactionView())),
@@ -143,7 +190,6 @@ class _AnalysisViewState extends State<AnalysisView> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Chart type menu (đã có sẵn)
                 _buildChartTypeMenu(isDark),
               ],
             ),

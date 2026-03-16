@@ -23,7 +23,7 @@ class _HelpViewState extends State<HelpView> {
 
   void _performSearch(String query) {
     setState(() {
-      _searchQuery = query;
+      _searchQuery = query;  
       if (query.isNotEmpty) {
         _searchResults = HelpData.searchFAQs(query);
       } else {

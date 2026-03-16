@@ -1,8 +1,9 @@
+// lib/view/Function/AI_Chatbot/chatbot_view.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../../../models/chat_message_model.dart';
 import '../../../service/ai_assistant_service.dart';
-import 'message_bubble.dart';
 import 'typing_indicator.dart';
 
 class ChatbotView extends StatefulWidget {
@@ -12,7 +13,8 @@ class ChatbotView extends StatefulWidget {
   State<ChatbotView> createState() => _ChatbotViewState();
 }
 
-class _ChatbotViewState extends State<ChatbotView> {
+class _ChatbotViewState extends State<ChatbotView>
+    with TickerProviderStateMixin {
   final AIAssistantService _aiService = AIAssistantService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -24,92 +26,20 @@ class _ChatbotViewState extends State<ChatbotView> {
   bool _isStreaming = false;
   String _streamingText = '';
   String? _streamingMessageId;
-  List<String> _suggestedReplies = [];
+  bool _hasStartedChat = false; // ✅ Ẩn welcome khi đã chat
 
-  // ✅ Topic categories for quick access
-  int _selectedTopicIndex = 0;
-  final List<Map<String, dynamic>> _topics = [
-    {
-      'label': '💰 Tài chính',
-      'color': const Color(0xFF00CED1),
-      'actions': [
-        {'emoji': '📊', 'label': 'Phân tích chi tiêu', 'msg': 'Phân tích chi tiêu của tôi tháng này'},
-        {'emoji': '💰', 'label': 'Kiểm tra ngân sách', 'msg': 'Tôi có đang chi tiêu quá ngân sách không?'},
-        {'emoji': '💡', 'label': 'Gợi ý tiết kiệm', 'msg': 'Làm thế nào để tôi tiết kiệm được nhiều hơn?'},
-        {'emoji': '🔮', 'label': 'Dự đoán chi tiêu', 'msg': 'Dự đoán chi tiêu cuối tháng của tôi'},
-      ],
-    },
-    {
-      'label': '🏥 Sức khỏe',
-      'color': Colors.green,
-      'actions': [
-        {'emoji': '🥗', 'label': 'Chế độ ăn uống', 'msg': 'Chế độ ăn uống lành mạnh cho người đi làm như thế nào?'},
-        {'emoji': '🏃', 'label': 'Tập thể dục', 'msg': 'Lịch tập thể dục hiệu quả cho người bận rộn'},
-        {'emoji': '😴', 'label': 'Giấc ngủ', 'msg': 'Làm sao để cải thiện chất lượng giấc ngủ?'},
-        {'emoji': '🧘', 'label': 'Giảm stress', 'msg': 'Cách quản lý stress và lo âu hiệu quả'},
-      ],
-    },
-    {
-      'label': '💻 Công nghệ',
-      'color': Colors.indigo,
-      'actions': [
-        {'emoji': '📱', 'label': 'Flutter/Dart', 'msg': 'Giải thích về Flutter và Dart cho người mới học'},
-        {'emoji': '🔥', 'label': 'Firebase', 'msg': 'Firebase Firestore hoạt động như thế nào?'},
-        {'emoji': '🤖', 'label': 'AI & ML', 'msg': 'Trí tuệ nhân tạo và Machine Learning là gì?'},
-        {'emoji': '🌐', 'label': 'Web Dev', 'msg': 'Cách học lập trình web từ đầu'},
-      ],
-    },
-    {
-      'label': '⛪ Đức tin',
-      'color': Colors.amber[700]!,
-      'actions': [
-        {'emoji': '📖', 'label': 'Kinh Thánh', 'msg': 'Giải thích về Tin Mừng Gioan chương 3'},
-        {'emoji': '🙏', 'label': 'Cầu nguyện', 'msg': 'Cách cầu nguyện hiệu quả hơn trong cuộc sống bận rộn'},
-        {'emoji': '✝️', 'label': 'Giáo lý', 'msg': 'Giải thích các Bí tích trong Công Giáo'},
-        {'emoji': '🕊️', 'label': 'Đời sống tâm linh', 'msg': 'Làm sao để sống đức tin trong thời đại ngày nay?'},
-      ],
-    },
-    {
-      'label': '📚 Học tập',
-      'color': Colors.orange,
-      'actions': [
-        {'emoji': '📝', 'label': 'Phương pháp học', 'msg': 'Phương pháp học tập hiệu quả nhất là gì?'},
-        {'emoji': '🧮', 'label': 'Toán học', 'msg': 'Giải thích xác suất và thống kê cơ bản'},
-        {'emoji': '🌍', 'label': 'Lịch sử VN', 'msg': 'Tóm tắt lịch sử Việt Nam qua các thời kỳ'},
-        {'emoji': '🔬', 'label': 'Khoa học', 'msg': 'Giải thích về biến đổi khí hậu'},
-      ],
-    },
+  // ✅ Suggested prompts kiểu ChatGPT
+  final List<Map<String, String>> _suggestions = [
+    {'emoji': '', 'text': 'Phân tích chi tiêu tháng này'},
+    {'emoji': '', 'text': 'Làm sao để tiết kiệm nhiều hơn?'},
+    {'emoji': '', 'text': 'Chia sẻ Tin Mừng hôm nay'},
+    {'emoji': '', 'text': 'Giải thích Flutter cho người mới'},
   ];
 
   @override
   void initState() {
     super.initState();
-    _sendWelcomeMessage();
-  }
-
-  void _sendWelcomeMessage() {
-    setState(() {
-      _messages.add(ChatMessage(
-        id: _uuid.v4(),
-        message: 'Xin chào! Tôi là **BuddyAI** 🤖\n\n'
-            'Tôi có thể giúp bạn về **mọi lĩnh vực**:\n\n'
-            '• 💰 Tài chính & Chi tiêu cá nhân\n'
-            '• 🏥 Sức khỏe & Dinh dưỡng\n'
-            '• 💻 Công nghệ & Lập trình\n'
-            '• ⛪ Đức tin Công Giáo\n'
-            '• 📚 Giáo dục & Học tập\n'
-            '• 🌍 Lịch sử & Địa lý\n'
-            '• 🧠 Khoa học & Nhiều hơn nữa...\n\n'
-            'Bạn muốn hỏi gì hôm nay?',
-        isUser: false,
-        timestamp: DateTime.now(),
-      ));
-      _suggestedReplies = [
-        'Phân tích chi tiêu tháng này',
-        'Cách học lập trình Flutter',
-        'Chia sẻ về Tin Mừng hôm nay',
-      ];
-    });
+    _messageController.addListener(() => setState(() {}));
   }
 
   Future<void> _sendMessage(String text) async {
@@ -119,7 +49,9 @@ class _ChatbotViewState extends State<ChatbotView> {
     _messageController.clear();
     _focusNode.unfocus();
 
+    if (!mounted) return;
     setState(() {
+      _hasStartedChat = true;
       _messages.add(ChatMessage(
         id: _uuid.v4(),
         message: userMsg,
@@ -127,7 +59,6 @@ class _ChatbotViewState extends State<ChatbotView> {
         timestamp: DateTime.now(),
       ));
       _isTyping = true;
-      _suggestedReplies = [];
     });
 
     _scrollToBottom();
@@ -139,6 +70,8 @@ class _ChatbotViewState extends State<ChatbotView> {
             ? _messages.sublist(0, _messages.length - 1)
             : [],
       );
+
+      if (!mounted) return;
 
       final streamId = _uuid.v4();
       setState(() {
@@ -154,10 +87,9 @@ class _ChatbotViewState extends State<ChatbotView> {
         ));
       });
 
-      // Stream từng ký tự
       for (int i = 0; i < aiResponse.length; i++) {
-        await Future.delayed(const Duration(milliseconds: 10));
-        if (!mounted) break;
+        await Future.delayed(const Duration(milliseconds: 8));
+        if (!mounted) return;
         setState(() {
           _streamingText = aiResponse.substring(0, i + 1);
           final idx = _messages.indexWhere((m) => m.id == streamId);
@@ -170,50 +102,30 @@ class _ChatbotViewState extends State<ChatbotView> {
             );
           }
         });
-        if (i % 30 == 0) _scrollToBottom();
+        if (i % 40 == 0) _scrollToBottom();
       }
 
+      if (!mounted) return;
       setState(() {
         _isStreaming = false;
         _streamingMessageId = null;
-        _suggestedReplies = _generateSuggestedReplies(userMsg);
       });
-
       _scrollToBottom();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isTyping = false;
         _isStreaming = false;
         _messages.add(ChatMessage(
           id: _uuid.v4(),
-          message: 'Xin lỗi, tôi gặp sự cố kết nối. Vui lòng thử lại! 😅',
+          message: 'Xin lỗi, có lỗi xảy ra. Vui lòng thử lại!',
           isUser: false,
           timestamp: DateTime.now(),
         ));
       });
     }
 
-    _scrollToBottom();
-  }
-
-  List<String> _generateSuggestedReplies(String userMsg) {
-    final msg = userMsg.toLowerCase();
-
-    if (msg.contains('chi tiêu') || msg.contains('phân tích') || msg.contains('ngân sách')) {
-      return ['Danh mục nào chi nhiều nhất?', 'Gợi ý cắt giảm chi tiêu', 'Kế hoạch tiết kiệm cho tôi'];
-    } else if (msg.contains('tiết kiệm') || msg.contains('mục tiêu')) {
-      return ['Quy tắc 50/30/20 là gì?', 'Cách tiết kiệm hiệu quả hơn', 'Đặt mục tiêu tài chính'];
-    } else if (msg.contains('flutter') || msg.contains('dart') || msg.contains('lập trình')) {
-      return ['Giải thích State Management', 'Firebase với Flutter', 'Tips debug Flutter'];
-    } else if (msg.contains('kinh thánh') || msg.contains('công giáo') || msg.contains('đức tin') || msg.contains('cầu nguyện')) {
-      return ['Chia sẻ về Tin Mừng hôm nay', 'Ý nghĩa của các Bí tích', 'Cách đọc Kinh Thánh mỗi ngày'];
-    } else if (msg.contains('sức khỏe') || msg.contains('ăn') || msg.contains('tập')) {
-      return ['Chế độ ăn lành mạnh', 'Lịch tập thể dục phù hợp', 'Cách giảm stress'];
-    } else if (msg.contains('học') || msg.contains('lịch sử') || msg.contains('khoa học')) {
-      return ['Phương pháp học hiệu quả', 'Giải thích chi tiết hơn', 'Cho ví dụ thực tế'];
-    }
-
-    return ['Hỏi thêm về tài chính', 'Tư vấn sức khỏe', 'Hỏi về lập trình'];
+    if (mounted) _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -221,173 +133,33 @@ class _ChatbotViewState extends State<ChatbotView> {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
         );
       }
     });
   }
 
-  void _clearConversation() {
+  void _clearChat() {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: const Text('Xóa cuộc trò chuyện?'),
-        content: const Text('Toàn bộ lịch sử chat sẽ bị xóa.'),
+        content: const Text('Toàn bộ lịch sử sẽ bị xóa.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Hủy')),
+          TextButton(
             onPressed: () {
               Navigator.pop(context);
               setState(() {
                 _messages.clear();
-                _suggestedReplies = [];
+                _hasStartedChat = false;
               });
-              _sendWelcomeMessage();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Xóa', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ✅ Topic selector tabs
-  Widget _buildTopicTabs() {
-    return SizedBox(
-      height: 40,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: _topics.length,
-        itemBuilder: (context, index) {
-          final isSelected = _selectedTopicIndex == index;
-          final color = _topics[index]['color'] as Color;
-          return GestureDetector(
-            onTap: () => setState(() => _selectedTopicIndex = index),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: isSelected ? color : color.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isSelected ? color : color.withOpacity(0.3),
-                ),
-              ),
-              child: Text(
-                _topics[index]['label'],
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: isSelected ? Colors.white : color,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // ✅ Quick action grid per topic
-  Widget _buildQuickActionGrid() {
-    final actions = _topics[_selectedTopicIndex]['actions'] as List;
-    final color = _topics[_selectedTopicIndex]['color'] as Color;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: GridView.count(
-        crossAxisCount: 2,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 3.0,
-        children: actions.map((action) {
-          return GestureDetector(
-            onTap: () => _sendMessage(action['msg']),
-            child: Container(
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.07),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: color.withOpacity(0.25)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(action['emoji'], style: const TextStyle(fontSize: 16)),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      action['label'],
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: color,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  // ✅ Suggested replies
-  Widget _buildSuggestedReplies() {
-    if (_suggestedReplies.isEmpty || _isTyping || _isStreaming) {
-      return const SizedBox.shrink();
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Gợi ý tiếp theo:',
-              style: TextStyle(fontSize: 11, color: Colors.grey[400])),
-          const SizedBox(height: 6),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _suggestedReplies.map((reply) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: GestureDetector(
-                    onTap: () => _sendMessage(reply),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: const Color(0xFF00CED1).withOpacity(0.4)),
-                        boxShadow: [
-                          BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
-                              blurRadius: 4)
-                        ],
-                      ),
-                      child: Text(reply,
-                          style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF00897B),
-                              fontWeight: FontWeight.w500)),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
+            child: const Text('Xóa', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -397,171 +169,537 @@ class _ChatbotViewState extends State<ChatbotView> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF212121) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF0D0D0D);
+    final subColor = isDark ? const Color(0xFF8E8EA0) : const Color(0xFF8E8EA0);
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF5F5F5),
+      backgroundColor: bg,
       appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-        elevation: 0.5,
+        backgroundColor: bg,
+        elevation: 0,
+        centerTitle: true,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_rounded,
-              color: isDark ? Colors.white : Colors.black87, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: textColor, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 38, height: 38,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                    colors: [Color(0xFF00CED1), Color(0xFF8B5CF6)]),
-                borderRadius: BorderRadius.circular(19),
-              ),
-              child: const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+            Text(
+              'BuddyAI',
+              style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  color: textColor),
             ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('BuddyAI',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                Text(
-                  _isTyping || _isStreaming ? 'Đang trả lời...' : 'Trợ lý AI toàn diện',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: _isTyping || _isStreaming
-                        ? const Color(0xFF00CED1)
-                        : Colors.grey,
-                  ),
-                ),
-              ],
-            ),
+            const SizedBox(width: 6),
+            Icon(Icons.keyboard_arrow_down_rounded,
+                color: subColor, size: 20),
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_outline_rounded, color: Colors.grey),
-            onPressed: _clearConversation,
-            tooltip: 'Xóa hội thoại',
-          ),
+          if (_messages.isNotEmpty)
+            IconButton(
+              icon: Icon(Icons.edit_outlined, color: textColor, size: 20),
+              onPressed: _clearChat,
+              tooltip: 'Cuộc trò chuyện mới',
+            ),
         ],
       ),
       body: Column(
         children: [
-          // Quick actions khi mới vào
-          if (_messages.length <= 1) ...[
-            const SizedBox(height: 8),
-            _buildTopicTabs(),
-            const SizedBox(height: 4),
-            _buildQuickActionGrid(),
-          ],
-
-          // Messages
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              itemCount: _messages.length + (_isTyping ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == _messages.length) {
-                  return const TypingIndicator();
-                }
-                final msg = _messages[index];
-                return MessageBubble(
-                  message: msg,
-                  isStreaming: _isStreaming && msg.id == _streamingMessageId,
+            child: _hasStartedChat
+                ? _buildChatList(isDark, textColor, subColor)
+                : _buildWelcomeScreen(isDark, textColor, subColor),
+          ),
+          _buildInputBar(isDark, textColor, subColor),
+        ],
+      ),
+    );
+  }
+
+  // ✅ Welcome screen kiểu ChatGPT
+  Widget _buildWelcomeScreen(
+      bool isDark, Color textColor, Color subColor) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          const SizedBox(height: 48),
+
+          // Logo / icon
+          Container(
+            width: 56, height: 56,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? const Color(0xFF2F2F2F)
+                  : const Color(0xFFF4F4F4),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isDark
+                    ? const Color(0xFF444444)
+                    : const Color(0xFFE5E5E5),
+              ),
+            ),
+            child: const Center(
+              child: Text('🤖', style: TextStyle(fontSize: 26)),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Greeting
+          Text(
+            'Tôi có thể giúp gì cho bạn?',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 48),
+
+          // Suggestion cards — 2x2 grid kiểu ChatGPT
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 1.55,
+            children: _suggestions.map((s) {
+              return _buildSuggestionCard(s, isDark, textColor);
+            }).toList(),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestionCard(
+      Map<String, String> s, bool isDark, Color textColor) {
+    return GestureDetector(
+      onTap: () => _sendMessage(s['text']!),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark
+              ? const Color(0xFF2F2F2F)
+              : const Color(0xFFF4F4F4),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isDark
+                ? const Color(0xFF3F3F3F)
+                : const Color(0xFFE5E5E5),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(s['emoji']!, style: const TextStyle(fontSize: 20)),
+            const Spacer(),
+            Text(
+              s['text']!,
+              style: TextStyle(
+                fontSize: 13,
+                color: textColor,
+                fontWeight: FontWeight.w500,
+                height: 1.3,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ✅ Chat list — clean, no bubbles background noise
+  Widget _buildChatList(bool isDark, Color textColor, Color subColor) {
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: _messages.length + (_isTyping ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == _messages.length) {
+          return _buildTypingRow(isDark);
+        }
+        final msg = _messages[index];
+        if (msg.isUser) {
+          return _buildUserMessage(msg, isDark, textColor);
+        } else {
+          return _buildAIMessage(
+              msg, isDark, textColor, subColor,
+              isStreaming: _isStreaming && msg.id == _streamingMessageId);
+        }
+      },
+    );
+  }
+
+  // ✅ User message — right aligned, teal bubble
+  Widget _buildUserMessage(
+      ChatMessage msg, bool isDark, Color textColor) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24, left: 48),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Flexible(
+            child: GestureDetector(
+              onLongPress: () {
+                Clipboard.setData(ClipboardData(text: msg.message));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Đã sao chép'),
+                      duration: Duration(seconds: 1)),
                 );
               },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF2F2F2F)
+                      : const Color(0xFFF4F4F4),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(18),
+                    topRight: Radius.circular(18),
+                    bottomLeft: Radius.circular(18),
+                    bottomRight: Radius.circular(4),
+                  ),
+                ),
+                child: Text(
+                  msg.message,
+                  style: TextStyle(
+                      fontSize: 15, color: textColor, height: 1.5),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ AI message — left aligned, no bubble, just text + avatar
+  Widget _buildAIMessage(ChatMessage msg, bool isDark, Color textColor,
+      Color subColor,
+      {bool isStreaming = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // AI avatar
+          Container(
+            width: 30, height: 30,
+            margin: const EdgeInsets.only(right: 12, top: 2),
+            decoration: BoxDecoration( 
+              color: isDark
+                  ? const Color(0xFF2F2F2F)
+                  : const Color(0xFFF4F4F4),
+              shape: BoxShape.circle,
+              border: Border.all(
+                  color: isDark
+                      ? const Color(0xFF444444)
+                      : const Color(0xFFE5E5E5)),
+            ),
+            child: const Center(
+              child: Text('🤖', style: TextStyle(fontSize: 14)),
             ),
           ),
 
-          // Suggested replies
-          _buildSuggestedReplies(),
-
-          // Input
-          Container(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: Row(
+          // Message content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    focusNode: _focusNode,
-                    enabled: !_isTyping && !_isStreaming,
-                    decoration: InputDecoration(
-                      hintText: _isTyping || _isStreaming
-                          ? 'BuddyAI đang trả lời...'
-                          : 'Hỏi bất cứ điều gì...',
-                      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: isDark
-                          ? const Color(0xFF3C3C3C)
-                          : Colors.grey[100],
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 12),
-                    ),
-                    style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87,
-                        fontSize: 15),
-                    maxLines: null,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: _sendMessage,
+                if (msg.message.isEmpty && isStreaming)
+                  _buildTypingDots(isDark)
+                else
+                  GestureDetector(
+                    onLongPress: () {
+                      Clipboard.setData(
+                          ClipboardData(text: msg.message));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Đã sao chép'),
+                            duration: Duration(seconds: 1)),
+                      );
+                    },
+                    child: _buildFormattedText(
+                        msg.message, textColor, isStreaming),
                   ),
-                ),
-                const SizedBox(width: 8),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  decoration: BoxDecoration(
-                    gradient: _isTyping || _isStreaming
-                        ? const LinearGradient(colors: [Colors.grey, Colors.grey])
-                        : const LinearGradient(
-                            colors: [Color(0xFF00CED1), Color(0xFF8B5CF6)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: _isTyping || _isStreaming
-                        ? []
-                        : [
-                            BoxShadow(
-                              color: const Color(0xFF00CED1).withOpacity(0.4),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                  ),
-                  child: IconButton(
-                    icon: Icon(
-                      _isTyping || _isStreaming
-                          ? Icons.hourglass_empty
-                          : Icons.send_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    onPressed: _isTyping || _isStreaming
-                        ? null
-                        : () => _sendMessage(_messageController.text),
-                  ),
-                ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTypingRow(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 30, height: 30,
+            margin: const EdgeInsets.only(right: 12, top: 2),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? const Color(0xFF2F2F2F)
+                  : const Color(0xFFF4F4F4),
+              shape: BoxShape.circle,
+              border: Border.all(
+                  color: isDark
+                      ? const Color(0xFF444444)
+                      : const Color(0xFFE5E5E5)),
+            ),
+            child: const Center(
+                child: Text('🤖', style: TextStyle(fontSize: 14))),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: _buildTypingDots(isDark),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTypingDots(bool isDark) {
+    return const SizedBox(
+      height: 20,
+      child: TypingIndicator(),
+    );
+  }
+
+  // ✅ Simple markdown-like renderer
+  Widget _buildFormattedText(
+      String text, Color textColor, bool isStreaming) {
+    final lines = text.split('\n');
+    final widgets = <Widget>[];
+
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i];
+
+      if (line.startsWith('## ')) {
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 4),
+          child: Text(line.substring(3),
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: textColor)),
+        ));
+      } else if (line.startsWith('### ')) {
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(top: 6, bottom: 2),
+          child: Text(line.substring(4),
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: textColor)),
+        ));
+      } else if (line.startsWith('- ') || line.startsWith('• ')) {
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(bottom: 3),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 7, right: 8),
+                child: Container(
+                    width: 5, height: 5,
+                    decoration: const BoxDecoration(
+                        color: Color(0xFF00CED1),
+                        shape: BoxShape.circle)),
+              ),
+              Expanded(
+                child: _buildInlineText(
+                    line.substring(2), textColor),
+              ),
+            ],
+          ),
+        ));
+      } else if (RegExp(r'^\d+\. ').hasMatch(line)) {
+        final match = RegExp(r'^(\d+)\. (.+)').firstMatch(line);
+        if (match != null) {
+          widgets.add(Padding(
+            padding: const EdgeInsets.only(bottom: 3),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 22, height: 22,
+                  margin: const EdgeInsets.only(right: 8, top: 1),
+                  decoration: const BoxDecoration(
+                      color: Color(0xFF00CED1),
+                      shape: BoxShape.circle),
+                  child: Center(
+                    child: Text(match.group(1)!,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                Expanded(
+                    child: _buildInlineText(
+                        match.group(2)!, textColor)),
+              ],
+            ),
+          ));
+        }
+      } else if (line.trim().isEmpty) {
+        widgets.add(const SizedBox(height: 6));
+      } else {
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(bottom: 2),
+          child: _buildInlineText(line, textColor),
+        ));
+      }
+    }
+
+    // Blinking cursor khi đang stream
+    if (isStreaming && text.isNotEmpty) {
+      widgets.add(_buildCursor());
+    }
+
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: widgets);
+  }
+
+  Widget _buildInlineText(String text, Color textColor) {
+    // Bold: **text**
+    final spans = <TextSpan>[];
+    final pattern = RegExp(r'\*\*(.+?)\*\*');
+    int last = 0;
+
+    for (final match in pattern.allMatches(text)) {
+      if (match.start > last) {
+        spans.add(TextSpan(
+            text: text.substring(last, match.start),
+            style: TextStyle(
+                color: textColor, fontSize: 15, height: 1.6)));
+      }
+      spans.add(TextSpan(
+          text: match.group(1),
+          style: TextStyle(
+              color: textColor,
+              fontSize: 15,
+              height: 1.6,
+              fontWeight: FontWeight.w700)));
+      last = match.end;
+    }
+    if (last < text.length) {
+      spans.add(TextSpan(
+          text: text.substring(last),
+          style:
+              TextStyle(color: textColor, fontSize: 15, height: 1.6)));
+    }
+
+    if (spans.isEmpty) {
+      return Text(text,
+          style:
+              TextStyle(color: textColor, fontSize: 15, height: 1.6));
+    }
+    return RichText(
+        text: TextSpan(children: spans),
+        textAlign: TextAlign.left);
+  }
+
+  Widget _buildCursor() {
+    return const _BlinkingCursor();
+  }
+
+  // ✅ Input bar — kiểu ChatGPT, rounded, clean
+  Widget _buildInputBar(bool isDark, Color textColor, Color subColor) {
+    final hasText = _messageController.text.trim().isNotEmpty;
+    final isBusy = _isTyping || _isStreaming;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+      color: isDark ? const Color(0xFF212121) : Colors.white,
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark
+              ? const Color(0xFF2F2F2F)
+              : const Color(0xFFF4F4F4),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDark
+                ? const Color(0xFF3F3F3F)
+                : const Color(0xFFE5E5E5),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _messageController,
+                focusNode: _focusNode,
+                enabled: !isBusy,
+                maxLines: 5,
+                minLines: 1,
+                textInputAction: TextInputAction.newline,
+                style: TextStyle(
+                    color: textColor, fontSize: 15, height: 1.4),
+                decoration: InputDecoration(
+                  hintText: isBusy
+                      ? 'BuddyAI đang trả lời...'
+                      : 'Hỏi bất cứ điều gì...',
+                  hintStyle:
+                      TextStyle(color: subColor, fontSize: 15),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 14),
+                ),
+              ),
+            ),
+
+            // Send button
+            Padding(
+              padding: const EdgeInsets.only(right: 8, bottom: 8),
+              child: GestureDetector(
+                onTap: (hasText && !isBusy)
+                    ? () => _sendMessage(_messageController.text)
+                    : null,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 34, height: 34,
+                  decoration: BoxDecoration(
+                    color: (hasText && !isBusy)
+                        ? const Color(0xFF00CED1)
+                        : (isDark
+                            ? const Color(0xFF3F3F3F)
+                            : const Color(0xFFE5E5E5)),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isBusy
+                        ? Icons.stop_rounded
+                        : Icons.arrow_upward_rounded,
+                    color: (hasText && !isBusy)
+                        ? Colors.white
+                        : subColor,
+                    size: 18,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -571,6 +709,52 @@ class _ChatbotViewState extends State<ChatbotView> {
     _messageController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
+    super.dispose();
+  }
+}
+
+// ✅ Blinking cursor widget
+class _BlinkingCursor extends StatefulWidget {
+  const _BlinkingCursor();
+
+  @override
+  State<_BlinkingCursor> createState() => _BlinkingCursorState();
+}
+
+class _BlinkingCursorState extends State<_BlinkingCursor>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, __) => Opacity(
+        opacity: _controller.value,
+        child: Container(
+          width: 2, height: 18,
+          margin: const EdgeInsets.only(top: 2),
+          decoration: BoxDecoration(
+            color: const Color(0xFF00CED1),
+            borderRadius: BorderRadius.circular(1),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
     super.dispose();
   }
 }

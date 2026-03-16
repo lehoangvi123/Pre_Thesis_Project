@@ -59,9 +59,9 @@ class MyApp extends StatelessWidget {
             '/onboarding': (context) => const OnboardingView(),
             '/home': (context) => const HomeView(),
             '/test-voice': (context) => TestVoiceView(),
-          },
+          },   
         );
-      },    
+      },     
     );
   }
 }
