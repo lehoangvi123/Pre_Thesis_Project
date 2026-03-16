@@ -1,5 +1,4 @@
 // lib/service/TransactionService.dart
-// THÊM METHODS NÀY VÀO FILE TRANSACTIONSERVICE CÓ SẴN
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -20,16 +19,31 @@ class TransactionService {
   CollectionReference<Map<String, dynamic>> get _txRef =>
       _db.collection('users').doc(uid).collection('transactions');
 
-  // Đảm bảo user doc có field balance tồn tại trước khi update
+  // Đảm bảo user doc có đủ các field trước khi update
   Future<void> ensureUserDoc() async {
     final uid = this.uid;
     if (uid.isEmpty) throw Exception("User not logged in.");
 
     final snap = await _userDoc.get();
     if (!snap.exists) {
-      await _userDoc.set({'balance': 0.0});
-    } else if (!(snap.data()?.containsKey('balance') ?? false)) {
-      await _userDoc.update({'balance': 0.0});
+      // ✅ FIX: Tạo đủ 3 fields ngay từ đầu
+      await _userDoc.set({
+        'balance': 0.0,
+        'totalIncome': 0.0,
+        'totalExpense': 0.0,
+      });
+    } else {
+      final data = snap.data() ?? {};
+      final Map<String, dynamic> missing = {};
+
+      // ✅ FIX: Tự động thêm field nếu thiếu (cho user cũ)
+      if (!data.containsKey('balance'))      missing['balance']      = 0.0;
+      if (!data.containsKey('totalIncome'))  missing['totalIncome']  = 0.0;
+      if (!data.containsKey('totalExpense')) missing['totalExpense'] = 0.0;
+
+      if (missing.isNotEmpty) {
+        await _userDoc.update(missing);
+      }
     }
   }
 
@@ -63,9 +77,10 @@ class TransactionService {
 
     await _txRef.doc(id).set(tx.toMap());
 
-    // Cộng số dư
+    // ✅ FIX: Cập nhật cả balance VÀ totalIncome
     await _userDoc.update({
-      'balance': FieldValue.increment(amount.abs()),
+      'balance':     FieldValue.increment(amount.abs()),
+      'totalIncome': FieldValue.increment(amount.abs()),
     });
   }
 
@@ -100,9 +115,10 @@ class TransactionService {
 
     await _txRef.doc(id).set(tx.toMap());
 
-    // Trừ balance
+    // ✅ FIX: Cập nhật cả balance VÀ totalExpense
     await _userDoc.update({
-      'balance': FieldValue.increment(delta),
+      'balance':      FieldValue.increment(delta),
+      'totalExpense': FieldValue.increment(amount.abs()),
     });
   }
 
@@ -132,234 +148,190 @@ class TransactionService {
   Future<Map<String, double>> getBalance() async {
     await ensureUserDoc();
     final snap = await _userDoc.get();
-    final currentBalance = (snap.data()?['balance'] as num?)?.toDouble() ?? 0.0;
+    final data = snap.data() ?? {};
 
     return {
-      "balance": currentBalance,
+      "balance":      (data['balance']      as num?)?.toDouble() ?? 0.0,
+      "totalIncome":  (data['totalIncome']  as num?)?.toDouble() ?? 0.0,
+      "totalExpense": (data['totalExpense'] as num?)?.toDouble() ?? 0.0,
     };
   }
 
-// lib/service/TransactionService.dart
-// FIXED VERSION - Tương thích với CategoryModel có sẵn
+  // ✅ FIX DATA: Recalculate totalIncome & totalExpense từ transactions
+  // Gọi hàm này 1 lần để sửa dữ liệu cũ bị sai
+  Future<void> recalculateTotals() async {
+    print('🔧 Recalculating totals from transactions...');
 
-// ========================================
-// 🎤 VOICE INPUT METHODS (THÊM VÀO CUỐI CLASS)
-// ========================================
+    final txSnap = await _txRef.get();
+    double totalIncome  = 0.0;
+    double totalExpense = 0.0;
 
-/// 🎤 Save voice transaction
-Future<bool> saveVoiceTransaction({
-  required String type,        // 'income' hoặc 'expense'
-  required double amount,
-  required String categoryName,
-  required String note,
-  DateTime? date,
-}) async {
-  try {
-    print('🎤 [Voice] Saving transaction...');
-    print('   Type: $type');
-    print('   Amount: $amount');
-    print('   Category: $categoryName');
-    print('   Note: $note');
+    for (final doc in txSnap.docs) {
+      final data = doc.data();
+      final type   = data['type'] as String? ?? '';
+      final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
 
-    // 1. Tìm hoặc tạo category
-    final category = await _getOrCreateCategory(categoryName, type);
-    
-    // 2. Lưu transaction dùng methods có sẵn
-    if (type == 'income') {
-      await addIncome(
-        category: category,
-        amount: amount,
-        title: note.isEmpty ? 'Voice transaction' : note,
-        message: '🎤 Từ voice input',
-        date: date ?? DateTime.now(),
-      );
-    } else {
-      await addExpense(
-        category: category,
-        amount: amount,
-        title: note.isEmpty ? 'Voice transaction' : note,
-        message: '🎤 Từ voice input',
-        date: date ?? DateTime.now(),
-      );
+      if (type == 'income') {
+        totalIncome += amount.abs();
+      } else if (type == 'expense') {
+        totalExpense += amount.abs();
+      }
     }
 
-    print('✅ [Voice] Transaction saved successfully!');
-    return true;
-  } catch (e) {
-    print('❌ [Voice] Error saving transaction: $e');
-    return false;
+    final balance = totalIncome - totalExpense;
+
+    await _userDoc.update({
+      'totalIncome':  totalIncome,
+      'totalExpense': totalExpense,
+      'balance':      balance,
+    });
+
+    print('✅ Recalculated → Income: $totalIncome | Expense: $totalExpense | Balance: $balance');
   }
-}
 
-/// Tìm category theo tên, hoặc tạo mới nếu chưa có
-Future<CategoryModel> _getOrCreateCategory(String categoryName, String type) async {
-  try {
-    // Lấy tất cả categories của user theo type
-    final categoriesSnap = await _db
-        .collection('users')
-        .doc(uid)
-        .collection('categories')
-        .where('name', isEqualTo: categoryName)
-        .where('type', isEqualTo: type)
-        .limit(1)
-        .get();
+  // ========================================
+  // 🎤 VOICE INPUT METHODS
+  // ========================================
 
-    // Nếu tìm thấy category
-    if (categoriesSnap.docs.isNotEmpty) {
-      final data = categoriesSnap.docs.first.data();
-      print('📂 Found existing category: $categoryName');
-      return CategoryModel.fromMap(data);
-    }
+  Future<bool> saveVoiceTransaction({
+    required String type,
+    required double amount,
+    required String categoryName,
+    required String note,
+    DateTime? date,
+  }) async {
+    try {
+      print('🎤 [Voice] Saving transaction...');
+      print('   Type: $type');
+      print('   Amount: $amount');
+      print('   Category: $categoryName');
+      print('   Note: $note');
 
-    // Nếu không có, tạo category mới
-    print('📂 Creating new category: $categoryName ($type)');
-    
-    final newCategoryId = _uuid.v4();
-    final iconName = _getDefaultIcon(categoryName);
-    final colorHex = _getDefaultColor(type);
-    
-    // Dùng factory constructor phù hợp
-    final CategoryModel newCategory;
-    if (type == 'income') {
-      newCategory = CategoryModel.income(
-        id: newCategoryId,
-        name: categoryName,
-        iconName: iconName,
-        colorHex: colorHex,
-      );
-    } else {
-      newCategory = CategoryModel.expense(
-        id: newCategoryId,
-        name: categoryName,
-        iconName: iconName,
-        colorHex: colorHex,
-      );
-    }
+      final category = await _getOrCreateCategory(categoryName, type);
 
-    // Lưu category mới vào Firestore
-    await _db
-        .collection('users')
-        .doc(uid)
-        .collection('categories')
-        .doc(newCategory.id)
-        .set(newCategory.toMap());
+      if (type == 'income') {
+        await addIncome(
+          category: category,
+          amount: amount,
+          title: note.isEmpty ? 'Voice transaction' : note,
+          message: '🎤 Từ voice input',
+          date: date ?? DateTime.now(),
+        );
+      } else {
+        await addExpense(
+          category: category,
+          amount: amount,
+          title: note.isEmpty ? 'Voice transaction' : note,
+          message: '🎤 Từ voice input',
+          date: date ?? DateTime.now(),
+        );
+      }
 
-    return newCategory;
-    
-  } catch (e) {
-    print('⚠️ Error getting/creating category: $e');
-    
-    // Fallback: return default category
-    if (type == 'income') {
-      return CategoryModel.income(
-        id: 'default',
-        name: categoryName,
-        iconName: 'attach_money',
-        colorHex: '4CAF50',
-      );
-    } else {
-      return CategoryModel.expense(
-        id: 'default',
-        name: categoryName,
-        iconName: 'category',
-        colorHex: 'F44336',
-      );
+      print('✅ [Voice] Transaction saved successfully!');
+      return true;
+    } catch (e) {
+      print('❌ [Voice] Error saving transaction: $e');
+      return false;
     }
   }
-}
 
-/// Get default icon dựa trên tên category
-String _getDefaultIcon(String categoryName) {
-  final lower = categoryName.toLowerCase();
-  
-  // Food & Dining
-  if (lower.contains('food') || 
-      lower.contains('ăn') || 
-      lower.contains('cà phê') ||
-      lower.contains('coffee') ||
-      lower.contains('dining')) {
-    return 'restaurant';
-  }
-  
-  // Transportation
-  if (lower.contains('transport') || 
-      lower.contains('xe') || 
-      lower.contains('grab') ||
-      lower.contains('taxi') ||
-      lower.contains('car')) {
-    return 'directions_car';
-  }
-  
-  // Housing
-  if (lower.contains('house') || 
-      lower.contains('housing') || 
-      lower.contains('nhà') ||
-      lower.contains('phòng') ||
-      lower.contains('home')) {
-    return 'home';
-  }
-  
-  // Shopping
-  if (lower.contains('shop') || 
-      lower.contains('mua') ||
-      lower.contains('shopping')) {
-    return 'shopping_bag';
-  }
-  
-  // Healthcare
-  if (lower.contains('health') || 
-      lower.contains('sức khỏe') ||
-      lower.contains('healthcare') ||
-      lower.contains('medical')) {
-    return 'medical_services';
-  }
-  
-  // Education
-  if (lower.contains('education') || 
-      lower.contains('học') ||
-      lower.contains('sách')) {
-    return 'school';
-  }
-  
-  // Entertainment
-  if (lower.contains('entertainment') ||
-      lower.contains('vui chơi') ||
-      lower.contains('phim') ||
-      lower.contains('game')) {
-    return 'movie';
-  }
-  
-  // Gym & Sports
-  if (lower.contains('gym') ||
-      lower.contains('sport') ||
-      lower.contains('thể thao')) {
-    return 'fitness_center';
-  }
-  
-  // Income categories
-  if (lower.contains('salary') || lower.contains('lương')) {
-    return 'attach_money';
-  }
-  
-  if (lower.contains('freelance')) {
-    return 'work';
-  }
-  
-  if (lower.contains('gift') || lower.contains('quà')) {
-    return 'card_giftcard';
-  }
-  
-  if (lower.contains('investment') || lower.contains('đầu tư')) {
-    return 'trending_up';
-  }
-  
-  // Default
-  return 'category';
-}
+  Future<CategoryModel> _getOrCreateCategory(String categoryName, String type) async {
+    try {
+      final categoriesSnap = await _db
+          .collection('users')
+          .doc(uid)
+          .collection('categories')
+          .where('name', isEqualTo: categoryName)
+          .where('type', isEqualTo: type)
+          .limit(1)
+          .get();
 
-/// Get default color dựa trên type
-String _getDefaultColor(String type) {
-  // Green cho income, Red cho expense (hex without #)
-  return type == 'income' ? '4CAF50' : 'F44336';
-}
+      if (categoriesSnap.docs.isNotEmpty) {
+        final data = categoriesSnap.docs.first.data();
+        print('📂 Found existing category: $categoryName');
+        return CategoryModel.fromMap(data);
+      }
+
+      print('📂 Creating new category: $categoryName ($type)');
+
+      final newCategoryId = _uuid.v4();
+      final iconName  = _getDefaultIcon(categoryName);
+      final colorHex  = _getDefaultColor(type);
+
+      final CategoryModel newCategory;
+      if (type == 'income') {
+        newCategory = CategoryModel.income(
+          id: newCategoryId,
+          name: categoryName,
+          iconName: iconName,
+          colorHex: colorHex,
+        );
+      } else {
+        newCategory = CategoryModel.expense(
+          id: newCategoryId,
+          name: categoryName,
+          iconName: iconName,
+          colorHex: colorHex,
+        );
+      }
+
+      await _db
+          .collection('users')
+          .doc(uid)
+          .collection('categories')
+          .doc(newCategory.id)
+          .set(newCategory.toMap());
+
+      return newCategory;
+    } catch (e) {
+      print('⚠️ Error getting/creating category: $e');
+      if (type == 'income') {
+        return CategoryModel.income(
+          id: 'default',
+          name: categoryName,
+          iconName: 'attach_money',
+          colorHex: '4CAF50',
+        );
+      } else {
+        return CategoryModel.expense(
+          id: 'default',
+          name: categoryName,
+          iconName: 'category',
+          colorHex: 'F44336',
+        );
+      }
+    }
+  }
+
+  String _getDefaultIcon(String categoryName) {
+    final lower = categoryName.toLowerCase();
+    if (lower.contains('food') || lower.contains('ăn') ||
+        lower.contains('cà phê') || lower.contains('coffee') ||
+        lower.contains('dining')) return 'restaurant';
+    if (lower.contains('transport') || lower.contains('xe') ||
+        lower.contains('grab') || lower.contains('taxi') ||
+        lower.contains('car')) return 'directions_car';
+    if (lower.contains('house') || lower.contains('housing') ||
+        lower.contains('nhà') || lower.contains('phòng') ||
+        lower.contains('home')) return 'home';
+    if (lower.contains('shop') || lower.contains('mua') ||
+        lower.contains('shopping')) return 'shopping_bag';
+    if (lower.contains('health') || lower.contains('sức khỏe') ||
+        lower.contains('healthcare') || lower.contains('medical')) return 'medical_services';
+    if (lower.contains('education') || lower.contains('học') ||
+        lower.contains('sách')) return 'school';
+    if (lower.contains('entertainment') || lower.contains('vui chơi') ||
+        lower.contains('phim') || lower.contains('game')) return 'movie';
+    if (lower.contains('gym') || lower.contains('sport') ||
+        lower.contains('thể thao')) return 'fitness_center';
+    if (lower.contains('salary') || lower.contains('lương')) return 'attach_money';
+    if (lower.contains('freelance')) return 'work';
+    if (lower.contains('gift') || lower.contains('quà')) return 'card_giftcard';
+    if (lower.contains('investment') || lower.contains('đầu tư')) return 'trending_up';
+    return 'category';
+  }
+
+  String _getDefaultColor(String type) {
+    return type == 'income' ? '4CAF50' : 'F44336';
+  }
 }
