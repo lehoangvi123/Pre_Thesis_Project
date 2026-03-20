@@ -973,9 +973,9 @@ class _HomeViewState extends State<HomeView> {
             children: [
               _buildNavItem(Icons.home_rounded, true, const Color(0xFF00CED1),
                   label: 'Home', onTap: () {}),
-              _buildNavItem(Icons.search_rounded, false,
-                  isDark ? Colors.grey[500]! : Colors.grey[400]!,
-                  label: 'Analysis', onTap: () {
+              _buildNavItem(Icons.assignment_rounded, false,
+    isDark ? Colors.grey[500]! : Colors.grey[400]!,
+    label: 'Plan', onTap: () {
                 Navigator.pushReplacement(context,
                     MaterialPageRoute(builder: (_) => const AnalysisView()));
               }),

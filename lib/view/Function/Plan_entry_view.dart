@@ -35,6 +35,8 @@ class _PlanEntryViewState extends State<PlanEntryView> {
 
   Future<void> _checkIntroSeen() async {
     final prefs = await SharedPreferences.getInstance();
+    // TODO: xoá dòng này trước khi release
+    await prefs.remove('plan_intro_seen');
     final seen  = prefs.getBool('plan_intro_seen') ?? false;
     if (mounted) setState(() => _introSeen = seen);
   }

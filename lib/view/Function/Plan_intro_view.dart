@@ -111,8 +111,8 @@ class _PlanIntroViewState extends State<PlanIntroView>
                 _OptionCard(
                   icon: Icons.format_list_bulleted_rounded,
                   iconColor: _teal,
-                  title: 'Điền theo hướng dẫn',
-                  desc: 'Trả lời 4 bước đơn giản — hệ thống tự lập bảng chi tiêu phù hợp cho bạn',
+                  title: 'Lập Plan cho bạn',
+                  desc: 'Lập plan cho bạn sau khi bạn điền form ngắn gọn về tình hình tài chính và mục tiêu của bạn',
                   badge: 'Được dùng nhiều nhất',
                   badgeColor: _teal,
                   isDark: isDark,
