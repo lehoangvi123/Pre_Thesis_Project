@@ -1,5 +1,4 @@
 // lib/view/Function/Plan/plan_form_widgets.dart
-// Reusable widgets cho form lập kế hoạch
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,14 +7,14 @@ class PlanFormWidgets {
   static const _teal   = Color(0xFF00CED1);
   static const _purple = Color(0xFF8B5CF6);
 
-  // ── Section label ─────────────────────────────────────
+  // ── Section label ─────────────────────────────────────────
   static Widget label(String text) => Padding(
     padding: const EdgeInsets.only(bottom: 10),
     child: Text(text,
         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
   );
 
-  // ── 2-column grid (choice cards) ──────────────────────
+  // ── 2-column grid ─────────────────────────────────────────
   static Widget grid({
     required List<Map<String, String>> opts,
     required String? selected,
@@ -27,8 +26,7 @@ class PlanFormWidgets {
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
+      crossAxisSpacing: 10, mainAxisSpacing: 10,
       childAspectRatio: aspectRatio,
       children: opts.map((o) {
         final active = selected == o['v'];
@@ -37,29 +35,24 @@ class PlanFormWidgets {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             decoration: BoxDecoration(
-              color: active
-                  ? _teal.withOpacity(0.1)
+              color: active ? _teal.withOpacity(0.1)
                   : (isDark ? const Color(0xFF2C2C2C) : Colors.grey[50]),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                  color: active
-                      ? _teal
+                  color: active ? _teal
                       : (isDark ? Colors.grey[700]! : Colors.grey[200]!),
                   width: active ? 2 : 1),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             child: Row(children: [
-              Text(o['i']!, style: const TextStyle(fontSize: 18)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(o['l']!,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                            active ? FontWeight.w600 : FontWeight.normal,
-                        color: active ? _teal : null),
-                    maxLines: 2),
-              ),
+              if (o['i'] != null)
+                Text(o['i']!, style: const TextStyle(fontSize: 18)),
+              if (o['i'] != null) const SizedBox(width: 8),
+              Expanded(child: Text(o['l']!,
+                  style: TextStyle(fontSize: 12,
+                      fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+                      color: active ? _teal : null),
+                  maxLines: 2)),
             ]),
           ),
         );
@@ -67,7 +60,7 @@ class PlanFormWidgets {
     );
   }
 
-  // ── Multi-select grid ─────────────────────────────────
+  // ── Multi-select grid ─────────────────────────────────────
   static Widget multiGrid({
     required List<Map<String, String>> opts,
     required List<String> selected,
@@ -79,8 +72,7 @@ class PlanFormWidgets {
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
+      crossAxisSpacing: 10, mainAxisSpacing: 10,
       childAspectRatio: aspectRatio,
       children: opts.map((o) {
         final active = selected.contains(o['v']);
@@ -89,32 +81,27 @@ class PlanFormWidgets {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             decoration: BoxDecoration(
-              color: active
-                  ? _teal.withOpacity(0.1)
+              color: active ? _teal.withOpacity(0.1)
                   : (isDark ? const Color(0xFF2C2C2C) : Colors.grey[50]),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                  color: active
-                      ? _teal
+                  color: active ? _teal
                       : (isDark ? Colors.grey[700]! : Colors.grey[200]!),
                   width: active ? 2 : 1),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             child: Row(children: [
-              Text(o['i']!, style: const TextStyle(fontSize: 18)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(o['l']!,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                            active ? FontWeight.w600 : FontWeight.normal,
-                        color: active ? _teal : null),
-                    maxLines: 2),
-              ),
+              if (o['i'] != null)
+                Text(o['i']!, style: const TextStyle(fontSize: 18)),
+              if (o['i'] != null) const SizedBox(width: 8),
+              Expanded(child: Text(o['l']!,
+                  style: TextStyle(fontSize: 12,
+                      fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+                      color: active ? _teal : null),
+                  maxLines: 2)),
               if (active)
                 const Icon(Icons.check_circle_rounded,
-                    color: Color(0xFF00CED1), size: 16),
+                    color: _teal, size: 16),
             ]),
           ),
         );
@@ -122,7 +109,7 @@ class PlanFormWidgets {
     );
   }
 
-  // ── Horizontal row (choice pills) ────────────────────
+  // ── Horizontal row pills ──────────────────────────────────
   static Widget row({
     required List<Map<String, String>> opts,
     required String? selected,
@@ -131,40 +118,33 @@ class PlanFormWidgets {
   }) {
     return Row(children: opts.map((o) {
       final active = selected == o['v'];
-      return Expanded(
-        child: GestureDetector(
-          onTap: () => onSelect(o['v']!),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            margin: EdgeInsets.only(right: o == opts.last ? 0 : 8),
-            padding: const EdgeInsets.symmetric(vertical: 11),
-            decoration: BoxDecoration(
-              color: active
-                  ? _teal.withOpacity(0.1)
-                  : (isDark ? const Color(0xFF2C2C2C) : Colors.grey[50]),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                  color: active
-                      ? _teal
-                      : (isDark ? Colors.grey[700]! : Colors.grey[200]!),
-                  width: active ? 2 : 1),
-            ),
-            child: Center(
-              child: Text(o['l']!,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight:
-                          active ? FontWeight.w600 : FontWeight.normal,
-                      color: active ? _teal : null)),
-            ),
+      final isLast = o == opts.last;
+      return Expanded(child: GestureDetector(
+        onTap: () => onSelect(o['v']!),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          margin: EdgeInsets.only(right: isLast ? 0 : 8),
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          decoration: BoxDecoration(
+            color: active ? _teal.withOpacity(0.1)
+                : (isDark ? const Color(0xFF2C2C2C) : Colors.grey[50]),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+                color: active ? _teal
+                    : (isDark ? Colors.grey[700]! : Colors.grey[200]!),
+                width: active ? 2 : 1),
           ),
+          child: Center(child: Text(o['l']!,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+                  color: active ? _teal : null))),
         ),
-      );
+      ));
     }).toList());
   }
 
-  // ── Wrap chips (multi-select) ─────────────────────────
+  // ── Wrap chips ────────────────────────────────────────────
   static Widget chips({
     required List<String> opts,
     required List<String> selected,
@@ -179,27 +159,23 @@ class PlanFormWidgets {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
           decoration: BoxDecoration(
-            color: active
-                ? _teal.withOpacity(0.1)
+            color: active ? _teal.withOpacity(0.1)
                 : (isDark ? const Color(0xFF2C2C2C) : Colors.grey[50]),
             borderRadius: BorderRadius.circular(99),
             border: Border.all(
-                color: active
-                    ? _teal
+                color: active ? _teal
                     : (isDark ? Colors.grey[700]! : Colors.grey[200]!),
                 width: active ? 2 : 1),
           ),
-          child: Text(o,
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: active ? FontWeight.w600 : FontWeight.normal,
-                  color: active ? _teal : null)),
+          child: Text(o, style: TextStyle(fontSize: 13,
+              fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+              color: active ? _teal : null)),
         ),
       );
     }).toList());
   }
 
-  // ── Money text field ──────────────────────────────────
+  // ── Money field ───────────────────────────────────────────
   static Widget moneyField({
     required TextEditingController controller,
     required String hint,
@@ -209,35 +185,28 @@ class PlanFormWidgets {
       controller: controller,
       keyboardType: TextInputType.number,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
+      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600,
           color: isDark ? Colors.white : Colors.black87),
       decoration: InputDecoration(
         hintText: hint,
         suffixText: 'đ',
-        suffixStyle:
-            const TextStyle(color: _teal, fontWeight: FontWeight.w600),
+        suffixStyle: const TextStyle(color: _teal, fontWeight: FontWeight.w600),
         filled: true,
         fillColor: isDark ? const Color(0xFF2C2C2C) : Colors.grey[50],
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(
                 color: isDark ? Colors.grey[700]! : Colors.grey[200]!)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(
                 color: isDark ? Colors.grey[700]! : Colors.grey[200]!)),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: _teal, width: 2)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
     );
   }
 
-  // ── Custom text field (nghề khác) ─────────────────────
+  // ── Text field ────────────────────────────────────────────
   static Widget textField({
     required TextEditingController controller,
     required String hint,
@@ -246,32 +215,26 @@ class PlanFormWidgets {
   }) {
     return TextField(
       controller: controller,
-      style: TextStyle(
-          fontSize: 14,
+      style: TextStyle(fontSize: 14,
           color: isDark ? Colors.white : Colors.black87),
       decoration: InputDecoration(
-        hintText: hint,
-        labelText: label,
+        hintText: hint, labelText: label,
         filled: true,
         fillColor: isDark ? const Color(0xFF2C2C2C) : Colors.grey[50],
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(
                 color: isDark ? Colors.grey[700]! : Colors.grey[200]!)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(
                 color: isDark ? Colors.grey[700]! : Colors.grey[200]!)),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: _teal, width: 2)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
     );
   }
 
-  // ── Bool card (yes/no) ────────────────────────────────
+  // ── Bool card ─────────────────────────────────────────────
   static Widget boolCard({
     required String label,
     required String icon,
@@ -285,25 +248,20 @@ class PlanFormWidgets {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isActive
-              ? _teal.withOpacity(0.1)
+          color: isActive ? _teal.withOpacity(0.1)
               : (isDark ? const Color(0xFF2C2C2C) : Colors.grey[50]),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-              color: isActive
-                  ? _teal
+              color: isActive ? _teal
                   : (isDark ? Colors.grey[700]! : Colors.grey[200]!),
               width: isActive ? 2 : 1),
         ),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Text(icon, style: const TextStyle(fontSize: 20)),
           const SizedBox(height: 4),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 11,
-                  fontWeight:
-                      isActive ? FontWeight.w600 : FontWeight.normal,
-                  color: isActive ? _teal : null),
+          Text(label, style: TextStyle(fontSize: 11,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+              color: isActive ? _teal : null),
               textAlign: TextAlign.center),
         ]),
       ),

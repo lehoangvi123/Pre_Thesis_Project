@@ -14,45 +14,36 @@ class PlanFormData {
     {'v': 'Other',      'i': '✏️', 'l': 'Khác...'},
   ];
 
-  // ── Tỉnh thành nổi bật (giảm từ 63 xuống ~25) ────────────
+  // ── Tỉnh thành nổi bật ───────────────────────────────────
   static const provinces = [
-    // Miền Nam — đông dân, kinh tế lớn
-    {'v': 'HCM',       'l': 'TP. Hồ Chí Minh', 'r': 'south'},
-    {'v': 'BinhDuong', 'l': 'Bình Dương',        'r': 'south'},
-    {'v': 'DongNai',   'l': 'Đồng Nai',          'r': 'south'},
-    {'v': 'BaRiaVT',   'l': 'Bà Rịa - Vũng Tàu','r': 'south'},
-    {'v': 'LongAn',    'l': 'Long An',           'r': 'south'},
-    {'v': 'CanTho',    'l': 'Cần Thơ',           'r': 'south'},
-    {'v': 'AnGiang',   'l': 'An Giang',          'r': 'south'},
-    {'v': 'KienGiang', 'l': 'Kiên Giang',        'r': 'south'},
-    {'v': 'TayNinh',   'l': 'Tây Ninh',          'r': 'south'},
-    {'v': 'BinhPhuoc', 'l': 'Bình Phước',        'r': 'south'},
-
-    // Miền Trung — du lịch + kinh tế
-    {'v': 'DaNang',    'l': 'Đà Nẵng',           'r': 'central'},
-    {'v': 'HueTT',     'l': 'Thừa Thiên Huế',    'r': 'central'},
-    {'v': 'QuangNam',  'l': 'Quảng Nam',         'r': 'central'},
-    {'v': 'KhanhHoa',  'l': 'Khánh Hòa',         'r': 'central'},
-    {'v': 'NghAn',     'l': 'Nghệ An',           'r': 'central'},
-    {'v': 'ThanhHoa',  'l': 'Thanh Hóa',         'r': 'central'},
-
-    // Tây Nguyên — nổi bật
-    {'v': 'DakLak',    'l': 'Đắk Lắk',           'r': 'highland'},
-    {'v': 'LamDong',   'l': 'Lâm Đồng',          'r': 'highland'},
-    {'v': 'GiaLai',    'l': 'Gia Lai',            'r': 'highland'},
-
-    // Miền Bắc — đông dân, kinh tế lớn
-    {'v': 'Hanoi',     'l': 'Hà Nội',            'r': 'north'},
-    {'v': 'HaiPhong',  'l': 'Hải Phòng',         'r': 'north'},
-    {'v': 'QuangNinh', 'l': 'Quảng Ninh',        'r': 'north'},
-    {'v': 'BacNinh',   'l': 'Bắc Ninh',          'r': 'north'},
-    {'v': 'HaiDuong',  'l': 'Hải Dương',         'r': 'north'},
-    {'v': 'ThaiNguyen','l': 'Thái Nguyên',        'r': 'north'},
-    {'v': 'VinhPhuc',  'l': 'Vĩnh Phúc',         'r': 'north'},
-    {'v': 'NamDinh',   'l': 'Nam Định',           'r': 'north'},
-
-    // ✅ Tỉnh khác — cho các tỉnh không có trong danh sách
-    {'v': 'Other',     'l': 'Tỉnh / thành khác', 'r': 'other'},
+    {'v': 'HCM',        'l': 'TP. Hồ Chí Minh',    'r': 'south'},
+    {'v': 'BinhDuong',  'l': 'Bình Dương',           'r': 'south'},
+    {'v': 'DongNai',    'l': 'Đồng Nai',             'r': 'south'},
+    {'v': 'BaRiaVT',    'l': 'Bà Rịa - Vũng Tàu',   'r': 'south'},
+    {'v': 'LongAn',     'l': 'Long An',              'r': 'south'},
+    {'v': 'CanTho',     'l': 'Cần Thơ',              'r': 'south'},
+    {'v': 'AnGiang',    'l': 'An Giang',             'r': 'south'},
+    {'v': 'KienGiang',  'l': 'Kiên Giang',           'r': 'south'},
+    {'v': 'TayNinh',    'l': 'Tây Ninh',             'r': 'south'},
+    {'v': 'BinhPhuoc',  'l': 'Bình Phước',           'r': 'south'},
+    {'v': 'DaNang',     'l': 'Đà Nẵng',              'r': 'central'},
+    {'v': 'HueTT',      'l': 'Thừa Thiên Huế',       'r': 'central'},
+    {'v': 'QuangNam',   'l': 'Quảng Nam',            'r': 'central'},
+    {'v': 'KhanhHoa',   'l': 'Khánh Hòa',            'r': 'central'},
+    {'v': 'NghAn',      'l': 'Nghệ An',              'r': 'central'},
+    {'v': 'ThanhHoa',   'l': 'Thanh Hóa',            'r': 'central'},
+    {'v': 'DakLak',     'l': 'Đắk Lắk',              'r': 'highland'},
+    {'v': 'LamDong',    'l': 'Lâm Đồng',             'r': 'highland'},
+    {'v': 'GiaLai',     'l': 'Gia Lai',              'r': 'highland'},
+    {'v': 'Hanoi',      'l': 'Hà Nội',               'r': 'north'},
+    {'v': 'HaiPhong',   'l': 'Hải Phòng',            'r': 'north'},
+    {'v': 'QuangNinh',  'l': 'Quảng Ninh',           'r': 'north'},
+    {'v': 'BacNinh',    'l': 'Bắc Ninh',             'r': 'north'},
+    {'v': 'HaiDuong',   'l': 'Hải Dương',            'r': 'north'},
+    {'v': 'ThaiNguyen', 'l': 'Thái Nguyên',          'r': 'north'},
+    {'v': 'VinhPhuc',   'l': 'Vĩnh Phúc',            'r': 'north'},
+    {'v': 'NamDinh',    'l': 'Nam Định',              'r': 'north'},
+    {'v': 'Other',      'l': 'Tỉnh / thành khác',    'r': 'other'},
   ];
 
   static const regionLabels = {
@@ -113,7 +104,6 @@ class PlanFormData {
     {'v': 'Divorced', 'l': 'Đã ly hôn'},
   ];
 
-  // ── Helpers ───────────────────────────────────────────────
   static String cityName(String v) {
     if (v == 'Other') return 'Tỉnh / thành khác';
     for (final p in provinces) {

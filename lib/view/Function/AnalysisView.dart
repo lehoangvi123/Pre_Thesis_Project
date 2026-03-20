@@ -15,6 +15,7 @@ import './AddSavingGoalView.dart';
 import './analysis_widgets.dart';
 import './Spend_rule_view.dart';
 import './Plan_form_screen.dart';
+import './Plan_entry_view.dart';
 import './Plan_form_data.dart';
 
 // ─────────────────────────────────────────────────────────
@@ -92,6 +93,8 @@ THÔNG TIN NGƯỜI DÙNG:
 - Có con: ${d['hasChildren'] ?? 'Chưa có con'}
 - Phương tiện: ${d['transport'] ?? 'Xe máy'}
 - Thói quen ăn uống: ${d['eatingHabit'] ?? '50% nấu, 50% ăn ngoài'}
+- Chi tiêu hiện tại: ${d['currentSpending'] ?? 'Chưa rõ'}
+- Bảo hiểm y tế: ${d['insurance'] ?? 'Chưa có bảo hiểm'}
 - Có nợ: ${hasDebt ? 'Có (${_fmt(d['debtAmount'])}đ)' : 'Không'}
 - Có tiết kiệm: ${hasSavings ? 'Có' : 'Chưa có'}
 - Mục tiêu tài chính: $goals
@@ -260,7 +263,7 @@ Lưu ý quan trọng:
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
-          child: PlanFormScreen(
+          child: PlanEntryView(
             onPlanCreated: _onPlanCreated,
             isGenerating: _isGenerating,
             onGenerate: _generate,

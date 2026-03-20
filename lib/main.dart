@@ -12,7 +12,8 @@ import './view/ThemeProvider/ThemeProviderDark.dart';
 import './view/Function/Language/MultiLanguage.dart';
 import './provider/TransactionProvider.dart';
 import 'package:project1/view/TextVoice/test_voice.dart';
-import './service/backend_keepalive_service.dart';
+import './service/backend_keepalive_service.dart'; 
+import 'package:project1/view/Function/AI_Chatbot/chatbot_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,7 +59,8 @@ class MyApp extends StatelessWidget {
             '/welcome': (context) => const WelcomeView(),
             '/onboarding': (context) => const OnboardingView(),
             '/home': (context) => const HomeView(),
-            '/test-voice': (context) => TestVoiceView(),
+            '/test-voice': (context) => TestVoiceView(), 
+            '/chat':        (context) => const ChatbotView(),
           },   
         );
       },     
