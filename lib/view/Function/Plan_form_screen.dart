@@ -55,7 +55,8 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
   final List<String> _savingGoals = [];
   bool _hasDebt    = false;
   bool _hasSavings = false;
-  final _targetSalaryCtrl = TextEditingController();
+  final _targetSalaryCtrl  = TextEditingController();
+  final _currentSalaryCtrl = TextEditingController(); // ✅ Thu nhập hiện tại
   final _debtCtrl         = TextEditingController();
   String? _currentSpending;
   String? _insurance;
@@ -65,6 +66,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
     _pageController.dispose();
     _customOccupationCtrl.dispose();
     _targetSalaryCtrl.dispose();
+    _currentSalaryCtrl.dispose();
     _debtCtrl.dispose();
     super.dispose();
   }
@@ -120,7 +122,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
       'livingStatus':     _livingStatus   ?? 'Renting',
       'incomeStability':  _incomeStability ?? 'Stable',
       'incomeSources':    List<String>.from(_incomeSources),
-      'currentSalary':    0.0,
+      'currentSalary':    double.tryParse(_currentSalaryCtrl.text.replaceAll(',', '')) ?? 0,
       'targetSalary':     double.tryParse(_targetSalaryCtrl.text.replaceAll(',', '')) ?? 0,
       'hasDebt':          _hasDebt,
       'debtAmount':       double.tryParse(_debtCtrl.text.replaceAll(',', '')) ?? 0,
@@ -567,6 +569,17 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
           ],
           selected: _insurance,
           onSelect: (v) => setState(() => _insurance = v),
+          isDark: isDark,
+        ),
+
+        const SizedBox(height: 18),
+
+        // ✅ Thu nhập hiện tại
+        PlanFormWidgets.label('Thu nhập hiện tại / tháng'),
+        _moneyFieldWithSub(
+          controller: _currentSalaryCtrl,
+          hint: 'VD: 10,000,000',
+          subText: 'Giúp hệ thống đề xuất kế hoạch sát thực tế hơn',
           isDark: isDark,
         ),
 

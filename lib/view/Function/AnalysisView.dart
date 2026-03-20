@@ -18,9 +18,6 @@ import './Plan_form_screen.dart';
 import './Plan_entry_view.dart';
 import './Plan_form_data.dart';
 
-// ─────────────────────────────────────────────────────────
-// MAIN VIEW
-// ─────────────────────────────────────────────────────────
 class AnalysisView extends StatefulWidget {
   const AnalysisView({Key? key}) : super(key: key);
   @override
@@ -32,7 +29,8 @@ class _AnalysisViewState extends State<AnalysisView> {
   Map<String, dynamic>? _savedFormData;
   bool _isGenerating = false;
 
-  static const _backendUrl = 'https://buddy-budget-system-backend.onrender.com/api/chat';
+  static const _backendUrl =
+      'https://buddy-budget-system-backend.onrender.com/api/chat';
 
   void _onPlanCreated(Map<String, dynamic> plan, Map<String, dynamic> formData) {
     setState(() { _savedPlan = plan; _savedFormData = formData; });
@@ -42,14 +40,13 @@ class _AnalysisViewState extends State<AnalysisView> {
     setState(() { _savedPlan = null; _savedFormData = null; });
   }
 
-  // ── Format tiền ──────────────────────────────────────
   String _fmt(dynamic v) {
     final n = (v as num?)?.toInt() ?? 0;
     return n.toString().replaceAllMapped(
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
   }
 
-  // ── Build prompt gửi lên backend ─────────────────────
+  // ── Build prompt ─────────────────────────────────────
   String _buildPrompt(Map<String, dynamic> d) {
     final cityLabel = PlanFormData.cityName(d['city'] ?? 'HCM');
     final occLabel  = PlanFormData.occupationLabel(
@@ -80,6 +77,16 @@ class _AnalysisViewState extends State<AnalysisView> {
     final stability  = d['incomeStability'] ?? 'Stable';
     final sources    = (d['incomeSources'] as List? ?? []).join(', ');
 
+    // ✅ Thu nhập hiện tại & mong muốn
+    final currentSalary = (d['currentSalary'] as num?)?.toDouble() ?? 0;
+    final targetSalary  = (d['targetSalary']  as num?)?.toDouble() ?? 0;
+    final currentSalaryText = currentSalary > 0
+        ? '${_fmt(currentSalary)}đ/tháng'
+        : 'Chưa cung cấp';
+    final targetSalaryText = targetSalary > 0
+        ? '${_fmt(targetSalary)}đ/tháng'
+        : 'Chưa cung cấp';
+
     return '''Bạn là chuyên gia tư vấn tài chính cá nhân tại Việt Nam. Hãy lập kế hoạch tài chính cá nhân dựa trên thông tin sau:
 
 THÔNG TIN NGƯỜI DÙNG:
@@ -90,6 +97,8 @@ THÔNG TIN NGƯỜI DÙNG:
 - Chỗ ở: ${livMap[d['livingStatus']] ?? d['livingStatus']}
 - Thu nhập ổn định: $stability
 - Nguồn thu: ${sources.isEmpty ? 'Chưa rõ' : sources}
+- Thu nhập hiện tại: $currentSalaryText
+- Thu nhập mong muốn: $targetSalaryText
 - Có con: ${d['hasChildren'] ?? 'Chưa có con'}
 - Phương tiện: ${d['transport'] ?? 'Xe máy'}
 - Thói quen ăn uống: ${d['eatingHabit'] ?? '50% nấu, 50% ăn ngoài'}
@@ -99,26 +108,44 @@ THÔNG TIN NGƯỜI DÙNG:
 - Có tiết kiệm: ${hasSavings ? 'Có' : 'Chưa có'}
 - Mục tiêu tài chính: $goals
 
-YÊU CẦU: Dựa vào thông tin trên, hãy:
-1. Đề xuất mức thu nhập phù hợp (theo mức sống thực tế tại $cityLabel)
-2. Lập bảng phân bổ chi tiêu cụ thể (số tiền thực tế, không phải %)
-3. Đưa ra nhận xét và lời khuyên thiết thực
+BẢNG LƯƠNG THAM KHẢO THỰC TẾ 2024:
+- Sinh viên / thực tập: 3 - 6 triệu/tháng
+- Nhân viên mới (HCM/HN): 8 - 15 triệu/tháng
+- Kỹ sư IT (HCM): 15 - 35 triệu/tháng
+- Freelancer: 10 - 30 triệu/tháng
+- Bác sĩ / Y dược: 15 - 35 triệu/tháng
+- Giáo viên: 7 - 12 triệu/tháng
+- Kinh doanh: 12 - 40 triệu/tháng
 
-Trả về JSON hợp lệ (KHÔNG markdown, KHÔNG backtick, KHÔNG chữ "AI"):
+BẢNG GIÁ THUÊ NHÀ THỰC TẾ 2024:
+- TP. Hồ Chí Minh: phòng trọ 2-3tr, căn hộ mini 4-6tr, chung cư 7-12tr
+- Hà Nội: phòng trọ 2-3tr, căn hộ mini 3-5tr, chung cư 6-10tr
+- Đà Nẵng: phòng trọ 1.5-2.5tr, căn hộ 3-5tr
+- Tỉnh khác: phòng trọ 1-2tr, căn hộ 2-4tr
+
+YÊU CẦU QUAN TRỌNG:
+- Nếu user đã cung cấp "Thu nhập hiện tại" → dùng con số đó làm cơ sở, KHÔNG tự đoán
+- Nếu có "Thu nhập mong muốn" → đề xuất lộ trình đạt được
+- Nếu cả 2 đều chưa cung cấp → dùng bảng tham khảo ở trên để ước tính
+- Tổng expense_table phải BẰNG recommended_income
+- Nếu ở cùng gia đình hoặc có nhà riêng → KHÔNG có khoản Nhà ở
+- Không dùng chữ "AI" trong bất kỳ text nào
+
+Trả về JSON hợp lệ (KHÔNG markdown, KHÔNG backtick):
 {
   "recommended_income": <số nguyên, đơn vị đồng>,
-  "income_reason": "<lý do ngắn gọn 1 câu tại sao mức này phù hợp>",
-  "summary": "<nhận xét 2 câu về tình hình tài chính của người dùng>",
+  "income_reason": "<lý do ngắn gọn 1 câu>",
+  "summary": "<nhận xét 2 câu về tình hình tài chính>",
   "expense_table": [
-    {"category": "Nhà ở", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú ngắn>"},
-    {"category": "Ăn uống", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú ngắn>"},
-    {"category": "Di chuyển", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú ngắn>"},
-    {"category": "Hóa đơn tiện ích", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú ngắn>"},
-    {"category": "Mua sắm cá nhân", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú ngắn>"},
-    {"category": "Giải trí & xã hội", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú ngắn>"},
-    {"category": "Tiết kiệm", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú ngắn>"},
-    {"category": "Đầu tư & học tập", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú ngắn>"},
-    {"category": "Quỹ dự phòng", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú ngắn>"}
+    {"category": "Nhà ở", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú>"},
+    {"category": "Ăn uống", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú>"},
+    {"category": "Di chuyển", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú>"},
+    {"category": "Hóa đơn tiện ích", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú>"},
+    {"category": "Mua sắm cá nhân", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú>"},
+    {"category": "Giải trí & xã hội", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú>"},
+    {"category": "Tiết kiệm", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú>"},
+    {"category": "Đầu tư & học tập", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú>"},
+    {"category": "Quỹ dự phòng", "amount": <số nguyên>, "percent": <số nguyên>, "note": "<ghi chú>"}
     ${hasDebt ? ',{"category": "Trả nợ hàng tháng", "amount": <số nguyên>, "percent": <số nguyên>, "note": "Thanh toán đều đặn"}' : ''}
     ${married ? ',{"category": "Chi phí gia đình", "amount": <số nguyên>, "percent": <số nguyên>, "note": "Chi phí sinh hoạt chung"}' : ''}
   ],
@@ -128,13 +155,7 @@ Trả về JSON hợp lệ (KHÔNG markdown, KHÔNG backtick, KHÔNG chữ "AI")
     "<lời khuyên 3 - cụ thể, thiết thực>"
   ],
   "goal_plan": "<lộ trình 2-3 câu để đạt mục tiêu $goals>"
-}
-
-Lưu ý quan trọng:
-- Tổng expense_table phải BẰNG recommended_income
-- Số tiền phải thực tế theo mức sống tại $cityLabel
-- Nếu ở cùng gia đình hoặc có nhà riêng thì KHÔNG có khoản Nhà ở
-- Không dùng chữ "AI" trong bất kỳ text nào''';
+}''';
   }
 
   // ── Fallback khi backend lỗi ─────────────────────────
@@ -145,7 +166,9 @@ Lưu ý quan trọng:
     final hasDebt    = d['hasDebt'] as bool? ?? false;
     final married    = d['maritalStatus'] == 'Married';
 
-    // Thu nhập đề xuất cơ bản
+    // ✅ Ưu tiên dùng thu nhập user nhập
+    final inputSalary = (d['currentSalary'] as num?)?.toDouble() ?? 0;
+
     final baseIncome = <String, double>{
       'Student': 5000000, 'Employee': 12000000, 'Freelancer': 15000000,
       'Business': 18000000, 'Doctor': 22000000, 'Teacher': 10000000,
@@ -155,16 +178,18 @@ Lưu ý quan trọng:
       'HCM': 1.0, 'Hanoi': 0.95, 'DaNang': 0.85,
       'HaiPhong': 0.85, 'BinhDuong': 0.90,
     };
-    final rec = (baseIncome[occupation] ?? 12000000) * (cityMult[city] ?? 0.80);
 
-    // Tiền thuê
+    // Nếu user đã nhập → dùng luôn, không override
+    final baseRec = (baseIncome[occupation] ?? 12000000) * (cityMult[city] ?? 0.80);
+    final rec = inputSalary > 0 ? inputSalary : baseRec;
+
     final rentByCity = <String, double>{
       'HCM': 3800000, 'Hanoi': 3200000, 'DaNang': 2800000,
       'HaiPhong': 2500000, 'BinhDuong': 2500000,
     };
     double rent = 0;
-    if (living == 'Renting')  rent = rentByCity[city] ?? 2000000;
-    if (living == 'Boarding') rent = 1500000;
+    if (living == 'Renting')   rent = rentByCity[city] ?? 2000000;
+    if (living == 'Boarding')  rent = 1500000;
     if (living == 'Dormitory') rent = 800000;
 
     final food    = (rec * (occupation == 'Student' ? 0.22 : 0.18)).roundToDouble();
@@ -176,39 +201,57 @@ Lưu ý quan trọng:
     final invest  = (rec * (occupation == 'Student' ? 0.05 : 0.10)).roundToDouble();
     final emerg   = (rec * 0.05).roundToDouble();
     final family  = married ? (rec * 0.05).roundToDouble() : 0.0;
-    final debtPay = hasDebt ? (rec * 0.10).roundToDouble() : 0.0;
+    final debtPay = hasDebt  ? (rec * 0.10).roundToDouble() : 0.0;
 
     final cityName = PlanFormData.cityName(city);
-    final occLabel = PlanFormData.occupationLabel(occupation, d['customOccupation'] ?? '');
+    final occLabel = PlanFormData.occupationLabel(
+        occupation, d['customOccupation'] ?? '');
 
     final List<Map<String, dynamic>> table = [
       if (rent > 0)
-        {'category': 'Nhà ở', 'amount': rent, 'percent': (rent/rec*100).round(), 'note': 'Chi phí chỗ ở tại $cityName'},
-      {'category': 'Ăn uống', 'amount': food, 'percent': (food/rec*100).round(), 'note': 'Ăn sáng, trưa, tối'},
-      {'category': 'Di chuyển', 'amount': trans, 'percent': (trans/rec*100).round(), 'note': 'Xăng xe, Grab, xe buýt'},
-      {'category': 'Hóa đơn tiện ích', 'amount': bills, 'percent': (bills/rec*100).round(), 'note': 'Điện, nước, internet'},
-      {'category': 'Mua sắm cá nhân', 'amount': shop, 'percent': (shop/rec*100).round(), 'note': 'Quần áo, đồ dùng'},
-      {'category': 'Giải trí & xã hội', 'amount': ent, 'percent': (ent/rec*100).round(), 'note': 'Cà phê, phim, bạn bè'},
-      {'category': 'Tiết kiệm', 'amount': saving, 'percent': (saving/rec*100).round(), 'note': 'Chuyển ngay đầu tháng'},
-      {'category': 'Đầu tư & học tập', 'amount': invest, 'percent': (invest/rec*100).round(), 'note': 'Khóa học, sách, cổ phiếu'},
-      {'category': 'Quỹ dự phòng', 'amount': emerg, 'percent': (emerg/rec*100).round(), 'note': 'Tình huống bất ngờ'},
+        {'category': 'Nhà ở', 'amount': rent,
+          'percent': (rent/rec*100).round(), 'note': 'Chi phí chỗ ở tại $cityName'},
+      {'category': 'Ăn uống', 'amount': food,
+        'percent': (food/rec*100).round(), 'note': 'Ăn sáng, trưa, tối'},
+      {'category': 'Di chuyển', 'amount': trans,
+        'percent': (trans/rec*100).round(), 'note': 'Xăng xe, Grab, xe buýt'},
+      {'category': 'Hóa đơn tiện ích', 'amount': bills,
+        'percent': (bills/rec*100).round(), 'note': 'Điện, nước, internet'},
+      {'category': 'Mua sắm cá nhân', 'amount': shop,
+        'percent': (shop/rec*100).round(), 'note': 'Quần áo, đồ dùng'},
+      {'category': 'Giải trí & xã hội', 'amount': ent,
+        'percent': (ent/rec*100).round(), 'note': 'Cà phê, phim, bạn bè'},
+      {'category': 'Tiết kiệm', 'amount': saving,
+        'percent': (saving/rec*100).round(), 'note': 'Chuyển ngay đầu tháng'},
+      {'category': 'Đầu tư & học tập', 'amount': invest,
+        'percent': (invest/rec*100).round(), 'note': 'Khóa học, sách, cổ phiếu'},
+      {'category': 'Quỹ dự phòng', 'amount': emerg,
+        'percent': (emerg/rec*100).round(), 'note': 'Tình huống bất ngờ'},
       if (hasDebt)
-        {'category': 'Trả nợ hàng tháng', 'amount': debtPay, 'percent': (debtPay/rec*100).round(), 'note': 'Thanh toán đều đặn'},
+        {'category': 'Trả nợ hàng tháng', 'amount': debtPay,
+          'percent': (debtPay/rec*100).round(), 'note': 'Thanh toán đều đặn'},
       if (married)
-        {'category': 'Chi phí gia đình', 'amount': family, 'percent': (family/rec*100).round(), 'note': 'Chi phí sinh hoạt chung'},
+        {'category': 'Chi phí gia đình', 'amount': family,
+          'percent': (family/rec*100).round(), 'note': 'Chi phí sinh hoạt chung'},
     ];
 
     return {
       'recommended_income': rec,
       'income_reason': 'Mức phù hợp với $occLabel tại $cityName',
-      'summary': 'Với hoàn cảnh của bạn tại $cityName, kế hoạch được xây dựng để cân bằng chi tiêu và đạt mục tiêu tài chính. Ưu tiên tiết kiệm ngay từ đầu tháng để tạo thói quen tốt.',
+      'summary':
+          'Với hoàn cảnh của bạn tại $cityName, kế hoạch được xây dựng '
+          'để cân bằng chi tiêu và đạt mục tiêu tài chính. '
+          'Ưu tiên tiết kiệm ngay từ đầu tháng để tạo thói quen tốt.',
       'expense_table': table,
       'tips': [
         'Chuyển ${_fmt(saving)}đ vào tài khoản tiết kiệm ngay khi nhận lương',
         'Ghi chép chi tiêu hàng ngày bằng Budget Buddy để theo dõi tốt hơn',
         'Xem lại kế hoạch mỗi đầu tháng và điều chỉnh nếu cần',
       ],
-      'goal_plan': 'Duy trì tiết kiệm ${_fmt(saving)}đ/tháng đều đặn. Sau 3-6 tháng xây dựng quỹ dự phòng đủ 3 tháng chi tiêu, sau đó tăng dần tỷ lệ đầu tư để đạt mục tiêu dài hạn.',
+      'goal_plan':
+          'Duy trì tiết kiệm ${_fmt(saving)}đ/tháng đều đặn. '
+          'Sau 3-6 tháng xây dựng quỹ dự phòng đủ 3 tháng chi tiêu, '
+          'sau đó tăng dần tỷ lệ đầu tư để đạt mục tiêu dài hạn.',
     };
   }
 
@@ -226,22 +269,20 @@ Lưu ý quan trọng:
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'message': prompt,
-          'chatHistory': [],           // không cần history
-          'financialContext': '',       // không cần context
+          'chatHistory': [],
+          'financialContext': '',
         }),
       ).timeout(const Duration(seconds: 30));
 
       if (res.statusCode == 200) {
         final body    = jsonDecode(res.body);
-        // Backend trả về field "message"
         final rawText = body['message'] as String? ?? '';
         final cleaned = rawText
             .replaceAll('```json', '')
             .replaceAll('```', '')
             .trim();
-
         plan = jsonDecode(cleaned) as Map<String, dynamic>;
-        print('✅ Plan generated by backend (${body['provider']})');
+        print('✅ Plan generated (${body['provider']})');
       } else {
         print('⚠️ Backend error ${res.statusCode}, using fallback');
         plan = _fallbackPlan(formData);
@@ -357,7 +398,8 @@ class _PlanResultScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100],
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
+              border: Border.all(
+                  color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Icon(Icons.refresh_rounded, size: 15,
@@ -405,7 +447,8 @@ class _PlanResultScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
+        border: Border.all(
+            color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -435,7 +478,6 @@ class _PlanResultScreen extends StatelessWidget {
 
   Widget _expenseTable(bool isDark) {
     final rows = (plan['expense_table'] as List?) ?? [];
-    final rec  = (plan['recommended_income'] as num?)?.toDouble() ?? 1;
     final rowColors = [
       const Color(0xFF00CED1), const Color(0xFF4CAF50), const Color(0xFFFF9800),
       const Color(0xFF2196F3), const Color(0xFFE91E63), const Color(0xFF9C27B0),
@@ -447,10 +489,10 @@ class _PlanResultScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
+        border: Border.all(
+            color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
       ),
       child: Column(children: [
-        // Title
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           child: Row(children: [
@@ -459,7 +501,8 @@ class _PlanResultScreen extends StatelessWidget {
               decoration: BoxDecoration(
                   color: _purple.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.table_chart_rounded, color: _purple, size: 20),
+              child: const Icon(Icons.table_chart_rounded,
+                  color: _purple, size: 20),
             ),
             const SizedBox(width: 10),
             const Expanded(child: Text('Kế hoạch chi tiêu chi tiết',
@@ -467,8 +510,6 @@ class _PlanResultScreen extends StatelessWidget {
           ]),
         ),
         const SizedBox(height: 12),
-
-        // Column headers
         Container(
           color: isDark ? const Color(0xFF3A3A3A) : const Color(0xFFF5F5F5),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -487,8 +528,6 @@ class _PlanResultScreen extends StatelessWidget {
                 textAlign: TextAlign.center)),
           ]),
         ),
-
-        // Rows
         ...rows.asMap().entries.map((e) {
           final i       = e.key;
           final row     = e.value as Map;
@@ -500,15 +539,19 @@ class _PlanResultScreen extends StatelessWidget {
           return Column(children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                   Container(width: 8, height: 8,
-                      decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                      decoration: BoxDecoration(
+                          color: color, shape: BoxShape.circle)),
                   const SizedBox(width: 8),
                   Expanded(flex: 5, child: Text(row['category'] ?? '',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w500))),
                   Expanded(flex: 4, child: Text('${_fmt(amount)} đ',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
+                      style: TextStyle(fontSize: 13,
+                          fontWeight: FontWeight.w700, color: color),
                       textAlign: TextAlign.right)),
                   const SizedBox(width: 8),
                   Container(
@@ -524,12 +567,14 @@ class _PlanResultScreen extends StatelessWidget {
                 const SizedBox(height: 6),
                 Padding(
                   padding: const EdgeInsets.only(left: 16),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start, children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(2),
                       child: LinearProgressIndicator(
                         value: (percent / 100).clamp(0.0, 1.0),
-                        backgroundColor: isDark ? Colors.grey[700] : Colors.grey[100],
+                        backgroundColor:
+                            isDark ? Colors.grey[700] : Colors.grey[100],
                         valueColor: AlwaysStoppedAnimation(color),
                         minHeight: 4,
                       ),
@@ -537,7 +582,8 @@ class _PlanResultScreen extends StatelessWidget {
                     if ((row['note'] ?? '').toString().isNotEmpty) ...[
                       const SizedBox(height: 3),
                       Text(row['note'].toString(),
-                          style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey[500])),
                     ],
                   ]),
                 ),
@@ -548,8 +594,6 @@ class _PlanResultScreen extends StatelessWidget {
                   color: isDark ? Colors.grey[700] : Colors.grey[100]),
           ]);
         }).toList(),
-
-        // Total
         Container(
           margin: const EdgeInsets.all(14),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
@@ -562,9 +606,12 @@ class _PlanResultScreen extends StatelessWidget {
             const Icon(Icons.calculate_rounded, color: _teal, size: 18),
             const SizedBox(width: 8),
             const Expanded(child: Text('Tổng thu nhập / tháng',
-                style: TextStyle(fontWeight: FontWeight.w600, color: _teal, fontSize: 13))),
-            Text('${_fmt((plan['recommended_income'] as num?)?.toDouble() ?? 0)} đ',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: _teal, fontSize: 15)),
+                style: TextStyle(fontWeight: FontWeight.w600,
+                    color: _teal, fontSize: 13))),
+            Text(
+                '${_fmt((plan['recommended_income'] as num?)?.toDouble() ?? 0)} đ',
+                style: const TextStyle(fontWeight: FontWeight.bold,
+                    color: _teal, fontSize: 15)),
           ]),
         ),
       ]),
@@ -594,7 +641,8 @@ class _PlanResultScreen extends StatelessWidget {
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Container(
               width: 20, height: 20,
-              decoration: BoxDecoration(color: _purple, shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                  color: _purple, shape: BoxShape.circle),
               child: Center(child: Text('${e.key + 1}',
                   style: const TextStyle(color: Colors.white,
                       fontSize: 10, fontWeight: FontWeight.bold))),
@@ -617,7 +665,8 @@ class _PlanResultScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
+        border: Border.all(
+            color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: const [
@@ -641,10 +690,12 @@ class _PlanResultScreen extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const SpendingRuleView())),
         icon: const Icon(Icons.pie_chart_rounded, color: Colors.white, size: 18),
         label: const Text('Xem quy tắc 50/30/20',
-            style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+            style: TextStyle(color: Colors.white,
+                fontSize: 14, fontWeight: FontWeight.w600)),
         style: ElevatedButton.styleFrom(
           backgroundColor: _teal, elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14)),
         ),
       ),
     );
@@ -657,7 +708,8 @@ class _PlanResultScreen extends StatelessWidget {
 class _SharedBottomNavBar extends StatelessWidget {
   final int activeIndex;
   final bool isDark;
-  const _SharedBottomNavBar({required this.activeIndex, required this.isDark});
+  const _SharedBottomNavBar(
+      {required this.activeIndex, required this.isDark});
   static const _teal = Color(0xFF00CED1);
 
   @override
@@ -671,7 +723,8 @@ class _SharedBottomNavBar extends StatelessWidget {
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+          child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
             _item(context, Icons.home_rounded, 'Home', 0,
                 () => Navigator.pushReplacement(context,
                     MaterialPageRoute(builder: (_) => const HomeView()))),
@@ -679,7 +732,8 @@ class _SharedBottomNavBar extends StatelessWidget {
             _voiceItem(context),
             _item(context, Icons.layers_rounded, 'Category', 3,
                 () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const CategoriesView()))),
+                    MaterialPageRoute(
+                        builder: (_) => const CategoriesView()))),
             _item(context, Icons.person_outline_rounded, 'Profile', 4,
                 () => Navigator.pushReplacement(context,
                     MaterialPageRoute(builder: (_) => const ProfileView()))),
@@ -692,7 +746,8 @@ class _SharedBottomNavBar extends StatelessWidget {
   Widget _item(BuildContext ctx, IconData icon, String label,
       int index, VoidCallback onTap) {
     final active = index == activeIndex;
-    final color  = active ? _teal : (isDark ? Colors.grey[500]! : Colors.grey[400]!);
+    final color =
+        active ? _teal : (isDark ? Colors.grey[500]! : Colors.grey[400]!);
     return GestureDetector(
       onTap: onTap,
       child: Column(mainAxisSize: MainAxisSize.min, children: [
