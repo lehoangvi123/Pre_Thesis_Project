@@ -497,12 +497,60 @@ class _SpendingAnalysisViewState extends State<SpendingAnalysisView>
               .where('type', isEqualTo: 'expense')
               .get(),
           builder: (context, txSnap) {
-            // Gom chi tiêu thực tế theo category
+            // ✅ Mapping tên category EN → VI (khớp với plan)
+            const catMapping = {
+              // Ăn uống
+              'Food': 'Ăn uống', 'food': 'Ăn uống',
+              'Ăn uống': 'Ăn uống', 'an uong': 'Ăn uống',
+              // Di chuyển
+              'Transport': 'Di chuyển', 'transport': 'Di chuyển',
+              'Di chuyển': 'Di chuyển', 'Xăng xe': 'Di chuyển',
+              'Grab': 'Di chuyển',
+              // Nhà ở
+              'Rent': 'Nhà ở', 'rent': 'Nhà ở', 'Nhà ở': 'Nhà ở',
+              'Housing': 'Nhà ở',
+              // Mua sắm
+              'Shopping': 'Mua sắm cá nhân', 'Groceries': 'Mua sắm cá nhân',
+              'Mua sắm cá nhân': 'Mua sắm cá nhân',
+              'Mua sắm': 'Mua sắm cá nhân',
+              // Giải trí
+              'Entertainment': 'Giải trí & xã hội',
+              'Giải trí & xã hội': 'Giải trí & xã hội',
+              'Giải trí': 'Giải trí & xã hội',
+              'Coffee': 'Giải trí & xã hội', 'Cafe': 'Giải trí & xã hội',
+              // Hóa đơn
+              'Bills': 'Hóa đơn tiện ích', 'Utilities': 'Hóa đơn tiện ích',
+              'Hóa đơn tiện ích': 'Hóa đơn tiện ích',
+              'Electricity': 'Hóa đơn tiện ích',
+              'Internet': 'Hóa đơn tiện ích',
+              // Tiết kiệm
+              'Savings': 'Tiết kiệm', 'savings': 'Tiết kiệm',
+              'Tiết kiệm': 'Tiết kiệm',
+              // Đầu tư & học tập
+              'Investment': 'Đầu tư & học tập',
+              'Education': 'Đầu tư & học tập',
+              'Đầu tư & học tập': 'Đầu tư & học tập',
+              'Học tập': 'Đầu tư & học tập',
+              // Y tế
+              'Medicine': 'Quỹ dự phòng', 'Health': 'Quỹ dự phòng',
+              'Quỹ dự phòng': 'Quỹ dự phòng',
+              'Medical': 'Quỹ dự phòng',
+              // Trả nợ
+              'Debt': 'Trả nợ hàng tháng',
+              'Trả nợ hàng tháng': 'Trả nợ hàng tháng',
+              // Gia đình
+              'Family': 'Chi phí gia đình',
+              'Chi phí gia đình': 'Chi phí gia đình',
+            };
+
+            // Gom chi tiêu thực tế — normalize về tên tiếng Việt
             final Map<String, double> actualMap = {};
             if (txSnap.hasData) {
               for (final doc in txSnap.data!.docs) {
                 final d   = doc.data() as Map<String, dynamic>;
-                final cat = (d['category'] as String? ?? 'Khác').trim();
+                final raw = (d['category'] as String? ?? 'Khác').trim();
+                // Map sang tên tiếng Việt, nếu không có thì giữ nguyên
+                final cat = catMapping[raw] ?? raw;
                 final amt = (d['amount'] as num?)?.toDouble() ?? 0;
                 actualMap[cat] = (actualMap[cat] ?? 0) + amt;
               }
