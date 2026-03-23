@@ -31,9 +31,9 @@ class _CategoriesViewState extends State<CategoriesView> {
   final GlobalKey _expenseKey = GlobalKey();
   final GlobalKey _incomeKey  = GlobalKey();
 
-  // ✅ Alert flags — chỉ hiện 1 lần mỗi session
-  bool _hasShownAlert50 = false;
-  bool _hasShownAlert90 = false;
+  // ✅ Track cả income để detect khi tăng lương
+  double _lastPercentage = -1;
+  double _lastIncome     = -1;
 
   final List<Map<String, dynamic>> _defaultExpenseCategories = [
     {'name': 'Food',          'icon': Icons.restaurant,       'color': Color(0xFFFF6B6B), 'type': 'expense'},
@@ -100,60 +100,93 @@ class _CategoriesViewState extends State<CategoriesView> {
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
   }
 
-  // ✅ Kiểm tra và hiện alert khi chi tiêu vượt ngưỡng
+  // ✅ Lưu notification vào Firestore
+  Future<void> _saveNotification(String title, String body) async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return;
+      await _firestore
+          .collection('users')
+          .doc(uid)
+          .collection('notifications')
+          .add({
+        'title': title,
+        'body': body,
+        'createdAt': FieldValue.serverTimestamp(),
+        'isRead': false,
+        'type': 'spending_alert',
+      });
+    } catch (e) {
+      print('Error saving notification: $e');
+    }
+  }
+
   void _checkSpendingAlert(double totalExpense, double totalIncome) {
     if (totalIncome <= 0) return;
-    final pct = totalExpense / totalIncome * 100;
+    final pct     = (totalExpense / totalIncome * 100).clamp(0.0, 100.0);
+    final prevPct = _lastPercentage;
 
-    // Alert 50%
-    if (pct >= 50 && pct < 90 && !_hasShownAlert50) {
-      _hasShownAlert50 = true;
+    // Lần đầu load → chỉ lưu, không hiện alert
+    if (prevPct < 0) {
+      _lastPercentage = pct;
+      _lastIncome     = totalIncome;
+      return;
+    }
+
+    // Không thay đổi đáng kể → bỏ qua
+    if ((pct - prevPct).abs() < 0.5) return;
+
+    _lastPercentage = pct;
+    _lastIncome     = totalIncome;
+
+    void showAlert(String message, Color color, IconData icon) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Row(children: [
-            Icon(Icons.info_rounded, color: Colors.white, size: 20),
-            SizedBox(width: 10),
-            Expanded(child: Text(
-              '⚡ Bạn đã chi hơn 50% thu nhập tháng này!',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            )),
+          content: Row(children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message,
+                style: const TextStyle(fontWeight: FontWeight.w600))),
           ]),
-          backgroundColor: Colors.orange[700],
+          backgroundColor: color,
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 4),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 5),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(12),
+          // ✅ Không có action button
         ));
       });
     }
 
-    // Alert 90%
-    if (pct >= 90 && !_hasShownAlert90) {
-      _hasShownAlert90 = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Row(children: [
-            Icon(Icons.warning_rounded, color: Colors.white, size: 22),
-            SizedBox(width: 10),
-            Expanded(child: Text(
-              '🚨 Cảnh báo! Bạn đã chi gần hết thu nhập tháng này!',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            )),
-          ]),
-          backgroundColor: Colors.red[700],
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 6),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(12),
-          action: SnackBarAction(
-            label: 'Xem chi tiết',
-            textColor: Colors.white,
-            onPressed: () {},
-          ),
-        ));
-      });
+    // Vượt ngưỡng 90%
+    if (pct >= 90 && prevPct < 90) {
+      _saveNotification(
+        '🚨 Cảnh báo chi tiêu nghiêm trọng',
+        'Bạn đã chi ${pct.toStringAsFixed(0)}% thu nhập tháng này!',
+      );
+      showAlert(
+        'Cảnh báo! Bạn đã chi gần hết thu nhập tháng này!',
+        Colors.red[700]!,
+        Icons.warning_rounded,
+      );
+      return;
+    }
+
+    // Vượt ngưỡng 50%
+    if (pct >= 50 && prevPct < 50) {
+      _saveNotification(
+        '⚡ Cảnh báo chi tiêu',
+        'Bạn đã chi hơn 50% thu nhập tháng này (${pct.toStringAsFixed(0)}%).',
+      );
+      showAlert(
+        'Bạn đã chi hơn 50% thu nhập tháng này!',
+        Colors.orange[700]!,
+        Icons.info_rounded,
+      );
+      return;
     }
   }
 
@@ -181,8 +214,10 @@ class _CategoriesViewState extends State<CategoriesView> {
                     totalExpense = (userData['totalExpense'] ?? 0).toDouble();
                   }
 
-                  // ✅ Kiểm tra alert mỗi khi data thay đổi
-                  _checkSpendingAlert(totalExpense, totalIncome);
+                  // ✅ Chỉ check khi có data thực
+                  if (snapshot.hasData) {
+                    _checkSpendingAlert(totalExpense, totalIncome);
+                  }
 
                   return SingleChildScrollView(
                     controller: _scrollController,
@@ -238,7 +273,6 @@ class _CategoriesViewState extends State<CategoriesView> {
               color: isDark ? Colors.grey[400] : Colors.grey[600])),
         ])),
         Row(mainAxisSize: MainAxisSize.min, children: [
-          // Achievement
           Container(
             width: 46, height: 46,
             decoration: BoxDecoration(
@@ -265,7 +299,6 @@ class _CategoriesViewState extends State<CategoriesView> {
             ),
           ),
           const SizedBox(width: 8),
-          // Transaction
           GestureDetector(
             onTap: () => Navigator.pushReplacement(context,
                 MaterialPageRoute(builder: (_) => const TransactionView())),
@@ -283,7 +316,6 @@ class _CategoriesViewState extends State<CategoriesView> {
             ),
           ),
           const SizedBox(width: 8),
-          // Notification
           Container(
             width: 46, height: 46,
             decoration: BoxDecoration(
@@ -331,21 +363,16 @@ class _CategoriesViewState extends State<CategoriesView> {
           icon: Icons.account_balance_wallet_rounded,
           color: Colors.blue[600]!, isDark: isDark, isFullWidth: true),
       const SizedBox(height: 16),
-      // ✅ Progress bar mới — dùng totalIncome thực tế
       _buildProgressBar(totalExpense, totalIncome, isDark),
     ]);
   }
 
-  // ✅ Progress bar mới — theo totalIncome thực tế + 2 mức cảnh báo
   Widget _buildProgressBar(
       double totalExpense, double totalIncome, bool isDark) {
-
-    // Nếu chưa có thu nhập thì ẩn
     if (totalIncome <= 0) return const SizedBox.shrink();
 
     final percentage = (totalExpense / totalIncome * 100).clamp(0.0, 100.0);
 
-    // Màu + trạng thái theo mức %
     final Color barColor;
     final Color bgColor;
     final IconData statusIcon;
@@ -376,7 +403,6 @@ class _CategoriesViewState extends State<CategoriesView> {
         border: Border.all(color: barColor.withOpacity(0.25), width: 1),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Header
         Row(children: [
           Container(
             padding: const EdgeInsets.all(6),
@@ -389,7 +415,6 @@ class _CategoriesViewState extends State<CategoriesView> {
           Expanded(child: Text(statusText, style: TextStyle(
               fontSize: 13, fontWeight: FontWeight.w600,
               color: isDark ? Colors.grey[200] : Colors.grey[800]))),
-          // % badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
@@ -400,10 +425,7 @@ class _CategoriesViewState extends State<CategoriesView> {
                     fontWeight: FontWeight.bold, color: barColor)),
           ),
         ]),
-
         const SizedBox(height: 12),
-
-        // Thanh progress
         ClipRRect(
           borderRadius: BorderRadius.circular(6),
           child: LinearProgressIndicator(
@@ -413,10 +435,7 @@ class _CategoriesViewState extends State<CategoriesView> {
             valueColor: AlwaysStoppedAnimation<Color>(barColor),
           ),
         ),
-
         const SizedBox(height: 10),
-
-        // Số tiền đã chi / thu nhập
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text('Đã chi: ${_formatCurrency(totalExpense)}đ',
               style: TextStyle(fontSize: 12,
@@ -425,8 +444,6 @@ class _CategoriesViewState extends State<CategoriesView> {
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
                   color: isDark ? Colors.grey[300] : Colors.grey[700])),
         ]),
-
-        // ✅ Alert box khi >= 50%
         if (percentage >= 50) ...[
           const SizedBox(height: 10),
           Container(
@@ -457,12 +474,9 @@ class _CategoriesViewState extends State<CategoriesView> {
   }
 
   Widget _buildInfoCard({
-    required String title,
-    required String amount,
-    required IconData icon,
-    required Color color,
-    required bool isDark,
-    bool isFullWidth = false,
+    required String title, required String amount,
+    required IconData icon, required Color color,
+    required bool isDark, bool isFullWidth = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -495,8 +509,7 @@ class _CategoriesViewState extends State<CategoriesView> {
   }
 
   Widget _buildCategoriesSection({
-    Key? key,
-    required String title,
+    Key? key, required String title,
     required List<Map<String, dynamic>> categories,
     required String categoryType,
   }) {
@@ -506,17 +519,14 @@ class _CategoriesViewState extends State<CategoriesView> {
 
     return Container(
       key: key,
-      decoration: isHighlighted
-          ? BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: categoryType == 'income'
-                    ? Colors.green.withOpacity(0.5)
-                    : Colors.red.withOpacity(0.5),
-                width: 2,
-              ),
-            )
-          : null,
+      decoration: isHighlighted ? BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: categoryType == 'income'
+                ? Colors.green.withOpacity(0.5)
+                : Colors.red.withOpacity(0.5),
+            width: 2,
+          )) : null,
       padding: isHighlighted ? const EdgeInsets.all(12) : EdgeInsets.zero,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(
@@ -537,8 +547,7 @@ class _CategoriesViewState extends State<CategoriesView> {
                     : Icons.arrow_downward_rounded,
                 color: categoryType == 'income'
                     ? Colors.green[600] : Colors.red[500],
-                size: 20,
-              ),
+                size: 20),
             ),
             Text(title, style: TextStyle(
                 fontSize: 20, fontWeight: FontWeight.bold,
@@ -555,8 +564,7 @@ class _CategoriesViewState extends State<CategoriesView> {
                 ),
                 child: Text(
                   categoryType == 'income' ? '💰 Thu nhập' : '💸 Chi tiêu',
-                  style: TextStyle(
-                      fontSize: 11, fontWeight: FontWeight.bold,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
                       color: categoryType == 'income'
                           ? Colors.green[700] : Colors.red[600]),
                 ),
@@ -592,10 +600,8 @@ class _CategoriesViewState extends State<CategoriesView> {
                       if (docType != categoryType) return null;
                       return {
                         'name': data['name'] ?? 'Untitled',
-                        'icon': icon,
-                        'color': Color(colorValue),
-                        'type': docType,
-                        'isCustom': true,
+                        'icon': icon, 'color': Color(colorValue),
+                        'type': docType, 'isCustom': true,
                       };
                     } catch (e) { return null; }
                   }).where((item) => item != null).cast<Map<String, dynamic>>().toList()
@@ -612,14 +618,10 @@ class _CategoriesViewState extends State<CategoriesView> {
               ),
               itemCount: allCategories.length + 1,
               itemBuilder: (context, index) {
-                if (index == allCategories.length) {
-                  return _buildMoreButton(categoryType);
-                }
+                if (index == allCategories.length) return _buildMoreButton(categoryType);
                 final category = allCategories[index];
-                return _buildCategoryCard(
-                  category['name'], category['icon'],
-                  category['color'], category['isCustom'] ?? false,
-                );
+                return _buildCategoryCard(category['name'], category['icon'],
+                    category['color'], category['isCustom'] ?? false);
               },
             );
           },
@@ -628,8 +630,7 @@ class _CategoriesViewState extends State<CategoriesView> {
     );
   }
 
-  Widget _buildCategoryCard(
-      String name, IconData icon, Color color, bool isCustom) {
+  Widget _buildCategoryCard(String name, IconData icon, Color color, bool isCustom) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: () => Navigator.push(context, MaterialPageRoute(
@@ -658,9 +659,9 @@ class _CategoriesViewState extends State<CategoriesView> {
           const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Text(name,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.grey[100] : const Color(0xFF1A1A1A)),
+            child: Text(name, style: TextStyle(
+                fontSize: 12, fontWeight: FontWeight.w700,
+                color: isDark ? Colors.grey[100] : const Color(0xFF1A1A1A)),
                 textAlign: TextAlign.center, maxLines: 1,
                 overflow: TextOverflow.ellipsis),
           ),
@@ -691,8 +692,7 @@ class _CategoriesViewState extends State<CategoriesView> {
       title: const Text('Xóa danh mục?'),
       content: Text('Bạn có chắc muốn xóa "$categoryName"?'),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
         TextButton(
           onPressed: () { Navigator.pop(context); _deleteCategory(categoryName); },
           child: const Text('Xóa', style: TextStyle(color: Colors.red)),
@@ -726,9 +726,8 @@ class _CategoriesViewState extends State<CategoriesView> {
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF2A2A2A) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(
-              color: color.withOpacity(0.2), blurRadius: 10,
-              offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: color.withOpacity(0.2),
+              blurRadius: 10, offset: const Offset(0, 4))],
           border: Border.all(color: color.withOpacity(0.4),
               width: 1.5, style: BorderStyle.solid),
         ),
@@ -764,30 +763,27 @@ class _CategoriesViewState extends State<CategoriesView> {
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(Icons.home_rounded, false,
-                  isDark ? Colors.grey[400]! : Colors.grey[500]!,
-                  label: 'Home',
-                  onTap: () => Navigator.pushReplacement(context,
-                      MaterialPageRoute(builder: (_) => const HomeView()))),
-              _buildNavItem(Icons.assignment_rounded, false,
-                  isDark ? Colors.grey[400]! : Colors.grey[500]!,
-                  label: 'Plan',
-                  onTap: () => Navigator.pushReplacement(context,
-                      MaterialPageRoute(builder: (_) => const AnalysisView()))),
-              _buildVoiceNavItem(),
-              _buildNavItem(Icons.layers_rounded, true,
-                  const Color(0xFF00CED1),
-                  label: 'Category', onTap: () {}),
-              _buildNavItem(Icons.person_outline_rounded, false,
-                  isDark ? Colors.grey[400]! : Colors.grey[500]!,
-                  label: 'Profile',
-                  onTap: () => Navigator.pushReplacement(context,
-                      MaterialPageRoute(builder: (_) => const ProfileView()))),
-            ],
-          ),
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+            _buildNavItem(Icons.home_rounded, false,
+                isDark ? Colors.grey[400]! : Colors.grey[500]!,
+                label: 'Home',
+                onTap: () => Navigator.pushReplacement(context,
+                    MaterialPageRoute(builder: (_) => const HomeView()))),
+            _buildNavItem(Icons.assignment_rounded, false,
+                isDark ? Colors.grey[400]! : Colors.grey[500]!,
+                label: 'Plan',
+                onTap: () => Navigator.pushReplacement(context,
+                    MaterialPageRoute(builder: (_) => const AnalysisView()))),
+            _buildVoiceNavItem(),
+            _buildNavItem(Icons.layers_rounded, true,
+                const Color(0xFF00CED1),
+                label: 'Category', onTap: () {}),
+            _buildNavItem(Icons.person_outline_rounded, false,
+                isDark ? Colors.grey[400]! : Colors.grey[500]!,
+                label: 'Profile',
+                onTap: () => Navigator.pushReplacement(context,
+                    MaterialPageRoute(builder: (_) => const ProfileView()))),
+          ]),
         ),
       ),
     );

@@ -6,11 +6,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 class PlanIntroView extends StatefulWidget {
   final VoidCallback onStartForm;
   final VoidCallback onFreeChat;
+  final VoidCallback onAnalysis;
+  final VoidCallback onBillScanner;
 
   const PlanIntroView({
     Key? key,
     required this.onStartForm,
     required this.onFreeChat,
+    required this.onAnalysis,
+    required this.onBillScanner,
   }) : super(key: key);
 
   @override
@@ -57,6 +61,16 @@ class _PlanIntroViewState extends State<PlanIntroView>
     widget.onFreeChat();
   }
 
+  void _goAnalysis() async {
+    await _markSeen();
+    widget.onAnalysis();
+  }
+
+  void _goBillScanner() async {
+    await _markSeen();
+    widget.onBillScanner();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -92,7 +106,7 @@ class _PlanIntroViewState extends State<PlanIntroView>
 
                 const SizedBox(height: 28),
 
-                Text('Lập kế hoạch\ntài chính cá nhân',
+                Text('Trợ lý tài chính',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 26,
                         fontWeight: FontWeight.bold, height: 1.25,
@@ -100,7 +114,7 @@ class _PlanIntroViewState extends State<PlanIntroView>
 
                 const SizedBox(height: 14),
 
-                Text('Chọn cách phù hợp với bạn để\nnhận kế hoạch chi tiêu chi tiết',
+                Text('Chọn công cụ phù hợp để quản lý\ntài chính cá nhân hiệu quả hơn',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 15, height: 1.5,
                         color: isDark ? Colors.grey[400] : Colors.grey[600])),
@@ -112,7 +126,7 @@ class _PlanIntroViewState extends State<PlanIntroView>
                   icon: Icons.format_list_bulleted_rounded,
                   iconColor: _teal,
                   title: 'Lập Plan cho bạn',
-                  desc: 'Lập plan cho bạn sau khi bạn điền form ngắn gọn về tình hình tài chính và mục tiêu của bạn',
+                  desc: 'Trả lời 4 bước đơn giản — hệ thống tự lập bảng chi tiêu phù hợp cho bạn',
                   badge: 'Được dùng nhiều nhất',
                   badgeColor: _teal,
                   isDark: isDark,
@@ -131,6 +145,34 @@ class _PlanIntroViewState extends State<PlanIntroView>
                   badgeColor: _purple,
                   isDark: isDark,
                   onTap: _goChat,
+                ),
+
+                const SizedBox(height: 12),
+
+                // Card 3 — Phân tích chi tiêu
+                _OptionCard(
+                  icon: Icons.bar_chart_rounded,
+                  iconColor: Color(0xFFFF9800),
+                  title: 'Phân tích chi tiêu',
+                  desc: 'Xem biểu đồ thống kê thu chi và cảnh báo chi tiêu theo tháng',
+                  badge: 'Mới',
+                  badgeColor: Color(0xFFFF9800),
+                  isDark: isDark,
+                  onTap: _goAnalysis,
+                ),
+
+                const SizedBox(height: 12),
+
+                // Card 4 — Chụp ảnh bill
+                _OptionCard(
+                  icon: Icons.receipt_long_rounded,
+                  iconColor: Color(0xFF4CAF50),
+                  title: 'Chụp ảnh bill',
+                  desc: 'Chụp hóa đơn và tự động nhận diện giao dịch chi tiêu',
+                  badge: null,
+                  badgeColor: Color(0xFF4CAF50),
+                  isDark: isDark,
+                  onTap: _goBillScanner,
                 ),
 
                 const Spacer(flex: 3),

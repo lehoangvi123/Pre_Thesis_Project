@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:project1/view/Function/AI_Chatbot/chatbot_view.dart';
+import 'Spending_analysis_view.dart';
+import 'package:project1/view/Bill_Scanner_Service/Bill_scanner_view.dart';
 import 'Plan_intro_view.dart';
 import 'Plan_form_screen.dart';
 
@@ -48,6 +50,17 @@ class _PlanEntryViewState extends State<PlanEntryView> {
         MaterialPageRoute(builder: (_) => const ChatbotView()));
   }
 
+  void _onAnalysis() {
+    Navigator.push(context,
+        MaterialPageRoute(builder: (_) => const SpendingAnalysisView()));
+  }
+
+  // ✅ Gán class Bill Scanner của bạn vào đây
+  void _onBillScanner() {
+    Navigator.push(context,
+        MaterialPageRoute(builder: (_) => const BillScannerViewSimple()));
+  }
+
   @override
   Widget build(BuildContext context) {
     // Loading
@@ -56,8 +69,10 @@ class _PlanEntryViewState extends State<PlanEntryView> {
     // Chưa xem → intro
     if (_introSeen == false) {
       return PlanIntroView(
-        onStartForm: _onStartForm,
-        onFreeChat:  _onFreeChat,
+        onStartForm:   _onStartForm,
+        onFreeChat:    _onFreeChat,
+        onAnalysis:    _onAnalysis,
+        onBillScanner: _onBillScanner,
       );
     }
 
