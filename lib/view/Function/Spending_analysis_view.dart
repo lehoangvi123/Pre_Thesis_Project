@@ -126,6 +126,12 @@ class _SpendingAnalysisViewState extends State<SpendingAnalysisView>
                             _categoryPieChart(userId, isDark),
                             const SizedBox(height: 24),
 
+                            // ── Plan vs thực tế ─────────────
+                            _sectionTitle('📋 Kế hoạch vs Thực tế', isDark),
+                            const SizedBox(height: 12),
+                            _planComparisonSection(userId, expense, isDark),
+                            const SizedBox(height: 24),
+
                             // ── Lời khuyên ─────────────────
                             _adviceCard(pct, income, expense, isDark),
                           ],
@@ -434,6 +440,270 @@ class _SpendingAnalysisViewState extends State<SpendingAnalysisView>
       ]),
     );
   }
+  // ── Plan vs Thực tế ──────────────────────────────────
+  Widget _planComparisonSection(
+      String userId, double totalExpense, bool isDark) {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('plans')
+          .doc('current_plan')
+          .snapshots(),
+      builder: (context, snap) {
+        // Chưa có plan
+        if (!snap.hasData || !snap.data!.exists) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
+            ),
+            child: Column(children: [
+              Icon(Icons.assignment_outlined,
+                  size: 40, color: Colors.grey[400]),
+              const SizedBox(height: 12),
+              Text('Chưa có kế hoạch chi tiêu',
+                  style: TextStyle(fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.grey[300] : Colors.grey[700])),
+              const SizedBox(height: 6),
+              Text('Vào mục "Lập Plan cho bạn" để tạo kế hoạch',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12,
+                      color: isDark ? Colors.grey[500] : Colors.grey[500])),
+            ]),
+          );
+        }
+
+        final data     = snap.data!.data() as Map<String, dynamic>;
+        final planData = data['plan'] as Map<String, dynamic>? ?? {};
+        final table    = (planData['expense_table'] as List? ?? []);
+        final recIncome =
+            (planData['recommended_income'] as num?)?.toDouble() ?? 0;
+        final createdAt = data['createdAt'] as Timestamp?;
+        final dateStr = createdAt != null
+            ? '${createdAt.toDate().day}/${createdAt.toDate().month}/${createdAt.toDate().year}'
+            : '';
+
+        // Lấy chi tiêu thực tế theo category từ transactions
+        return FutureBuilder<QuerySnapshot>(
+          future: _firestore
+              .collection('users')
+              .doc(userId)
+              .collection('transactions')
+              .where('type', isEqualTo: 'expense')
+              .get(),
+          builder: (context, txSnap) {
+            // Gom chi tiêu thực tế theo category
+            final Map<String, double> actualMap = {};
+            if (txSnap.hasData) {
+              for (final doc in txSnap.data!.docs) {
+                final d   = doc.data() as Map<String, dynamic>;
+                final cat = (d['category'] as String? ?? 'Khác').trim();
+                final amt = (d['amount'] as num?)?.toDouble() ?? 0;
+                actualMap[cat] = (actualMap[cat] ?? 0) + amt;
+              }
+            }
+
+            return Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                    color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
+              ),
+              child: Column(children: [
+                // Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Row(children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                          color: _teal.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10)),
+                      child: const Icon(Icons.assignment_rounded,
+                          color: _teal, size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      const Text('Kế hoạch hiện tại',
+                          style: TextStyle(fontSize: 14,
+                              fontWeight: FontWeight.w600)),
+                      if (dateStr.isNotEmpty)
+                        Text('Tạo ngày $dateStr',
+                            style: TextStyle(fontSize: 11,
+                                color: Colors.grey[500])),
+                    ])),
+                    // Thu nhập đề xuất
+                    Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                      Text('${_fmt(recIncome)}đ',
+                          style: TextStyle(fontSize: 14,
+                              fontWeight: FontWeight.bold, color: _teal)),
+                      Text('/ tháng', style: TextStyle(
+                          fontSize: 10, color: Colors.grey[500])),
+                    ]),
+                  ]),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Column headers
+                Container(
+                  color: isDark
+                      ? const Color(0xFF3A3A3A) : const Color(0xFFF5F5F5),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 8),
+                  child: Row(children: [
+                    const Expanded(flex: 4, child: Text('DANH MỤC',
+                        style: TextStyle(fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.grey, letterSpacing: 0.5))),
+                    const Expanded(flex: 3, child: Text('KẾ HOẠCH',
+                        style: TextStyle(fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.grey, letterSpacing: 0.5),
+                        textAlign: TextAlign.right)),
+                    const Expanded(flex: 3, child: Text('THỰC TẾ',
+                        style: TextStyle(fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.grey, letterSpacing: 0.5),
+                        textAlign: TextAlign.right)),
+                  ]),
+                ),
+
+                // Rows
+                ...table.asMap().entries.map((e) {
+                  final row      = e.value as Map;
+                  final catName  = row['category'] as String? ?? '';
+                  final limit    = (row['amount'] as num?)?.toDouble() ?? 0;
+                  final actual   = actualMap[catName] ?? 0;
+                  final overPct  = limit > 0 ? actual / limit : 0.0;
+                  final isOver   = actual > limit && limit > 0;
+                  final isWarn   = overPct >= 0.5 && overPct < 1.0 && limit > 0;
+                  final rowColor = isOver
+                      ? Colors.red[500]!
+                      : isWarn
+                          ? Colors.orange[500]!
+                          : Colors.green[500]!;
+
+                  return Column(children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Row(children: [
+                          Container(width: 8, height: 8,
+                              decoration: BoxDecoration(
+                                  color: rowColor, shape: BoxShape.circle)),
+                          const SizedBox(width: 8),
+                          Expanded(flex: 4, child: Text(catName,
+                              style: const TextStyle(fontSize: 12,
+                                  fontWeight: FontWeight.w500))),
+                          Expanded(flex: 3, child: Text('${_fmt(limit)}đ',
+                              style: TextStyle(fontSize: 11,
+                                  color: isDark
+                                      ? Colors.grey[400] : Colors.grey[600]),
+                              textAlign: TextAlign.right)),
+                          Expanded(flex: 3, child: Text('${_fmt(actual)}đ',
+                              style: TextStyle(fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: rowColor),
+                              textAlign: TextAlign.right)),
+                        ]),
+                        const SizedBox(height: 6),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 16),
+                          child: Stack(children: [
+                            // Background (giới hạn)
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: 1.0,
+                                minHeight: 6,
+                                backgroundColor: isDark
+                                    ? Colors.grey[700] : Colors.grey[100],
+                                valueColor: AlwaysStoppedAnimation(
+                                    isDark ? Colors.grey[700]!
+                                        : Colors.grey[100]!),
+                              ),
+                            ),
+                            // Foreground (thực tế)
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: overPct.clamp(0.0, 1.0),
+                                minHeight: 6,
+                                backgroundColor: Colors.transparent,
+                                valueColor:
+                                    AlwaysStoppedAnimation(rowColor),
+                              ),
+                            ),
+                          ]),
+                        ),
+                        if (isOver) ...[
+                          const SizedBox(height: 3),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16),
+                            child: Text(
+                              'Vượt ${_fmt(actual - limit)}đ '
+                              '(+${((overPct - 1) * 100).toStringAsFixed(0)}%)',
+                              style: TextStyle(fontSize: 10,
+                                  color: Colors.red[400]),
+                            ),
+                          ),
+                        ],
+                      ]),
+                    ),
+                    if (e.key < table.length - 1)
+                      Divider(height: 1, thickness: 0.5,
+                          color: isDark
+                              ? Colors.grey[700] : Colors.grey[100]),
+                  ]);
+                }).toList(),
+
+                // Footer tổng
+                Container(
+                  margin: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _teal.withOpacity(0.07),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _teal.withOpacity(0.2)),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.compare_arrows_rounded,
+                        color: _teal, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('Tổng chi tiêu thực tế',
+                        style: TextStyle(fontSize: 12,
+                            color: _teal, fontWeight: FontWeight.w600))),
+                    Text('${_fmt(totalExpense)}đ',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: totalExpense > recIncome
+                                ? Colors.red[500] : _teal)),
+                    Text(' / ${_fmt(recIncome)}đ',
+                        style: TextStyle(fontSize: 11,
+                            color: Colors.grey[500])),
+                  ]),
+                ),
+              ]),
+            );
+          },
+        );
+      },
+    );
+  }
+
   // ── Pie chart danh mục chi tiêu ──────────────────────
   Widget _categoryPieChart(String userId, bool isDark) {
     return StreamBuilder<QuerySnapshot>(

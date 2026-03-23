@@ -34,6 +34,31 @@ class _AnalysisViewState extends State<AnalysisView> {
 
   void _onPlanCreated(Map<String, dynamic> plan, Map<String, dynamic> formData) {
     setState(() { _savedPlan = plan; _savedFormData = formData; });
+    // ✅ Lưu plan vào Firestore (ghi đè plan cũ)
+    _savePlanToFirestore(plan, formData);
+  }
+
+  Future<void> _savePlanToFirestore(
+      Map<String, dynamic> plan, Map<String, dynamic> formData) async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+
+      // Ghi đè document 'current_plan' — chỉ lưu plan mới nhất
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('plans')
+          .doc('current_plan')
+          .set({
+        'plan':      plan,
+        'formData':  formData,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      print('✅ Plan saved to Firestore');
+    } catch (e) {
+      print('⚠️ Error saving plan: $e');
+    }
   }
 
   void _resetPlan() {
