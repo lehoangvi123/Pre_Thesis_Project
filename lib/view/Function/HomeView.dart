@@ -107,7 +107,6 @@ class _HomeViewState extends State<HomeView> {
                 const SizedBox(height: 20),
                 _buildQuickActions(),
                 const SizedBox(height: 16),
-                const AchievementProgressCard(),
                 const StreakTrackerCard(),
                 const SizedBox(height: 16),
                 _buildProgressBar(),
