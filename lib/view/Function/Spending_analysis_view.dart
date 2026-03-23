@@ -522,7 +522,7 @@ class _SpendingAnalysisViewState extends State<SpendingAnalysisView>
               'Bills': 'Hóa đơn tiện ích', 'Utilities': 'Hóa đơn tiện ích',
               'Hóa đơn tiện ích': 'Hóa đơn tiện ích',
               'Electricity': 'Hóa đơn tiện ích',
-              'Internet': 'Hóa đơn tiện ích',
+              'Internet': 'Hóa đơn tiện ích', 
               // Tiết kiệm
               'Savings': 'Tiết kiệm', 'savings': 'Tiết kiệm',
               'Tiết kiệm': 'Tiết kiệm',
