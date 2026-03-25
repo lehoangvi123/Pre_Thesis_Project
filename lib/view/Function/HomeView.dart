@@ -11,7 +11,6 @@ import './Transaction.dart';
 import './CategorizeContent.dart';
 import './ProfileView.dart';
 import './gamification_widgets.dart';
-import '../Achivement/Achievement_model.dart';
 import '../Achivement/Achievement_view.dart';
 import './Streak_update/Login_streak_service.dart';
 import '../Calender_Part/Calender.dart';
@@ -20,6 +19,8 @@ import './AddTransactionView.dart';
 import '../TextVoice/AI_deep_analysis_view.dart';
 import './AI_Chatbot/chatbot_view.dart';
 import '../../view/Bill_Scanner_Service/Bill_scanner_view.dart';
+// ✅ Import file mới
+import './HomeQuickAddExpense.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({Key? key}) : super(key: key);
@@ -45,9 +46,9 @@ class _HomeViewState extends State<HomeView> {
 
   Future<void> _loadUserName() async {
     try {
-      User? currentUser = FirebaseAuth.instance.currentUser;
+      final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
-        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+        final userDoc = await FirebaseFirestore.instance
             .collection('users').doc(currentUser.uid).get();
         if (userDoc.exists) {
           final userData = userDoc.data() as Map<String, dynamic>;
@@ -78,7 +79,8 @@ class _HomeViewState extends State<HomeView> {
           content: Row(children: [
             const Text('🔥', style: TextStyle(fontSize: 20)),
             const SizedBox(width: 12),
-            Expanded(child: Text('Login streak: $currentStreak days! Keep it up!',
+            Expanded(child: Text(
+                'Login streak: $currentStreak days! Keep it up!',
                 style: const TextStyle(fontWeight: FontWeight.bold))),
           ]),
           backgroundColor: Colors.orange[600],
@@ -86,7 +88,15 @@ class _HomeViewState extends State<HomeView> {
           duration: const Duration(seconds: 2),
         ));
       }
-    } catch (e) { print('Error checking streak: $e'); }
+    } catch (e) {
+      print('Error checking streak: $e');
+    }
+  }
+
+  // ── Format tiền ───────────────────────────────────────
+  String _formatCurrency(double amount) {
+    return amount.toStringAsFixed(0).replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
   }
 
   @override
@@ -119,11 +129,11 @@ class _HomeViewState extends State<HomeView> {
           ),
         ),
       ),
-      // ✅ Đã xóa floatingActionButton
       bottomNavigationBar: _buildBottomNavBar(),
     );
   }
 
+  // ── Header ────────────────────────────────────────────
   Widget _buildHeader() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
@@ -187,32 +197,35 @@ class _HomeViewState extends State<HomeView> {
 
   void _showLogoutDialog() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    showDialog(context: context, builder: (_) => AlertDialog(
-      backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Text('Đăng xuất', style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: isDark ? Colors.white : Colors.black)),
-      content: Text('Bạn có chắc chắn muốn đăng xuất không?',
-          style: TextStyle(
-              color: isDark ? Colors.grey[300] : Colors.black)),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text('Hủy', style: TextStyle(
-              color: isDark ? Colors.grey[400] : Colors.grey[600])),
-        ),
-        ElevatedButton(
-          onPressed: () { Navigator.of(context).pop(); _logout(); },
-          style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red[600],
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8))),
-          child: const Text('Đăng xuất',
-              style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    ));
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Đăng xuất', style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : Colors.black)),
+        content: Text('Bạn có chắc chắn muốn đăng xuất không?',
+            style: TextStyle(
+                color: isDark ? Colors.grey[300] : Colors.black)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Hủy', style: TextStyle(
+                color: isDark ? Colors.grey[400] : Colors.grey[600])),
+          ),
+          ElevatedButton(
+            onPressed: () { Navigator.of(context).pop(); _logout(); },
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red[600],
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8))),
+            child: const Text('Đăng xuất',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _logout() {
@@ -222,6 +235,7 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
+  // ── Balance Cards ─────────────────────────────────────
   Widget _buildBalanceCards() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     if (userId == null) return const Center(child: Text('Please login'));
@@ -238,7 +252,7 @@ class _HomeViewState extends State<HomeView> {
         }
         final userData =
             snapshot.data!.data() as Map<String, dynamic>? ?? {};
-        final balance     = (userData['balance']      ?? 0).toDouble();
+        final balance      = (userData['balance']      ?? 0).toDouble();
         final totalIncome  = (userData['totalIncome']  ?? 0).toDouble();
         final totalExpense = (userData['totalExpense'] ?? 0).toDouble();
 
@@ -349,7 +363,7 @@ class _HomeViewState extends State<HomeView> {
   }
 
   // ══════════════════════════════════════════════════════
-  // PLAN SECTION — Hiển thị kế hoạch chi tiêu từ Firestore
+  // PLAN SECTION
   // ══════════════════════════════════════════════════════
   Widget _buildPlanSection(bool isDark) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -364,20 +378,18 @@ class _HomeViewState extends State<HomeView> {
       builder: (context, snap) {
         if (!snap.hasData || !snap.data!.exists) return const SizedBox.shrink();
 
-        final data      = snap.data!.data() as Map<String, dynamic>;
-        final planData  = data['plan'] as Map<String, dynamic>? ?? {};
-        final table     = (planData['expense_table'] as List? ?? []);
-        final recIncome = (planData['recommended_income'] as num?)
-                ?.toDouble() ?? 0;
+        final data     = snap.data!.data() as Map<String, dynamic>;
+        final planData = data['plan'] as Map<String, dynamic>? ?? {};
+        final table    = (planData['expense_table'] as List? ?? []);
+        final recIncome =
+            (planData['recommended_income'] as num?)?.toDouble() ?? 0;
         final createdAt = data['createdAt'] as Timestamp?;
-        final dateStr   = createdAt != null
+        final dateStr = createdAt != null
             ? '${createdAt.toDate().day}/${createdAt.toDate().month}/${createdAt.toDate().year}'
             : '';
 
-        final previewRows = table;
-        final hasMore     = false;
-
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Title row
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text('Kế hoạch chi tiêu', style: TextStyle(
                 fontSize: 18, fontWeight: FontWeight.bold,
@@ -422,13 +434,14 @@ class _HomeViewState extends State<HomeView> {
                     const Text('Mức thu nhập đề xuất',
                         style: TextStyle(fontSize: 12, color: Colors.grey)),
                     Text('${_formatCurrency(recIncome)}đ / tháng',
-                        style: const TextStyle(fontSize: 15,
+                        style: const TextStyle(
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF00CED1))),
                   ])),
                   if (dateStr.isNotEmpty)
-                    Text(dateStr, style: TextStyle(
-                        fontSize: 10, color: Colors.grey[500])),
+                    Text(dateStr,
+                        style: TextStyle(fontSize: 10, color: Colors.grey[500])),
                 ]),
               ),
 
@@ -436,8 +449,20 @@ class _HomeViewState extends State<HomeView> {
               Divider(height: 1, thickness: 0.5,
                   color: isDark ? Colors.grey[700] : Colors.grey[100]),
 
-              // Danh mục
-              ...previewRows.asMap().entries.map((e) {
+              // ── Hint tap ──────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Row(children: [
+                  Icon(Icons.touch_app_rounded,
+                      size: 13, color: Colors.grey[400]),
+                  const SizedBox(width: 4),
+                  Text('Nhấn vào danh mục để thêm chi tiêu nhanh',
+                      style: TextStyle(fontSize: 11, color: Colors.grey[400])),
+                ]),
+              ),
+
+              // ── Danh mục ──────────────────────────────
+              ...table.asMap().entries.map((e) {
                 final row     = e.value as Map;
                 final cat     = row['category'] as String? ?? '';
                 final amount  = (row['amount'] as num?)?.toDouble() ?? 0;
@@ -452,56 +477,75 @@ class _HomeViewState extends State<HomeView> {
                 final color = colors[e.key % colors.length];
 
                 return Column(children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-                    child: Row(children: [
-                      Container(width: 8, height: 8,
+                  // ✅ Tap vào row → mở QuickAddExpenseSheet
+                  InkWell(
+                    onTap: () => QuickAddExpenseSheet.show(
+                      context: context,
+                      category: cat,
+                      budgetLimit: amount,
+                      isDark: isDark,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                      child: Row(children: [
+                        // Dot màu
+                        Container(
+                          width: 8, height: 8,
                           decoration: BoxDecoration(
-                              color: color, shape: BoxShape.circle)),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(cat,
-                          style: const TextStyle(fontSize: 13,
-                              fontWeight: FontWeight.w500))),
-                      Text('${_formatCurrency(amount)}đ',
-                          style: TextStyle(fontSize: 13,
-                              fontWeight: FontWeight.w700, color: color)),
-                      const SizedBox(width: 6),
-                      Container(
-                        width: 34, height: 20,
-                        decoration: BoxDecoration(
-                            color: color.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(6)),
-                        child: Center(child: Text('$percent%',
-                            style: TextStyle(fontSize: 9,
-                                fontWeight: FontWeight.w700, color: color))),
-                      ),
-                      const SizedBox(width: 6),
-                      // ✅ Nút chỉnh sửa
-                      GestureDetector(
-                        onTap: () => _editPlanAmount(
-                            uid, planData, table, e.key, cat, amount, recIncome),
-                        child: Container(
-                          width: 28, height: 28,
-                          decoration: BoxDecoration(
-                              color: isDark
-                                  ? Colors.grey[700] : Colors.grey[100],
-                              borderRadius: BorderRadius.circular(8)),
-                          child: Icon(Icons.edit_rounded,
-                              size: 14,
-                              color: isDark
-                                  ? Colors.grey[300] : Colors.grey[600]),
+                              color: color, shape: BoxShape.circle),
                         ),
-                      ),
-                    ]),
+                        const SizedBox(width: 10),
+
+                        // Tên danh mục
+                        Expanded(child: Text(cat,
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500))),
+
+                        // Số tiền
+                        Text('${_formatCurrency(amount)}đ',
+                            style: TextStyle(fontSize: 13,
+                                fontWeight: FontWeight.w700, color: color)),
+                        const SizedBox(width: 6),
+
+                        // % badge
+                        Container(
+                          width: 34, height: 20,
+                          decoration: BoxDecoration(
+                              color: color.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6)),
+                          child: Center(child: Text('$percent%',
+                              style: TextStyle(fontSize: 9,
+                                  fontWeight: FontWeight.w700, color: color))),
+                        ),
+                        const SizedBox(width: 6),
+
+                        // ✅ Nút edit (chỉnh ngân sách)
+                        GestureDetector(
+                          onTap: () => _editPlanAmount(
+                              uid, planData, table, e.key, cat, amount, recIncome),
+                          child: Container(
+                            width: 28, height: 28,
+                            decoration: BoxDecoration(
+                                color: isDark
+                                    ? Colors.grey[700] : Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8)),
+                            child: Icon(Icons.edit_rounded,
+                                size: 14,
+                                color: isDark
+                                    ? Colors.grey[300] : Colors.grey[600]),
+                          ),
+                        ),
+                      ]),
+                    ),
                   ),
-                  if (e.key < previewRows.length - 1)
+
+                  if (e.key < table.length - 1)
                     Divider(height: 1, thickness: 0.5,
                         color: isDark ? Colors.grey[700] : Colors.grey[100]),
                 ]);
               }).toList(),
-
-              // Xem thêm
-             
             ]),
           ),
         ]);
@@ -509,285 +553,249 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  // ── Chỉnh sửa số tiền từng danh mục trong plan ────────
- Future<void> _editPlanAmount(
-    String uid,
-    Map<String, dynamic> planData,
-    List table,
-    int index,
-    String category,
-    double currentAmount,
-    double recIncome) async {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
+  // ── Edit plan amount (slider) ─────────────────────────
+  Future<void> _editPlanAmount(
+      String uid,
+      Map<String, dynamic> planData,
+      List table,
+      int index,
+      String category,
+      double currentAmount,
+      double recIncome) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final double maxSlider = recIncome > 0
+        ? (recIncome * 0.6).clamp(1000000, 50000000)
+        : 10000000;
+    double tempAmount = currentAmount.clamp(0, maxSlider);
 
-  // Giới hạn slider: tối đa 50% thu nhập đề xuất hoặc ít nhất 10M
-  final double maxSlider = recIncome > 0
-      ? (recIncome * 0.6).clamp(1000000, 50000000)
-      : 10000000;
-  double tempAmount = currentAmount.clamp(0, maxSlider);
-
-  final result = await showModalBottomSheet<double>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (context) {
-      return StatefulBuilder(
+    final result = await showModalBottomSheet<double>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
         builder: (context, setSheetState) {
-          final percent = recIncome > 0
-              ? (tempAmount / recIncome * 100)
-              : 0.0;
-
+          final percent =
+              recIncome > 0 ? (tempAmount / recIncome * 100) : 0.0;
           return Container(
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(context).viewInsets.bottom + 28,
-              top: 20,
-              left: 20,
-              right: 20,
+              top: 20, left: 20, right: 20,
             ),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(24)),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Handle bar
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                width: 40, height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+              Row(children: [
                 Container(
-                  width: 40, height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
+                  padding: const EdgeInsets.all(9),
                   decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2)),
+                      color: const Color(0xFF00CED1).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(Icons.tune_rounded,
+                      color: Color(0xFF00CED1), size: 20),
                 ),
-
-                // Header
-                Row(children: [
-                  Container(
-                    padding: const EdgeInsets.all(9),
-                    decoration: BoxDecoration(
-                        color: const Color(0xFF00CED1).withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.tune_rounded,
-                        color: Color(0xFF00CED1), size: 20),
+                const SizedBox(width: 12),
+                Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Chỉnh ngân sách',
+                      style: TextStyle(
+                          fontSize: 17, fontWeight: FontWeight.bold)),
+                  Text(category,
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey[500])),
+                ])),
+              ]),
+              const SizedBox(height: 24),
+              // Số tiền gradient card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                    vertical: 18, horizontal: 20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF00CED1), Color(0xFF0097A7)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      const Text('Chỉnh số tiền',
-                          style: TextStyle(
-                              fontSize: 17, fontWeight: FontWeight.bold)),
-                      Text(category,
-                          style: TextStyle(
-                              fontSize: 12, color: Colors.grey[500])),
-                    ]),
-                  ),
-                ]),
-
-                const SizedBox(height: 28),
-
-                // Số tiền hiển thị lớn
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 18, horizontal: 20),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF00CED1), Color(0xFF0097A7)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                          color: const Color(0xFF00CED1).withOpacity(0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4)),
-                    ],
-                  ),
-                  child: Column(children: [
-                    Text(_formatCurrency(tempAmount) + 'đ',
-                        style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: -0.5)),
-                    const SizedBox(height: 4),
-                    Text(
-                      recIncome > 0
-                          ? '≈ ${percent.toStringAsFixed(1)}% thu nhập tháng'
-                          : 'Kéo slider để điều chỉnh',
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [BoxShadow(
+                      color: const Color(0xFF00CED1).withOpacity(0.3),
+                      blurRadius: 10, offset: const Offset(0, 4))],
+                ),
+                child: Column(children: [
+                  Text('${_formatCurrency(tempAmount)}đ',
                       style: const TextStyle(
-                          color: Colors.white70, fontSize: 12),
-                    ),
-                  ]),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Slider
-                SliderTheme(
-                  data: SliderThemeData(
-                    activeTrackColor: const Color(0xFF00CED1),
-                    thumbColor: const Color(0xFF00CED1),
-                    inactiveTrackColor:
-                        const Color(0xFF00CED1).withOpacity(0.15),
-                    overlayColor:
-                        const Color(0xFF00CED1).withOpacity(0.12),
-                    trackHeight: 6,
-                    thumbShape:
-                        const RoundSliderThumbShape(enabledThumbRadius: 12),
-                    overlayShape:
-                        const RoundSliderOverlayShape(overlayRadius: 22),
-                  ),
-                  child: Slider(
-                    value: tempAmount,
-                    min: 0,
-                    max: maxSlider,
-                    divisions: 200,
-                    onChanged: (val) =>
-                        setSheetState(() => tempAmount = val),
-                  ),
-                ),
-
-                // Min / Max label
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('0đ',
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.grey[400])),
-                      Text(_formatCurrency(maxSlider) + 'đ',
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.grey[400])),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                // Quick preset buttons
-                if (recIncome > 0) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [5, 10, 15, 20, 25].map((pct) {
-                      final val = recIncome * pct / 100;
-                      final isSelected =
-                          (tempAmount - val).abs() < 1000;
-                      return GestureDetector(
-                        onTap: () =>
-                            setSheetState(() => tempAmount = val),
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? const Color(0xFF00CED1)
-                                : const Color(0xFF00CED1).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color: const Color(0xFF00CED1)
-                                    .withOpacity(0.3)),
-                          ),
-                          child: Text('$pct%',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: isSelected
-                                      ? Colors.white
-                                      : const Color(0xFF00CED1))),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-
-                const SizedBox(height: 24),
-
-                // Buttons
-                Row(children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text('Hủy'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: () =>
-                          Navigator.pop(context, tempAmount),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00CED1),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
-                      ),
-                      child: const Text('Áp dụng',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15)),
-                    ),
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: -0.5)),
+                  const SizedBox(height: 4),
+                  Text(
+                    recIncome > 0
+                        ? '≈ ${percent.toStringAsFixed(1)}% thu nhập tháng'
+                        : 'Kéo slider để điều chỉnh',
+                    style: const TextStyle(
+                        color: Colors.white70, fontSize: 12),
                   ),
                 ]),
+              ),
+              const SizedBox(height: 20),
+              // Slider
+              SliderTheme(
+                data: SliderThemeData(
+                  activeTrackColor: const Color(0xFF00CED1),
+                  thumbColor: const Color(0xFF00CED1),
+                  inactiveTrackColor:
+                      const Color(0xFF00CED1).withOpacity(0.15),
+                  overlayColor:
+                      const Color(0xFF00CED1).withOpacity(0.12),
+                  trackHeight: 6,
+                  thumbShape:
+                      const RoundSliderThumbShape(enabledThumbRadius: 12),
+                  overlayShape:
+                      const RoundSliderOverlayShape(overlayRadius: 22),
+                ),
+                child: Slider(
+                  value: tempAmount,
+                  min: 0,
+                  max: maxSlider,
+                  divisions: 200,
+                  onChanged: (val) =>
+                      setSheetState(() => tempAmount = val),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('0đ',
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.grey[400])),
+                    Text('${_formatCurrency(maxSlider)}đ',
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.grey[400])),
+                  ],
+                ),
+              ),
+              // Preset %
+              if (recIncome > 0) ...[
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [5, 10, 15, 20, 25].map((pct) {
+                    final val = recIncome * pct / 100;
+                    final isSelected = (tempAmount - val).abs() < 1000;
+                    return GestureDetector(
+                      onTap: () =>
+                          setSheetState(() => tempAmount = val),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? const Color(0xFF00CED1)
+                              : const Color(0xFF00CED1).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: const Color(0xFF00CED1)
+                                  .withOpacity(0.3)),
+                        ),
+                        child: Text('$pct%',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected
+                                    ? Colors.white
+                                    : const Color(0xFF00CED1))),
+                      ),
+                    );
+                  }).toList(),
+                ),
               ],
-            ),
+              const SizedBox(height: 20),
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Hủy'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(flex: 2,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context, tempAmount),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00CED1),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: const Text('Áp dụng',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15)),
+                  ),
+                ),
+              ]),
+            ]),
           );
         },
-      );
-    },
-  );
+      ),
+    );
 
-  if (result == null) return;
+    if (result == null) return;
 
-  // Cập nhật Firestore (giữ nguyên logic cũ)
-  final newTable = List<Map<String, dynamic>>.from(
-      table.map((r) => Map<String, dynamic>.from(r as Map)));
-  newTable[index]['amount'] = result.toInt();
-  newTable[index]['percent'] = recIncome > 0
-      ? (result / recIncome * 100).round()
-      : 0;
+    final newTable = List<Map<String, dynamic>>.from(
+        table.map((r) => Map<String, dynamic>.from(r as Map)));
+    newTable[index]['amount'] = result.toInt();
+    newTable[index]['percent'] =
+        recIncome > 0 ? (result / recIncome * 100).round() : 0;
 
-  try {
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('plans')
-        .doc('current_plan')
-        .update({'plan.expense_table': newTable});
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('plans')
+          .doc('current_plan')
+          .update({'plan.expense_table': newTable});
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Đã cập nhật "$category"'),
-        backgroundColor: const Color(0xFF00CED1),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(12),
-      ));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Đã cập nhật "$category"'),
+          backgroundColor: const Color(0xFF00CED1),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
+          margin: const EdgeInsets.all(12),
+        ));
+      }
+    } catch (e) {
+      print('Error updating plan: $e');
     }
-  } catch (e) {
-    print('Error updating plan: $e');
   }
-}
 
+  // ══════════════════════════════════════════════════════
+  // BUDGET SECTION
+  // ══════════════════════════════════════════════════════
   Widget _buildBudgetSection(bool isDark) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final now = DateTime.now();
@@ -805,8 +813,10 @@ class _HomeViewState extends State<HomeView> {
         }).toList();
 
         activeDocs.sort((a, b) {
-          final aDate = ((a.data() as Map)['endDate'] as Timestamp).toDate();
-          final bDate = ((b.data() as Map)['endDate'] as Timestamp).toDate();
+          final aDate =
+              ((a.data() as Map)['endDate'] as Timestamp).toDate();
+          final bDate =
+              ((b.data() as Map)['endDate'] as Timestamp).toDate();
           return aDate.compareTo(bDate);
         });
 
@@ -816,7 +826,8 @@ class _HomeViewState extends State<HomeView> {
           totalBudget += (d['limitAmount'] ?? 0.0).toDouble();
           totalSpent  += (d['spentAmount'] ?? 0.0).toDouble();
         }
-        final usage = totalBudget > 0 ? (totalSpent / totalBudget * 100) : 0.0;
+        final usage =
+            totalBudget > 0 ? (totalSpent / totalBudget * 100) : 0.0;
 
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -830,7 +841,8 @@ class _HomeViewState extends State<HomeView> {
             ),
           ]),
           const SizedBox(height: 12),
-          _buildOverviewCard(activeDocs, totalBudget, totalSpent, usage, isDark),
+          _buildOverviewCard(
+              activeDocs, totalBudget, totalSpent, usage, isDark),
           const SizedBox(height: 12),
           if (activeDocs.isNotEmpty)
             ...activeDocs.take(3).map((doc) => Padding(
@@ -885,8 +897,10 @@ class _HomeViewState extends State<HomeView> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             const Text('Tổng quan ngân sách', style: TextStyle(
-                color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-            Icon(exceededCount > 0 ? Icons.error
+                color: Colors.white,
+                fontSize: 16, fontWeight: FontWeight.bold)),
+            Icon(exceededCount > 0
+                ? Icons.error
                 : usage >= 80 ? Icons.warning : Icons.check_circle,
                 color: Colors.white, size: 24),
           ]),
@@ -916,13 +930,15 @@ class _HomeViewState extends State<HomeView> {
               value: (usage / 100).clamp(0.0, 1.0),
               minHeight: 8,
               backgroundColor: Colors.white30,
-              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(Colors.white),
             ),
           ),
           const SizedBox(height: 8),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text('Sử dụng: ${usage.toStringAsFixed(1)}%',
-                style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                style: const TextStyle(
+                    color: Colors.white70, fontSize: 12)),
             if (exceededCount > 0)
               Text('$exceededCount vượt mức',
                   style: const TextStyle(color: Colors.white,
@@ -940,16 +956,20 @@ class _HomeViewState extends State<HomeView> {
   Widget _buildPreviewCard(Map<String, dynamic> data, bool isDark) {
     final limitAmount = (data['limitAmount'] ?? 0.0).toDouble();
     final spentAmount = (data['spentAmount'] ?? 0.0).toDouble();
-    final percentage  = limitAmount > 0 ? (spentAmount / limitAmount * 100) : 0.0;
-    final remaining   = limitAmount - spentAmount;
+    final percentage =
+        limitAmount > 0 ? (spentAmount / limitAmount * 100) : 0.0;
+    final remaining = limitAmount - spentAmount;
 
-    final Color statusColor = percentage >= 100 ? Colors.red
-        : percentage >= 80 ? Colors.deepOrange
-        : percentage >= 50 ? Colors.orange : Colors.green;
+    final Color statusColor = percentage >= 100
+        ? Colors.red
+        : percentage >= 80
+            ? Colors.deepOrange
+            : percentage >= 50 ? Colors.orange : Colors.green;
 
     final iconCode = data['categoryIcon'] as int?;
     final IconData icon = iconCode != null
-        ? IconData(iconCode, fontFamily: 'MaterialIcons') : Icons.wallet;
+        ? IconData(iconCode, fontFamily: 'MaterialIcons')
+        : Icons.wallet;
 
     return GestureDetector(
       onTap: () => Navigator.push(context,
@@ -959,7 +979,8 @@ class _HomeViewState extends State<HomeView> {
         decoration: BoxDecoration(
           color: isDark ? Colors.grey[850] : Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: statusColor.withOpacity(0.3), width: 1),
+          border: Border.all(
+              color: statusColor.withOpacity(0.3), width: 1),
         ),
         child: Row(children: [
           Container(
@@ -973,7 +994,8 @@ class _HomeViewState extends State<HomeView> {
           Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(data['categoryName'] ?? '',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold,
+                style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.bold,
                     color: isDark ? Colors.white : Colors.black87)),
             const SizedBox(height: 4),
             ClipRRect(
@@ -1046,15 +1068,17 @@ class _HomeViewState extends State<HomeView> {
   // ══════════════════════════════════════════════════════
   Widget _buildAddButtons(bool isDark) {
     return Row(children: [
-      // Add Income
       Expanded(child: GestureDetector(
-        onTap: () => _showAddTransactionSheet(isIncome: true, isDark: isDark),
+        onTap: () =>
+            _showAddTransactionSheet(isIncome: true, isDark: isDark),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 13),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1A3A2A) : const Color(0xFFE8F5E9),
+            color: isDark
+                ? const Color(0xFF1A3A2A) : const Color(0xFFE8F5E9),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.green[400]!.withOpacity(0.5)),
+            border:
+                Border.all(color: Colors.green[400]!.withOpacity(0.5)),
           ),
           child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             Icon(Icons.trending_up_rounded,
@@ -1067,13 +1091,14 @@ class _HomeViewState extends State<HomeView> {
         ),
       )),
       const SizedBox(width: 12),
-      // Add Expense
       Expanded(child: GestureDetector(
-        onTap: () => _showAddTransactionSheet(isIncome: false, isDark: isDark),
+        onTap: () =>
+            _showAddTransactionSheet(isIncome: false, isDark: isDark),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 13),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF3A1A1A) : const Color(0xFFFFEBEE),
+            color: isDark
+                ? const Color(0xFF3A1A1A) : const Color(0xFFFFEBEE),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: Colors.red[400]!.withOpacity(0.5)),
           ),
@@ -1090,7 +1115,6 @@ class _HomeViewState extends State<HomeView> {
     ]);
   }
 
-  // ── Bottom sheet thêm giao dịch ────────────────────────
   void _showAddTransactionSheet({
     required bool isIncome,
     required bool isDark,
@@ -1099,7 +1123,6 @@ class _HomeViewState extends State<HomeView> {
     final noteCtrl   = TextEditingController();
     String selectedCategory = isIncome ? 'Lương' : 'Ăn uống';
 
-    // Danh mục theo loại
     final expenseCategories = [
       {'icon': '🍜', 'name': 'Ăn uống'},
       {'icon': '🚗', 'name': 'Di chuyển'},
@@ -1122,9 +1145,6 @@ class _HomeViewState extends State<HomeView> {
     ];
     final categories = isIncome ? incomeCategories : expenseCategories;
     final mainColor  = isIncome ? Colors.green[600]! : Colors.red[500]!;
-    final bgColor    = isIncome
-        ? (isDark ? const Color(0xFF0D2B1A) : const Color(0xFFF1FBF4))
-        : (isDark ? const Color(0xFF2B0D0D) : const Color(0xFFFFF1F1));
 
     showModalBottomSheet(
       context: context,
@@ -1136,8 +1156,8 @@ class _HomeViewState extends State<HomeView> {
               bottom: MediaQuery.of(ctx).viewInsets.bottom),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-            borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(24)),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: SingleChildScrollView(
             child: Padding(
@@ -1145,7 +1165,6 @@ class _HomeViewState extends State<HomeView> {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                // Handle bar
                 Center(child: Container(
                   width: 40, height: 4,
                   decoration: BoxDecoration(
@@ -1153,8 +1172,6 @@ class _HomeViewState extends State<HomeView> {
                       borderRadius: BorderRadius.circular(2)),
                 )),
                 const SizedBox(height: 20),
-
-                // Title
                 Row(children: [
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -1178,24 +1195,19 @@ class _HomeViewState extends State<HomeView> {
                     child: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          shape: BoxShape.circle),
+                          color: Colors.grey[200], shape: BoxShape.circle),
                       child: Icon(Icons.close_rounded,
                           size: 18, color: Colors.grey[700]),
                     ),
                   ),
                 ]),
-
                 const SizedBox(height: 24),
-
-                // Ô nhập số tiền — to, nổi bật
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: mainColor.withOpacity(0.06),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                        color: mainColor.withOpacity(0.2)),
+                    border: Border.all(color: mainColor.withOpacity(0.2)),
                   ),
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1203,8 +1215,7 @@ class _HomeViewState extends State<HomeView> {
                     Text('Số tiền', style: TextStyle(
                         fontSize: 12, color: Colors.grey[500])),
                     const SizedBox(height: 6),
-                    Row(crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
+                    Row(children: [
                       Text('₫', style: TextStyle(
                           fontSize: 26, fontWeight: FontWeight.bold,
                           color: mainColor)),
@@ -1226,10 +1237,7 @@ class _HomeViewState extends State<HomeView> {
                     ]),
                   ]),
                 ),
-
                 const SizedBox(height: 16),
-
-                // Ghi chú
                 TextField(
                   controller: noteCtrl,
                   style: TextStyle(fontSize: 15,
@@ -1240,8 +1248,8 @@ class _HomeViewState extends State<HomeView> {
                     prefixIcon: Icon(Icons.edit_note_rounded,
                         color: Colors.grey[400]),
                     filled: true,
-                    fillColor: isDark
-                        ? Colors.grey[800] : Colors.grey[50],
+                    fillColor:
+                        isDark ? Colors.grey[800] : Colors.grey[50],
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none),
@@ -1253,16 +1261,11 @@ class _HomeViewState extends State<HomeView> {
                         horizontal: 14, vertical: 12),
                   ),
                 ),
-
                 const SizedBox(height: 16),
-
-                // Category label
                 Text('Danh mục', style: TextStyle(
                     fontSize: 13, fontWeight: FontWeight.w600,
                     color: isDark ? Colors.grey[300] : Colors.grey[700])),
                 const SizedBox(height: 10),
-
-                // Category chips
                 Wrap(spacing: 8, runSpacing: 8,
                     children: categories.map((c) {
                   final isSelected = selectedCategory == c['name'];
@@ -1284,8 +1287,7 @@ class _HomeViewState extends State<HomeView> {
                                 ? mainColor : Colors.transparent,
                             width: 1.5),
                       ),
-                      child: Row(mainAxisSize: MainAxisSize.min,
-                          children: [
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
                         Text(c['icon']!,
                             style: const TextStyle(fontSize: 14)),
                         const SizedBox(width: 6),
@@ -1300,10 +1302,7 @@ class _HomeViewState extends State<HomeView> {
                     ),
                   );
                 }).toList()),
-
                 const SizedBox(height: 24),
-
-                // Nút thêm
                 SizedBox(
                   width: double.infinity,
                   height: 52,
@@ -1312,7 +1311,6 @@ class _HomeViewState extends State<HomeView> {
                       final amount = double.tryParse(
                           amountCtrl.text.replaceAll(',', ''));
                       if (amount == null || amount <= 0) return;
-
                       await _saveTransaction(
                         isIncome:  isIncome,
                         amount:    amount,
@@ -1342,7 +1340,7 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  // ── Lưu transaction vào Firestore ─────────────────────
+  // ── Save transaction ──────────────────────────────────
   Future<void> _saveTransaction({
     required bool isIncome,
     required double amount,
@@ -1355,7 +1353,6 @@ class _HomeViewState extends State<HomeView> {
 
       final title = note.isEmpty ? category : note;
 
-      // ✅ Lưu vào users/{uid}/transactions — khớp với TransactionView
       await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
@@ -1363,15 +1360,14 @@ class _HomeViewState extends State<HomeView> {
           .add({
         'type':         isIncome ? 'income' : 'expense',
         'amount':       amount,
-        'category':     category,      // field 'category' — TransactionView dùng
-        'categoryName': category,      // field 'categoryName' — AddTransactionView dùng
-        'title':        title,         // field 'title' — TransactionView search dùng
+        'category':     category,
+        'categoryName': category,
+        'title':        title,
         'note':         title,
         'date':         Timestamp.fromDate(DateTime.now()),
         'createdAt':    Timestamp.now(),
       });
 
-      // Cập nhật balance
       await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
@@ -1392,7 +1388,8 @@ class _HomeViewState extends State<HomeView> {
             Text('Đã thêm ${isIncome ? 'thu nhập' : 'chi tiêu'} '
                 '${_formatCurrency(amount)}đ'),
           ]),
-          backgroundColor: isIncome ? Colors.green[600] : Colors.red[500],
+          backgroundColor:
+              isIncome ? Colors.green[600] : Colors.red[500],
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
           shape: RoundedRectangleBorder(
@@ -1400,72 +1397,19 @@ class _HomeViewState extends State<HomeView> {
           margin: const EdgeInsets.all(12),
         ));
       }
-    } catch (e) { print('Error saving transaction: $e'); }
+    } catch (e) {
+      print('Error saving transaction: $e');
+    }
   }
 
-  Widget _buildQuickActions() {
-    return GestureDetector(
-      onTap: () => Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const CategoriesView())),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 24),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-              colors: [Color(0xFF00CED1), Color(0xFF009999)],
-              begin: Alignment.topLeft, end: Alignment.bottomRight),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(
-              color: const Color(0xFF00CED1).withOpacity(0.35),
-              blurRadius: 12, offset: const Offset(0, 4))],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.swap_horiz_rounded,
-                    color: Colors.white, size: 24),
-              ),
-              const SizedBox(width: 14),
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Quản lý Thu Chi', style: TextStyle(
-                    color: Colors.white, fontSize: 16,
-                    fontWeight: FontWeight.bold)),
-                Text('Thêm thu nhập & chi tiêu',
-                    style: TextStyle(
-                        color: Colors.white.withOpacity(0.8), fontSize: 12)),
-              ]),
-            ]),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.arrow_forward_ios_rounded,
-                  color: Colors.white, size: 16),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatCurrency(double amount) {
-    return amount.toStringAsFixed(0).replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
-  }
-
+  // ── Bottom nav ────────────────────────────────────────
   Widget _buildBottomNavBar() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1),
+        boxShadow: [BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
             blurRadius: 10, offset: const Offset(0, -5))],
       ),
       child: SafeArea(
@@ -1478,19 +1422,22 @@ class _HomeViewState extends State<HomeView> {
                   const Color(0xFF00CED1), label: 'Home', onTap: () {}),
               _buildNavItem(Icons.assignment_rounded, false,
                   isDark ? Colors.grey[500]! : Colors.grey[400]!,
-                  label: 'Plan', onTap: () => Navigator.pushReplacement(
-                      context, MaterialPageRoute(
+                  label: 'Plan',
+                  onTap: () => Navigator.pushReplacement(context,
+                      MaterialPageRoute(
                           builder: (_) => const AnalysisView()))),
               _buildVoiceNavItem(),
               _buildNavItem(Icons.layers_rounded, false,
                   isDark ? Colors.grey[500]! : Colors.grey[400]!,
-                  label: 'Category', onTap: () => Navigator.pushReplacement(
-                      context, MaterialPageRoute(
+                  label: 'Category',
+                  onTap: () => Navigator.pushReplacement(context,
+                      MaterialPageRoute(
                           builder: (_) => const CategoriesView()))),
               _buildNavItem(Icons.person_outline_rounded, false,
                   isDark ? Colors.grey[500]! : Colors.grey[400]!,
-                  label: 'Profile', onTap: () => Navigator.pushReplacement(
-                      context, MaterialPageRoute(
+                  label: 'Profile',
+                  onTap: () => Navigator.pushReplacement(context,
+                      MaterialPageRoute(
                           builder: (_) => const ProfileView()))),
             ],
           ),
@@ -1513,11 +1460,14 @@ class _HomeViewState extends State<HomeView> {
                 color: const Color(0xFF00CED1).withOpacity(0.45),
                 blurRadius: 12, offset: const Offset(0, 4))],
           ),
-          child: const Icon(Icons.mic_rounded, color: Colors.white, size: 26),
+          child: const Icon(Icons.mic_rounded,
+              color: Colors.white, size: 26),
         ),
         const SizedBox(height: 4),
-        const Text('Voice', style: TextStyle(fontSize: 10,
-            fontWeight: FontWeight.w600, color: Color(0xFF00CED1))),
+        const Text('Voice', style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF00CED1))),
       ]),
     );
   }
@@ -1531,15 +1481,19 @@ class _HomeViewState extends State<HomeView> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: isActive ? color.withOpacity(0.12) : Colors.transparent,
+            color: isActive
+                ? color.withOpacity(0.12) : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: isActive ? color : color, size: 24),
+          child: Icon(icon, color: color, size: 24),
         ),
         if (label.isNotEmpty)
-          Text(label, style: TextStyle(fontSize: 10,
-              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-              color: isActive ? color
+          Text(label, style: TextStyle(
+              fontSize: 10,
+              fontWeight: isActive
+                  ? FontWeight.w600 : FontWeight.normal,
+              color: isActive
+                  ? color
                   : isDark ? Colors.grey[500]! : Colors.grey[400]!)),
       ]),
     );

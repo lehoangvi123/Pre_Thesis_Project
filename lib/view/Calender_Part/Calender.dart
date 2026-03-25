@@ -1,11 +1,10 @@
 // lib/view/calendar/CalendarView.dart
-// ✅ CALENDAR VIEW - Xem lịch sử giao dịch theo ngày (giống Folly)
+// ✅ CALENDAR VIEW - Xem lịch sử giao dịch theo ngày
 
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart'; 
 
 class CalendarView extends StatefulWidget {
   const CalendarView({Key? key}) : super(key: key);
@@ -21,9 +20,10 @@ class _CalendarViewState extends State<CalendarView> {
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  
+
   Map<DateTime, List<Map<String, dynamic>>> _events = {};
-  Map<DateTime, double> _dailyTotals = {}; // Tổng chi tiêu mỗi ngày
+  Map<DateTime, double> _dailyExpenseTotals = {};
+  Map<DateTime, double> _dailyIncomeTotals = {};
   bool _isLoading = true;
 
   @override
@@ -33,49 +33,56 @@ class _CalendarViewState extends State<CalendarView> {
     _loadMonthData();
   }
 
-  // ✅ Load data tháng hiện tại
+  // ✅ Kiểm tra đúng cả 2 field: type == 'income' hoặc isIncome == true
+  bool _isIncome(Map<String, dynamic> data) {
+    return data['type'] == 'income' || data['isIncome'] == true;
+  }
+
   Future<void> _loadMonthData() async {
     setState(() => _isLoading = true);
-
     try {
-      DateTime startOfMonth = DateTime(_focusedDay.year, _focusedDay.month, 1);
-      DateTime endOfMonth = DateTime(_focusedDay.year, _focusedDay.month + 1, 0, 23, 59, 59);
+      final startOfMonth =
+          DateTime(_focusedDay.year, _focusedDay.month, 1);
+      final endOfMonth = DateTime(
+          _focusedDay.year, _focusedDay.month + 1, 0, 23, 59, 59);
 
-      QuerySnapshot snapshot = await _firestore
+      final snapshot = await _firestore
           .collection('users')
           .doc(userId)
           .collection('transactions')
-          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
-          .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
+          .where('date',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
+          .where('date',
+              isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
           .orderBy('date', descending: false)
           .get();
 
-      Map<DateTime, List<Map<String, dynamic>>> events = {};
-      Map<DateTime, double> totals = {};
+      final Map<DateTime, List<Map<String, dynamic>>> events = {};
+      final Map<DateTime, double> expenseTotals = {};
+      final Map<DateTime, double> incomeTotals = {};
 
       for (var doc in snapshot.docs) {
-        var data = doc.data() as Map<String, dynamic>;
-        DateTime date = (data['date'] as Timestamp).toDate();
-        DateTime dateOnly = DateTime(date.year, date.month, date.day);
+        final data = doc.data();
+        final date = (data['date'] as Timestamp).toDate();
+        final dateOnly = DateTime(date.year, date.month, date.day);
+        final amount = (data['amount'] ?? 0).toDouble().abs();
+        final income = _isIncome(data);
 
-        // Add to events
-        if (events[dateOnly] == null) {
-          events[dateOnly] = [];
-        }
+        events[dateOnly] ??= [];
         events[dateOnly]!.add(data);
 
-        // Calculate daily total (only expenses)
-        bool isIncome = data['isIncome'] ?? false;
-        double amount = (data['amount'] ?? 0).toDouble();
-        
-        if (!isIncome) {
-          totals[dateOnly] = (totals[dateOnly] ?? 0) + amount;
+        if (income) {
+          incomeTotals[dateOnly] = (incomeTotals[dateOnly] ?? 0) + amount;
+        } else {
+          expenseTotals[dateOnly] =
+              (expenseTotals[dateOnly] ?? 0) + amount;
         }
       }
 
       setState(() {
         _events = events;
-        _dailyTotals = totals;
+        _dailyExpenseTotals = expenseTotals;
+        _dailyIncomeTotals = incomeTotals;
         _isLoading = false;
       });
     } catch (e) {
@@ -84,29 +91,45 @@ class _CalendarViewState extends State<CalendarView> {
     }
   }
 
-  // ✅ Get events for selected day
   List<Map<String, dynamic>> _getEventsForDay(DateTime day) {
-    DateTime dateOnly = DateTime(day.year, day.month, day.day);
+    final dateOnly = DateTime(day.year, day.month, day.day);
     return _events[dateOnly] ?? [];
   }
 
-  // ✅ Helper: Get Vietnamese weekday name
   String _getWeekdayName(int weekday) {
-    switch (weekday) {
-      case DateTime.monday: return 'Thứ 2';
-      case DateTime.tuesday: return 'Thứ 3';
-      case DateTime.wednesday: return 'Thứ 4';
-      case DateTime.thursday: return 'Thứ 5';
-      case DateTime.friday: return 'Thứ 6';
-      case DateTime.saturday: return 'Thứ 7';
-      case DateTime.sunday: return 'Chủ nhật';
-      default: return '';
-    }
+    const names = {
+      DateTime.monday: 'Thứ 2',
+      DateTime.tuesday: 'Thứ 3',
+      DateTime.wednesday: 'Thứ 4',
+      DateTime.thursday: 'Thứ 5',
+      DateTime.friday: 'Thứ 6',
+      DateTime.saturday: 'Thứ 7',
+      DateTime.sunday: 'Chủ nhật',
+    };
+    return names[weekday] ?? '';
   }
 
-  // ✅ Format date manually (no locale needed)
   String _formatSelectedDate(DateTime date) {
-    return '${_getWeekdayName(date.weekday)}, ${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    return '${_getWeekdayName(date.weekday)}, '
+        '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year}';
+  }
+
+  String _formatMoney(double amount) {
+    return '${amount.toInt().toString().replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]},',
+        )}đ';
+  }
+
+  String _formatShortMoney(double amount) {
+    if (amount >= 1000000) {
+      return '${(amount / 1000000).toStringAsFixed(1)}M';
+    } else if (amount >= 1000) {
+      return '${(amount / 1000).toInt()}K';
+    }
+    return amount.toInt().toString();
   }
 
   @override
@@ -114,10 +137,11 @@ class _CalendarViewState extends State<CalendarView> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF5F5F5),
-      
+      backgroundColor:
+          isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text('Lịch Chi Tiêu', style: TextStyle(color: Colors.white)),
+        title: const Text('Lịch Chi Tiêu',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF00D09E),
         elevation: 0,
         leading: IconButton(
@@ -125,7 +149,6 @@ class _CalendarViewState extends State<CalendarView> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          // Today button
           IconButton(
             icon: const Icon(Icons.today, color: Colors.white),
             tooltip: 'Hôm nay',
@@ -139,12 +162,13 @@ class _CalendarViewState extends State<CalendarView> {
           ),
         ],
       ),
-
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF00D09E)))
+          ? const Center(
+              child: CircularProgressIndicator(
+                  color: Color(0xFF00D09E)))
           : Column(
               children: [
-                // Calendar Widget
+                // ── Calendar ──────────────────────────────────
                 Container(
                   color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
                   child: TableCalendar(
@@ -152,9 +176,8 @@ class _CalendarViewState extends State<CalendarView> {
                     lastDay: DateTime.utc(2030, 12, 31),
                     focusedDay: _focusedDay,
                     calendarFormat: _calendarFormat,
-                    selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                    
-                    // Style
+                    selectedDayPredicate: (day) =>
+                        isSameDay(_selectedDay, day),
                     calendarStyle: CalendarStyle(
                       selectedDecoration: const BoxDecoration(
                         color: Color(0xFF00D09E),
@@ -164,13 +187,9 @@ class _CalendarViewState extends State<CalendarView> {
                         color: const Color(0xFF00D09E).withOpacity(0.3),
                         shape: BoxShape.circle,
                       ),
-                      markerDecoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      weekendTextStyle: TextStyle(color: Colors.red[400]),
+                      weekendTextStyle:
+                          TextStyle(color: Colors.red[400]),
                     ),
-                    
                     headerStyle: HeaderStyle(
                       formatButtonVisible: false,
                       titleCentered: true,
@@ -179,55 +198,46 @@ class _CalendarViewState extends State<CalendarView> {
                         fontWeight: FontWeight.bold,
                         color: isDark ? Colors.white : Colors.black,
                       ),
-                      leftChevronIcon: Icon(
-                        Icons.chevron_left,
-                        color: isDark ? Colors.white : Colors.black,
-                      ),
-                      rightChevronIcon: Icon(
-                        Icons.chevron_right,
-                        color: isDark ? Colors.white : Colors.black,
-                      ),
+                      leftChevronIcon: Icon(Icons.chevron_left,
+                          color: isDark ? Colors.white : Colors.black),
+                      rightChevronIcon: Icon(Icons.chevron_right,
+                          color: isDark ? Colors.white : Colors.black),
                     ),
-
-                    // Events
-                    eventLoader: (day) => _getEventsForDay(day),
-                    
-                    // Callbacks
+                    eventLoader: _getEventsForDay,
                     onDaySelected: (selectedDay, focusedDay) {
                       setState(() {
                         _selectedDay = selectedDay;
                         _focusedDay = focusedDay;
                       });
                     },
-                    
                     onPageChanged: (focusedDay) {
                       _focusedDay = focusedDay;
                       _loadMonthData();
                     },
-
-                    // Custom day builder
                     calendarBuilders: CalendarBuilders(
                       markerBuilder: (context, day, events) {
                         if (events.isEmpty) return null;
-                        
-                        DateTime dateOnly = DateTime(day.year, day.month, day.day);
-                        double total = _dailyTotals[dateOnly] ?? 0;
-                        
+                        final dateOnly =
+                            DateTime(day.year, day.month, day.day);
+                        final expTotal =
+                            _dailyExpenseTotals[dateOnly] ?? 0;
+                        if (expTotal == 0) return null;
+
                         return Positioned(
                           bottom: 1,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 1),
                             decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.7),
+                              color: Colors.red.withOpacity(0.75),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              _formatShortMoney(total),
+                              _formatShortMoney(expTotal),
                               style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                              ),
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold),
                             ),
                           ),
                         );
@@ -236,55 +246,76 @@ class _CalendarViewState extends State<CalendarView> {
                   ),
                 ),
 
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
 
-                // Selected day info
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _selectedDay != null
-                            ? _formatSelectedDate(_selectedDay!)
-                            : 'Chọn ngày',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black,
-                        ),
-                      ),
-                      if (_selectedDay != null) ...[
-                        Text(
-                          _formatMoney(_dailyTotals[DateTime(_selectedDay!.year, _selectedDay!.month, _selectedDay!.day)] ?? 0),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.red,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+                // ── Ngày đã chọn + tổng hôm đó ───────────────
+                if (_selectedDay != null)
+                  _buildDaySummaryBar(isDark),
 
-                // Transactions list
-                Expanded(
-                  child: _buildTransactionsList(),
-                ),
+                // ── Danh sách giao dịch ───────────────────────
+                Expanded(child: _buildTransactionsList(isDark)),
               ],
             ),
     );
   }
 
-  // ✅ Build transactions list for selected day
-  Widget _buildTransactionsList() {
+  // ── Thanh tóm tắt ngày ──────────────────────────────────
+  Widget _buildDaySummaryBar(bool isDark) {
+    final dateOnly = DateTime(
+        _selectedDay!.year, _selectedDay!.month, _selectedDay!.day);
+    final incomeTotal = _dailyIncomeTotals[dateOnly] ?? 0;
+    final expTotal = _dailyExpenseTotals[dateOnly] ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+      child: Row(
+        children: [
+          // Ngày
+          Expanded(
+            child: Text(
+              _formatSelectedDate(_selectedDay!),
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ),
+          // Thu nhập
+          if (incomeTotal > 0) ...[
+            Text(
+              '+${_formatMoney(incomeTotal)}',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.green[600],
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
+          // Chi tiêu
+          if (expTotal > 0)
+            Text(
+              '-${_formatMoney(expTotal)}',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Danh sách giao dịch trong ngày ──────────────────────
+  Widget _buildTransactionsList(bool isDark) {
     if (_selectedDay == null) {
       return const Center(child: Text('Chọn ngày để xem giao dịch'));
     }
 
-    List<Map<String, dynamic>> dayEvents = _getEventsForDay(_selectedDay!);
+    final dayEvents = _getEventsForDay(_selectedDay!);
 
     if (dayEvents.isEmpty) {
       return Center(
@@ -293,38 +324,53 @@ class _CalendarViewState extends State<CalendarView> {
           children: [
             Icon(Icons.inbox_outlined, size: 60, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            Text(
-              'Không có giao dịch',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-            ),
+            Text('Không có giao dịch',
+                style: TextStyle(fontSize: 16, color: Colors.grey[600])),
           ],
         ),
       );
     }
 
+    // Sắp xếp: income trước, expense sau; cùng loại thì mới nhất lên đầu
+    final sorted = List<Map<String, dynamic>>.from(dayEvents)
+      ..sort((a, b) {
+        final aIncome = _isIncome(a) ? 0 : 1;
+        final bIncome = _isIncome(b) ? 0 : 1;
+        if (aIncome != bIncome) return aIncome - bIncome;
+        final aDate = (a['date'] as Timestamp).toDate();
+        final bDate = (b['date'] as Timestamp).toDate();
+        return bDate.compareTo(aDate);
+      });
+
     return ListView.separated(
       padding: const EdgeInsets.all(16),
-      itemCount: dayEvents.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 8),
+      itemCount: sorted.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
-        var transaction = dayEvents[index];
-        bool isIncome = transaction['isIncome'] ?? false;
-        double amount = (transaction['amount'] ?? 0).toDouble();
-        String title = transaction['title'] ?? 'Không có tiêu đề';
-        String category = transaction['category'] ?? transaction['categoryName'] ?? 'Khác';
-        DateTime date = (transaction['date'] as Timestamp).toDate();
+        final tx = sorted[index];
+        final isIncome = _isIncome(tx);
+        final amount = (tx['amount'] ?? 0).toDouble().abs();
+        final title = tx['title'] ?? tx['note'] ?? 'Không có tiêu đề';
+        final category =
+            tx['category'] ?? tx['categoryName'] ?? 'Khác';
+        final date = (tx['date'] as Timestamp).toDate();
+        final timeStr =
+            '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+
+        final color = isIncome ? Colors.green[600]! : Colors.red[500]!;
+        final bgColor = isIncome
+            ? Colors.green.withOpacity(0.08)
+            : Colors.red.withOpacity(0.08);
 
         return Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? const Color(0xFF2C2C2C)
-                : Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 4,
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 6,
                 offset: const Offset(0, 2),
               ),
             ],
@@ -333,19 +379,22 @@ class _CalendarViewState extends State<CalendarView> {
             children: [
               // Icon
               Container(
-                width: 48,
-                height: 48,
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
-                  color: (isIncome ? Colors.green : Colors.red).withOpacity(0.1),
+                  color: bgColor,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  isIncome ? Icons.arrow_downward : Icons.arrow_upward,
-                  color: isIncome ? Colors.green : Colors.red,
+                  isIncome
+                      ? Icons.arrow_downward_rounded
+                      : Icons.arrow_upward_rounded,
+                  color: color,
+                  size: 22,
                 ),
               ),
               const SizedBox(width: 12),
-              
+
               // Info
               Expanded(
                 child: Column(
@@ -353,42 +402,45 @@ class _CalendarViewState extends State<CalendarView> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        fontSize: 15,
+                      style: TextStyle(
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : Colors.black87,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Text(
-                          category,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[600],
-                          ),
+                    const SizedBox(height: 3),
+                    Row(children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '• ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}',
+                        child: Text(category,
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: color,
+                                fontWeight: FontWeight.w500)),
+                      ),
+                      const SizedBox(width: 6),
+                      Text('• $timeStr',
                           style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                      ],
-                    ),
+                              fontSize: 11, color: Colors.grey[500])),
+                    ]),
                   ],
                 ),
               ),
-              
-              // Amount
+
+              // ✅ Amount — income = +xanh, expense = -đỏ
               Text(
                 '${isIncome ? '+' : '-'}${_formatMoney(amount)}',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: isIncome ? Colors.green : Colors.red,
+                  color: color,
                 ),
               ),
             ],
@@ -396,21 +448,5 @@ class _CalendarViewState extends State<CalendarView> {
         );
       },
     );
-  }
-
-  String _formatMoney(double amount) {
-    return '${amount.toInt().toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    )}đ';
-  }
-
-  String _formatShortMoney(double amount) {
-    if (amount >= 1000000) {
-      return '${(amount / 1000000).toStringAsFixed(1)}M';
-    } else if (amount >= 1000) {
-      return '${(amount / 1000).toInt()}K';
-    }
-    return amount.toInt().toString();
   }
 }
