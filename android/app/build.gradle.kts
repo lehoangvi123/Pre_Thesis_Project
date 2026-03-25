@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.project1"
-    compileSdk = 36  // ✅ NÂNG LÊN 36 (theo yêu cầu)
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -32,6 +32,16 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = false       // ✅ Kotlin DSL dùng isMinifyEnabled
+            isShrinkResources = false     // ✅ Kotlin DSL dùng isShrinkResources
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
@@ -41,9 +51,7 @@ flutter {
 }
 
 dependencies {
-    // ✅ NÂNG VERSION LÊN 2.1.4 (theo yêu cầu)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-    
     implementation("com.google.android.gms:play-services-auth:20.7.0")
     implementation("androidx.multidex:multidex:2.0.1")
 }
