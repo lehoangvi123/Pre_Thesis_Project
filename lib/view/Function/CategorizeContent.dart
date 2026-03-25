@@ -10,7 +10,6 @@ import '../notification/NotificationView.dart';
 import './ProfileView.dart';
 import '../FunctionCategorize/CategorizeDetailsView.dart';
 import '../FunctionCategorize/AddCategorizeDialog.dart';
-import '../Achivement/Achievement_model.dart';
 import '../Achivement/Achievement_service.dart';
 import '../Achivement/Achievement_view.dart';
 import '../Achivement/Achievement_popup.dart';
@@ -18,453 +17,388 @@ import '../Achivement/Achievement_popup.dart';
 class CategoriesView extends StatefulWidget {
   final String? initialType;
   const CategoriesView({Key? key, this.initialType}) : super(key: key);
-
   @override
   State<CategoriesView> createState() => _CategoriesViewState();
 }
 
 class _CategoriesViewState extends State<CategoriesView> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final AchievementService _achievementService = AchievementService();
-  final ScrollController _scrollController = ScrollController();
-  final GlobalKey _expenseKey = GlobalKey();
-  final GlobalKey _incomeKey  = GlobalKey();
+  final _firestore = FirebaseFirestore.instance;
+  final _auth      = FirebaseAuth.instance;
+  final _achievementService = AchievementService();
+  final _scrollCtrl = ScrollController();
+  final _expenseKey = GlobalKey();
+  final _incomeKey  = GlobalKey();
 
-  // ✅ Track cả income để detect khi tăng lương
-  double _lastPercentage = -1;
-  double _lastIncome     = -1;
+  double _lastPct      = -1;
+  double _totalIncome  = 0;
+  double _totalExpense = 0;
+  Map<String, double> _spentThis  = {};
+  Map<String, double> _spentLast  = {};
 
-  final List<Map<String, dynamic>> _defaultExpenseCategories = [
-    {'name': 'Food',          'icon': Icons.restaurant,       'color': Color(0xFFFF6B6B), 'type': 'expense'},
-    {'name': 'Transport',     'icon': Icons.directions_bus,   'color': Color(0xFF4ECDC4), 'type': 'expense'},
-    {'name': 'Medicine',      'icon': Icons.medical_services, 'color': Color(0xFFFF8B94), 'type': 'expense'},
-    {'name': 'Groceries',     'icon': Icons.shopping_bag,     'color': Color(0xFFFFBE0B), 'type': 'expense'},
-    {'name': 'Rent',          'icon': Icons.home,             'color': Color(0xFF8B5CF6), 'type': 'expense'},
-    {'name': 'Gifts',         'icon': Icons.card_giftcard,    'color': Color(0xFFFF6FC8), 'type': 'expense'},
-    {'name': 'Savings',       'icon': Icons.savings,          'color': Color(0xFF06D6A0), 'type': 'expense'},
-    {'name': 'Entertainment', 'icon': Icons.movie,            'color': Color(0xFF118AB2), 'type': 'expense'},
+  static const _defaultExpense = [
+    {'name': 'Food',          'icon': 0xe56c, 'color': 0xFFFF6B6B},
+    {'name': 'Transport',     'icon': 0xe1d5, 'color': 0xFF4ECDC4},
+    {'name': 'Medicine',      'icon': 0xf3f5, 'color': 0xFFFF8B94},
+    {'name': 'Groceries',     'icon': 0xf1cc, 'color': 0xFFFFBE0B},
+    {'name': 'Rent',          'icon': 0xe318, 'color': 0xFF8B5CF6},
+    {'name': 'Gifts',         'icon': 0xe1f0, 'color': 0xFFFF6FC8},
+    {'name': 'Savings',       'icon': 0xe586, 'color': 0xFF06D6A0},
+    {'name': 'Entertainment', 'icon': 0xe417, 'color': 0xFF118AB2},
   ];
 
-  final List<Map<String, dynamic>> _defaultIncomeCategories = [
-    {'name': 'Salary',     'icon': Icons.account_balance_wallet, 'color': Color(0xFF2DC653), 'type': 'income'},
-    {'name': 'Freelance',  'icon': Icons.laptop_mac,             'color': Color(0xFF00B4D8), 'type': 'income'},
-    {'name': 'Investment', 'icon': Icons.trending_up,            'color': Color(0xFFFFB703), 'type': 'income'},
+  static const _defaultIncome = [
+    {'name': 'Salary',     'icon': 0xe84f, 'color': 0xFF2DC653},
+    {'name': 'Freelance',  'icon': 0xe331, 'color': 0xFF00B4D8},
+    {'name': 'Investment', 'icon': 0xe6e1, 'color': 0xFFFFB703},
   ];
+
+  // Icon mapping từ tên string
+  IconData _iconFromString(String s) {
+    switch (s.toLowerCase()) {
+      case 'restaurant': case 'food':          return Icons.restaurant;
+      case 'directions_bus': case 'transport': return Icons.directions_bus;
+      case 'medical_services':                  return Icons.medical_services;
+      case 'shopping_bag': case 'groceries':    return Icons.shopping_bag;
+      case 'home': case 'rent':                 return Icons.home;
+      case 'card_giftcard': case 'gifts':       return Icons.card_giftcard;
+      case 'savings':                           return Icons.savings;
+      case 'movie': case 'entertainment':       return Icons.movie;
+      case 'account_balance_wallet': case 'salary': return Icons.account_balance_wallet;
+      case 'laptop_mac': case 'freelance':      return Icons.laptop_mac;
+      case 'trending_up': case 'investment':    return Icons.trending_up;
+      default:                                  return Icons.category;
+    }
+  }
+
+  IconData _iconFromCode(int code) =>
+      IconData(code, fontFamily: 'MaterialIcons');
 
   @override
   void initState() {
     super.initState();
-    _checkInitialAchievements();
+    _loadData();
+    _checkAchievements();
     if (widget.initialType == 'income') {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToIncome());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _incomeKey.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(ctx,
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut);
+        }
+      });
     }
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
-  void _scrollToIncome() {
-    final ctx = _incomeKey.currentContext;
-    if (ctx != null) {
-      Scrollable.ensureVisible(ctx,
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeInOut, alignment: 0.0);
+  Future<void> _loadData() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    final now   = DateTime.now();
+    final s1    = DateTime(now.year, now.month, 1);
+    final e1    = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+    final s2    = DateTime(now.year, now.month - 1, 1);
+    final e2    = DateTime(now.year, now.month, 0, 23, 59, 59);
+
+    Future<Map<String, double>> fetch(DateTime s, DateTime e) async {
+      final snap = await _firestore
+          .collection('users').doc(uid).collection('transactions')
+          .where('date', isGreaterThanOrEqualTo: s)
+          .where('date', isLessThanOrEqualTo: e)
+          .get();
+      final map = <String, double>{};
+      for (final doc in snap.docs) {
+        final d = doc.data();
+        if (d['type'] == 'expense' || d['isIncome'] == false) {
+          final cat = (d['category'] ?? d['categoryName'] ?? 'Other').toString();
+          final amt = (d['amount'] as num?)?.toDouble().abs() ?? 0;
+          map[cat] = (map[cat] ?? 0) + amt;
+        }
+      }
+      return map;
     }
+
+    final [thisM, lastM] = await Future.wait([fetch(s1, e1), fetch(s2, e2)]);
+    if (mounted) setState(() { _spentThis = thisM; _spentLast = lastM; });
   }
 
-  Future<void> _checkInitialAchievements() async {
+  Future<void> _checkAchievements() async {
     final user = _auth.currentUser;
     if (user == null) return;
     try {
-      final progress = await _achievementService.calculateProgress(user.uid);
-      final newAchievements = await _achievementService.checkAndUnlockAchievements(
-        transactionCount: progress['transactionCount'],
-        savingsAmount: progress['savingsAmount'],
-        streakDays: progress['streakDays'],
+      final p = await _achievementService.calculateProgress(user.uid);
+      final unlocked = await _achievementService.checkAndUnlockAchievements(
+        transactionCount: p['transactionCount'],
+        savingsAmount:    p['savingsAmount'],
+        streakDays:       p['streakDays'],
       );
-      for (final achievement in newAchievements) {
+      for (final a in unlocked) {
         if (mounted) {
           await Future.delayed(const Duration(milliseconds: 500));
-          AchievementPopupSimple.show(context, achievement);
+          AchievementPopupSimple.show(context, a);
         }
       }
-    } catch (e) { print('Achievement check error: $e'); }
+    } catch (e) { debugPrint('Achievement error: $e'); }
   }
 
-  String _formatCurrency(double amount) {
-    return amount.toStringAsFixed(0).replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
-  }
+  String _fmt(double v) => v.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
 
-  // ✅ Lưu notification vào Firestore
-  Future<void> _saveNotification(String title, String body) async {
-    try {
-      final uid = _auth.currentUser?.uid;
-      if (uid == null) return;
-      await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('notifications')
-          .add({
-        'title': title,
-        'body': body,
-        'createdAt': FieldValue.serverTimestamp(),
-        'isRead': false,
-        'type': 'spending_alert',
-      });
-    } catch (e) {
-      print('Error saving notification: $e');
-    }
-  }
+  void _checkAlert(double expense, double income) {
+    if (income <= 0) return;
+    final pct = (expense / income * 100).clamp(0.0, 100.0);
+    if (_lastPct < 0) { _lastPct = pct; return; }
+    if ((pct - _lastPct).abs() < 0.5) return;
+    _lastPct = pct;
 
-  void _checkSpendingAlert(double totalExpense, double totalIncome) {
-    if (totalIncome <= 0) return;
-    final pct     = (totalExpense / totalIncome * 100).clamp(0.0, 100.0);
-    final prevPct = _lastPercentage;
+    String msg; Color color; IconData icon;
+    if (pct >= 90) {
+      msg = 'Cảnh báo! Đã chi ${pct.toStringAsFixed(0)}% thu nhập tháng này!';
+      color = Colors.red[700]!; icon = Icons.warning_rounded;
+      _saveNotif('🚨 Cảnh báo nghiêm trọng', msg);
+    } else if (pct >= 50) {
+      msg = 'Đã chi hơn 50% thu nhập tháng này!';
+      color = Colors.orange[700]!; icon = Icons.info_rounded;
+      _saveNotif('⚡ Cảnh báo chi tiêu', msg);
+    } else return;
 
-    // Lần đầu load → chỉ lưu, không hiện alert
-    if (prevPct < 0) {
-      _lastPercentage = pct;
-      _lastIncome     = totalIncome;
-      return;
-    }
-
-    // Không thay đổi đáng kể → bỏ qua
-    if ((pct - prevPct).abs() < 0.5) return;
-
-    _lastPercentage = pct;
-    _lastIncome     = totalIncome;
-
-    void showAlert(String message, Color color, IconData icon) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(
           content: Row(children: [
             Icon(icon, color: Colors.white, size: 20),
             const SizedBox(width: 10),
-            Expanded(child: Text(message,
+            Expanded(child: Text(msg,
                 style: const TextStyle(fontWeight: FontWeight.w600))),
           ]),
           backgroundColor: color,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 5),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(12),
-          // ✅ Không có action button
         ));
-      });
-    }
-
-    // Vượt ngưỡng 90%
-    if (pct >= 90 && prevPct < 90) {
-      _saveNotification(
-        '🚨 Cảnh báo chi tiêu nghiêm trọng',
-        'Bạn đã chi ${pct.toStringAsFixed(0)}% thu nhập tháng này!',
-      );
-      showAlert(
-        'Cảnh báo! Bạn đã chi gần hết thu nhập tháng này!',
-        Colors.red[700]!,
-        Icons.warning_rounded,
-      );
-      return;
-    }
-
-    // Vượt ngưỡng 50%
-    if (pct >= 50 && prevPct < 50) {
-      _saveNotification(
-        '⚡ Cảnh báo chi tiêu',
-        'Bạn đã chi hơn 50% thu nhập tháng này (${pct.toStringAsFixed(0)}%).',
-      );
-      showAlert(
-        'Bạn đã chi hơn 50% thu nhập tháng này!',
-        Colors.orange[700]!,
-        Icons.info_rounded,
-      );
-      return;
-    }
+    });
   }
 
+  Future<void> _saveNotif(String title, String body) async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return;
+      await _firestore.collection('users').doc(uid)
+          .collection('notifications').add({
+        'title': title, 'body': body,
+        'createdAt': FieldValue.serverTimestamp(),
+        'isRead': false, 'type': 'spending_alert',
+      });
+    } catch (_) {}
+  }
+
+  // ══════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final userId = _auth.currentUser?.uid;
+    final uid    = _auth.currentUser?.uid;
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF8F9FA),
       body: SafeArea(
-        child: userId == null
+        child: uid == null
             ? const Center(child: Text('Please login'))
             : StreamBuilder<DocumentSnapshot>(
-                stream: _firestore.collection('users').doc(userId).snapshots(),
-                builder: (context, snapshot) {
-                  double balance     = 0.0;
-                  double totalIncome  = 0.0;
-                  double totalExpense = 0.0;
-
-                  if (snapshot.hasData && snapshot.data!.exists) {
-                    final userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
-                    balance      = (userData['balance']      ?? 0).toDouble();
-                    totalIncome  = (userData['totalIncome']  ?? 0).toDouble();
-                    totalExpense = (userData['totalExpense'] ?? 0).toDouble();
+                stream: _firestore.collection('users').doc(uid).snapshots(),
+                builder: (ctx, snap) {
+                  if (snap.hasData && snap.data!.exists) {
+                    final d = snap.data!.data() as Map<String, dynamic>? ?? {};
+                    _totalIncome  = (d['totalIncome']  ?? 0).toDouble();
+                    _totalExpense = (d['totalExpense'] ?? 0).toDouble();
+                    _checkAlert(_totalExpense, _totalIncome);
                   }
-
-                  // ✅ Chỉ check khi có data thực
-                  if (snapshot.hasData) {
-                    _checkSpendingAlert(totalExpense, totalIncome);
-                  }
-
                   return SingleChildScrollView(
-                    controller: _scrollController,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20.0, vertical: 16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildHeader(),
-                          const SizedBox(height: 28),
-                          _buildBalanceCards(
-                              balance, totalIncome, totalExpense, isDark),
-                          const SizedBox(height: 32),
-                          _buildCategoriesSection(
-                            key: _expenseKey,
-                            title: 'Expense',
-                            categories: _defaultExpenseCategories,
-                            categoryType: 'expense',
-                          ),
-                          const SizedBox(height: 40),
-                          _buildCategoriesSection(
-                            key: _incomeKey,
-                            title: 'Income',
-                            categories: _defaultIncomeCategories,
-                            categoryType: 'income',
-                          ),
-                          const SizedBox(height: 100),
-                        ],
+                    controller: _scrollCtrl,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      _buildHeader(isDark),
+                      const SizedBox(height: 16),
+                      if (_totalIncome > 0) ...[
+                        _buildSpendingAlert(isDark),
+                        const SizedBox(height: 16),
+                      ],
+                      if (_spentThis.isNotEmpty) ...[
+                        _buildTop3(isDark),
+                        const SizedBox(height: 20),
+                      ],
+                      _buildSection(
+                        key: _expenseKey,
+                        title: 'Expense',
+                        defaults: _defaultExpense,
+                        type: 'expense',
+                        isDark: isDark,
                       ),
-                    ),
+                      const SizedBox(height: 28),
+                      _buildSection(
+                        key: _incomeKey,
+                        title: 'Income',
+                        defaults: _defaultIncome,
+                        type: 'income',
+                        isDark: isDark,
+                      ),
+                      const SizedBox(height: 20),
+                      _buildRecentHistory(isDark),
+                      const SizedBox(height: 100),
+                    ]),
                   );
                 },
               ),
       ),
-      bottomNavigationBar: _buildBottomNavBar(),
+      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
-  Widget _buildHeader() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Categories', style: TextStyle(
-              fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: -0.5,
-              color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
-          const SizedBox(height: 6),
-          Text('Manage your categories', style: TextStyle(
-              fontSize: 15, fontWeight: FontWeight.w400,
-              color: isDark ? Colors.grey[400] : Colors.grey[600])),
-        ])),
-        Row(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 46, height: 46,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                  colors: [Color(0xFF00D09E), Color(0xFF00A8AA)]),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [BoxShadow(
-                  color: const Color(0xFF00D09E).withOpacity(0.25),
-                  blurRadius: 8, offset: const Offset(0, 2))],
-            ),
-            child: Material(color: Colors.transparent,
-              child: InkWell(
-                onTap: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const AchievementsView())),
-                borderRadius: BorderRadius.circular(12),
-                child: Center(child: Stack(clipBehavior: Clip.none, children: [
-                  const Icon(Icons.emoji_events, color: Colors.amber, size: 22),
-                  Positioned(right: -2, top: -2, child: Container(
-                      width: 8, height: 8,
-                      decoration: const BoxDecoration(
-                          color: Colors.red, shape: BoxShape.circle))),
-                ])),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () => Navigator.pushReplacement(context,
-                MaterialPageRoute(builder: (_) => const TransactionView())),
-            child: Container(
-              width: 46, height: 46,
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(
-                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
-                    blurRadius: 8, offset: const Offset(0, 2))],
-              ),
-              child: Icon(Icons.swap_horiz_rounded,
-                  color: isDark ? Colors.grey[300] : Colors.grey[700], size: 22),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            width: 46, height: 46,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
-                  blurRadius: 8, offset: const Offset(0, 2))],
-            ),
-            child: Material(color: Colors.transparent,
-              child: InkWell(
-                onTap: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const NotificationView())),
-                borderRadius: BorderRadius.circular(12),
-                child: Center(child: Icon(Icons.notifications_outlined,
-                    color: isDark ? Colors.grey[300] : Colors.grey[700], size: 22)),
-              ),
-            ),
-          ),
-        ]),
-      ],
-    );
-  }
-
-  Widget _buildBalanceCards(double balance, double totalIncome,
-      double totalExpense, bool isDark) {
-    return Column(children: [
-      Row(children: [
-        Expanded(child: _buildInfoCard(
-            title: 'Total Income',
-            amount: '+${_formatCurrency(totalIncome)} đ',
-            icon: Icons.trending_up_rounded,
-            color: Colors.green[600]!, isDark: isDark)),
-        const SizedBox(width: 12),
-        Expanded(child: _buildInfoCard(
-            title: 'Total Expenses',
-            amount: '${_formatCurrency(totalExpense)} đ',
-            icon: Icons.trending_down_rounded,
-            color: Colors.red[600]!, isDark: isDark)),
-      ]),
-      const SizedBox(height: 12),
-      _buildInfoCard(
-          title: 'Total Balance',
-          amount: '${balance >= 0 ? '+' : ''}${_formatCurrency(balance.abs())} đ',
-          icon: Icons.account_balance_wallet_rounded,
-          color: Colors.blue[600]!, isDark: isDark, isFullWidth: true),
-      const SizedBox(height: 16),
-      _buildProgressBar(totalExpense, totalIncome, isDark),
+  // ── Header ────────────────────────────────────────────
+  Widget _buildHeader(bool isDark) {
+    return Row(children: [
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Categories', style: TextStyle(
+            fontSize: 28, fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
+        const SizedBox(height: 4),
+        Text('Manage your categories', style: TextStyle(
+            fontSize: 14, color: isDark ? Colors.grey[400] : Colors.grey[600])),
+      ])),
+      _hBtn(
+        gradient: const LinearGradient(colors: [Color(0xFF00D09E), Color(0xFF00A8AA)]),
+        icon: Icons.emoji_events, iconColor: Colors.amber,
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const AchievementsView())),
+        isDark: isDark,
+      ),
+      const SizedBox(width: 8),
+      _hBtn(icon: Icons.swap_horiz_rounded,
+        onTap: () => Navigator.pushReplacement(context,
+            MaterialPageRoute(builder: (_) => const TransactionView())),
+        isDark: isDark),
+      const SizedBox(width: 8),
+      _hBtn(icon: Icons.notifications_outlined,
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const NotificationView())),
+        isDark: isDark),
     ]);
   }
 
-  Widget _buildProgressBar(
-      double totalExpense, double totalIncome, bool isDark) {
-    if (totalIncome <= 0) return const SizedBox.shrink();
+  Widget _hBtn({LinearGradient? gradient, required IconData icon,
+      Color? iconColor, required VoidCallback onTap, required bool isDark}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44, height: 44,
+        decoration: BoxDecoration(
+          gradient: gradient,
+          color: gradient == null
+              ? (isDark ? const Color(0xFF2C2C2C) : Colors.white) : null,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),
+              blurRadius: 8, offset: const Offset(0, 2))],
+        ),
+        child: Icon(icon,
+            color: iconColor ?? (isDark ? Colors.grey[300] : Colors.grey[700]),
+            size: 21),
+      ),
+    );
+  }
 
-    final percentage = (totalExpense / totalIncome * 100).clamp(0.0, 100.0);
-
-    final Color barColor;
-    final Color bgColor;
-    final IconData statusIcon;
-    final String statusText;
-
-    if (percentage >= 90) {
-      barColor   = Colors.red[600]!;
-      bgColor    = Colors.red.withOpacity(0.08);
-      statusIcon = Icons.warning_rounded;
-      statusText = 'Vượt ngưỡng nguy hiểm!';
-    } else if (percentage >= 50) {
-      barColor   = Colors.orange[600]!;
-      bgColor    = Colors.orange.withOpacity(0.08);
-      statusIcon = Icons.info_rounded;
-      statusText = 'Đã chi quá nửa thu nhập';
+  // ── Spending alert ────────────────────────────────────
+  Widget _buildSpendingAlert(bool isDark) {
+    final pct = (_totalExpense / _totalIncome * 100).clamp(0.0, 100.0);
+    final Color color;
+    final IconData icon;
+    final String text;
+    if (pct >= 90) {
+      color = Colors.red[600]!; icon = Icons.warning_rounded;
+      text  = 'Vượt ngưỡng nguy hiểm!';
+    } else if (pct >= 50) {
+      color = Colors.orange[600]!; icon = Icons.info_rounded;
+      text  = 'Đã chi quá nửa thu nhập';
     } else {
-      barColor   = Colors.green[600]!;
-      bgColor    = Colors.green.withOpacity(0.08);
-      statusIcon = Icons.check_circle_rounded;
-      statusText = 'Chi tiêu đang ổn định';
+      color = Colors.green[600]!; icon = Icons.check_circle_rounded;
+      text  = 'Chi tiêu đang ổn định';
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: color.withOpacity(0.07),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: barColor.withOpacity(0.25), width: 1),
+        border: Border.all(color: color.withOpacity(0.25)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-                color: barColor.withOpacity(0.15),
+                color: color.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(8)),
-            child: Icon(statusIcon, color: barColor, size: 18),
+            child: Icon(icon, color: color, size: 16),
           ),
           const SizedBox(width: 10),
-          Expanded(child: Text(statusText, style: TextStyle(
+          Expanded(child: Text(text, style: TextStyle(
               fontSize: 13, fontWeight: FontWeight.w600,
               color: isDark ? Colors.grey[200] : Colors.grey[800]))),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-                color: barColor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(99)),
-            child: Text('${percentage.toStringAsFixed(1)}%',
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(20)),
+            child: Text('${pct.toStringAsFixed(1)}%',
                 style: TextStyle(fontSize: 12,
-                    fontWeight: FontWeight.bold, color: barColor)),
+                    fontWeight: FontWeight.bold, color: color)),
           ),
         ]),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         ClipRRect(
           borderRadius: BorderRadius.circular(6),
           child: LinearProgressIndicator(
-            value: percentage / 100,
-            minHeight: 8,
+            value: pct / 100, minHeight: 7,
             backgroundColor: isDark ? Colors.grey[700] : Colors.grey[200],
-            valueColor: AlwaysStoppedAnimation<Color>(barColor),
+            valueColor: AlwaysStoppedAnimation(color),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('Đã chi: ${_formatCurrency(totalExpense)}đ',
-              style: TextStyle(fontSize: 12,
+          Text('Đã chi: ${_fmt(_totalExpense)}đ',
+              style: TextStyle(fontSize: 11,
                   color: isDark ? Colors.grey[400] : Colors.grey[600])),
-          Text('Thu nhập: ${_formatCurrency(totalIncome)}đ',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+          Text('Thu nhập: ${_fmt(_totalIncome)}đ',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
                   color: isDark ? Colors.grey[300] : Colors.grey[700])),
         ]),
-        if (percentage >= 50) ...[
+        if (pct >= 50) ...[
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: barColor.withOpacity(0.1),
+              color: color.withOpacity(0.08),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: barColor.withOpacity(0.3)),
+              border: Border.all(color: color.withOpacity(0.2)),
             ),
             child: Row(children: [
-              Icon(
-                percentage >= 90
-                    ? Icons.notifications_active_rounded
-                    : Icons.tips_and_updates_rounded,
-                color: barColor, size: 16),
+              Icon(pct >= 90
+                  ? Icons.notifications_active_rounded
+                  : Icons.tips_and_updates_rounded,
+                  color: color, size: 14),
               const SizedBox(width: 8),
               Expanded(child: Text(
-                percentage >= 90
-                    ? 'Bạn đã chi ${percentage.toStringAsFixed(0)}% thu nhập! Hãy dừng chi tiêu không cần thiết ngay.'
-                    : 'Bạn đã chi hơn 50% thu nhập tháng này. Hãy kiểm soát chi tiêu cẩn thận hơn.',
-                style: TextStyle(fontSize: 11, height: 1.4, color: barColor),
+                pct >= 90
+                    ? 'Đã chi ${pct.toStringAsFixed(0)}% thu nhập! Dừng chi tiêu không cần thiết ngay.'
+                    : 'Đã chi hơn 50% thu nhập. Kiểm soát chi tiêu cẩn thận hơn!',
+                style: TextStyle(fontSize: 11, height: 1.4, color: color),
               )),
             ]),
           ),
@@ -473,156 +407,229 @@ class _CategoriesViewState extends State<CategoriesView> {
     );
   }
 
-  Widget _buildInfoCard({
-    required String title, required String amount,
-    required IconData icon, required Color color,
-    required bool isDark, bool isFullWidth = false,
-  }) {
+  // ── Top 3 ─────────────────────────────────────────────
+  Widget _buildTop3(bool isDark) {
+    final sorted = _spentThis.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final top3   = sorted.take(3).toList();
+    final maxAmt = top3.first.value;
+    const colors = [Color(0xFFFF6B6B), Color(0xFFFFBE0B), Color(0xFF4ECDC4)];
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? [const Color(0xFF2C2C2C), const Color(0xFF242424)]
-              : [Colors.white, const Color(0xFFFAFAFA)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
-            blurRadius: 12, offset: const Offset(0, 3))],
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),
+            blurRadius: 10, offset: const Offset(0, 3))],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Icon(icon, size: 16, color: isDark ? Colors.grey[400] : Colors.grey[600]),
-          const SizedBox(width: 6),
-          Expanded(child: Text(title, style: TextStyle(
-              fontSize: 12, fontWeight: FontWeight.w500,
-              color: isDark ? Colors.grey[400] : Colors.grey[600]))),
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+                color: const Color(0xFFFF6B6B).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10)),
+            child: const Icon(Icons.bar_chart_rounded,
+                color: Color(0xFFFF6B6B), size: 18),
+          ),
+          const SizedBox(width: 10),
+          Text('Top chi tiêu tháng này', style: TextStyle(
+              fontSize: 14, fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white : Colors.black87)),
         ]),
-        const SizedBox(height: 12),
-        Text(amount, style: TextStyle(
-            fontSize: isFullWidth ? 22 : 18,
-            fontWeight: FontWeight.bold, color: color, letterSpacing: -0.5)),
+        const SizedBox(height: 14),
+        ...top3.asMap().entries.map((e) {
+          final color = colors[e.key];
+          final ratio = maxAmt > 0 ? e.value.value / maxAmt : 0.0;
+          final pctStr = _totalExpense > 0
+              ? (e.value.value / _totalExpense * 100).toStringAsFixed(0) : '0';
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Text('${e.key + 1}.',
+                    style: TextStyle(fontSize: 12,
+                        fontWeight: FontWeight.bold, color: Colors.grey[500])),
+                const SizedBox(width: 6),
+                Expanded(child: Text(e.value.key,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                    overflow: TextOverflow.ellipsis)),
+                Text('${_fmt(e.value.value)}đ',
+                    style: TextStyle(fontSize: 13,
+                        fontWeight: FontWeight.bold, color: color)),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: color.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(6)),
+                  child: Text('$pctStr%', style: TextStyle(
+                      fontSize: 10, fontWeight: FontWeight.bold, color: color)),
+                ),
+              ]),
+              const SizedBox(height: 5),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: ratio, minHeight: 6,
+                  backgroundColor: isDark ? Colors.grey[700] : Colors.grey[100],
+                  valueColor: AlwaysStoppedAnimation(color),
+                ),
+              ),
+            ]),
+          );
+        }),
       ]),
     );
   }
 
-  Widget _buildCategoriesSection({
-    Key? key, required String title,
-    required List<Map<String, dynamic>> categories,
-    required String categoryType,
+  // ── Category section (horizontal scroll) ─────────────
+  Widget _buildSection({
+    Key? key,
+    required String title,
+    required List<Map<String, dynamic>> defaults,
+    required String type,
+    required bool isDark,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isHighlighted =
-        widget.initialType != null && widget.initialType == categoryType;
+    final sectionColor = type == 'income' ? Colors.green[600]! : Colors.red[500]!;
+    final isHighlighted = widget.initialType == type;
 
     return Container(
       key: key,
       decoration: isHighlighted ? BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: categoryType == 'income'
-                ? Colors.green.withOpacity(0.5)
-                : Colors.red.withOpacity(0.5),
-            width: 2,
-          )) : null,
+          border: Border.all(color: sectionColor.withOpacity(0.5), width: 2)) : null,
       padding: isHighlighted ? const EdgeInsets.all(12) : EdgeInsets.zero,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 20),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              margin: const EdgeInsets.only(right: 12),
-              decoration: BoxDecoration(
-                color: categoryType == 'income'
-                    ? Colors.green.withOpacity(0.15)
-                    : Colors.red.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                categoryType == 'income'
-                    ? Icons.arrow_upward_rounded
-                    : Icons.arrow_downward_rounded,
-                color: categoryType == 'income'
-                    ? Colors.green[600] : Colors.red[500],
-                size: 20),
-            ),
-            Text(title, style: TextStyle(
-                fontSize: 20, fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
-            if (isHighlighted) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: categoryType == 'income'
-                      ? Colors.green.withOpacity(0.15)
-                      : Colors.red.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  categoryType == 'income' ? '💰 Thu nhập' : '💸 Chi tiêu',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
-                      color: categoryType == 'income'
-                          ? Colors.green[700] : Colors.red[600]),
-                ),
-              ),
-            ],
-          ]),
-        ),
+        // Section header
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+                color: sectionColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10)),
+            child: Icon(
+              type == 'income' ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+              color: sectionColor, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Text(title, style: TextStyle(
+              fontSize: 20, fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
+        ]),
+        const SizedBox(height: 14),
+
+        // Hint scroll arrow
+        Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+          Icon(Icons.swipe_rounded, size: 14, color: Colors.grey[400]),
+          const SizedBox(width: 4),
+          Text('Vuốt để xem thêm',
+              style: TextStyle(fontSize: 11, color: Colors.grey[400])),
+          const SizedBox(width: 2),
+          Icon(Icons.chevron_right_rounded, size: 16, color: Colors.grey[400]),
+        ]),
+        const SizedBox(height: 8),
+
+        // Horizontal scroll list
         StreamBuilder<QuerySnapshot>(
           stream: _firestore
               .collection('users')
               .doc(_auth.currentUser?.uid)
               .collection('categories')
               .snapshots(),
-          builder: (context, snapshot) {
-            final customCategories = snapshot.hasData
-                ? snapshot.data!.docs.map((doc) {
-                    try {
-                      final data = doc.data() as Map<String, dynamic>;
-                      IconData icon = Icons.category;
-                      if (data['icon'] != null) {
-                        if (data['icon'] is int)
-                          icon = IconData(data['icon'] as int, fontFamily: 'MaterialIcons');
-                        else if (data['icon'] is String)
-                          icon = _getIconFromString(data['icon'] as String);
-                      }
-                      int colorValue = 0xFF00CED1;
-                      if (data['color'] != null) {
-                        if (data['color'] is int) colorValue = data['color'] as int;
-                        else if (data['color'] is String)
-                          colorValue = int.tryParse(data['color']) ?? 0xFF00CED1;
-                      }
-                      final docType = data['type'] ?? 'expense';
-                      if (docType != categoryType) return null;
-                      return {
-                        'name': data['name'] ?? 'Untitled',
-                        'icon': icon, 'color': Color(colorValue),
-                        'type': docType, 'isCustom': true,
-                      };
-                    } catch (e) { return null; }
-                  }).where((item) => item != null).cast<Map<String, dynamic>>().toList()
-                : <Map<String, dynamic>>[];
+          builder: (ctx, snap) {
+            // Parse custom categories
+            final custom = <Map<String, dynamic>>[];
+            if (snap.hasData) {
+              for (final doc in snap.data!.docs) {
+                try {
+                  final d = doc.data() as Map<String, dynamic>;
+                  if ((d['type'] ?? 'expense') != type) continue;
+                  IconData icon = Icons.category;
+                  if (d['icon'] is int) {
+                    icon = IconData(d['icon'] as int, fontFamily: 'MaterialIcons');
+                  } else if (d['icon'] is String) {
+                    icon = _iconFromString(d['icon'] as String);
+                  }
+                  int colorVal = 0xFF00CED1;
+                  if (d['color'] is int) colorVal = d['color'] as int;
+                  else if (d['color'] is String) {
+                    colorVal = int.tryParse(d['color']) ?? colorVal;
+                  }
+                  custom.add({
+                    'name': d['name'] ?? 'Untitled',
+                    'iconData': icon,
+                    'color': Color(colorVal),
+                    'isCustom': true,
+                  });
+                } catch (_) {}
+              }
+            }
 
-            final allCategories = [...categories, ...customCategories];
+            // Build default items
+            final defaultItems = defaults.map((d) => {
+              'name': d['name'] as String,
+              'iconData': _iconFromCode(d['icon'] as int),
+              'color': Color(d['color'] as int),
+              'isCustom': false,
+            }).toList();
 
-            return GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3, childAspectRatio: 1.0,
-                crossAxisSpacing: 16, mainAxisSpacing: 16,
-              ),
-              itemCount: allCategories.length + 1,
-              itemBuilder: (context, index) {
-                if (index == allCategories.length) return _buildMoreButton(categoryType);
-                final category = allCategories[index];
-                return _buildCategoryCard(category['name'], category['icon'],
-                    category['color'], category['isCustom'] ?? false);
-              },
+            final all = [...defaultItems, ...custom];
+
+            return Stack(
+              alignment: Alignment.centerRight,
+              children: [
+                SizedBox(
+                  height: 108,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                    itemCount: all.length + 1,
+                    separatorBuilder: (_, __) => const SizedBox(width: 14),
+                    itemBuilder: (ctx, i) {
+                      if (i == all.length) {
+                        return _buildAddBtn(type, isDark, sectionColor);
+                      }
+                      return _buildCatCard(all[i], type, isDark);
+                    },
+                  ),
+                ),
+                // Gradient fade + arrow ở bên phải
+                if (all.length > 3)
+                  Positioned(
+                    right: 0,
+                    child: Container(
+                      width: 36, height: 108,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            (isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF8F9FA)).withOpacity(0),
+                            (isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF8F9FA)),
+                          ],
+                        ),
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: 24, height: 24,
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [BoxShadow(
+                                color: Colors.black.withOpacity(0.12),
+                                blurRadius: 6, offset: const Offset(0, 2))],
+                          ),
+                          child: Icon(Icons.chevron_right_rounded,
+                              size: 16,
+                              color: sectionColor),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             );
           },
         ),
@@ -630,128 +637,495 @@ class _CategoriesViewState extends State<CategoriesView> {
     );
   }
 
-  Widget _buildCategoryCard(String name, IconData icon, Color color, bool isCustom) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  // ── Category card (compact, horizontal) ──────────────
+  Widget _buildCatCard(Map<String, dynamic> cat, String type, bool isDark) {
+    final name     = cat['name'] as String;
+    final icon     = cat['iconData'] as IconData;
+    final color    = cat['color'] as Color;
+
+    final spent    = _spentThis[name] ?? 0;
+    final budget   = _totalIncome > 0 ? _totalIncome * 0.15 : 0.0;
+    final ringPct  = budget > 0 ? (spent / budget).clamp(0.0, 1.0) : 0.0;
+    final isOver   = spent > budget && budget > 0 && type == 'expense';
+
+    final lastAmt   = _spentLast[name] ?? 0;
+    final hasComp   = lastAmt > 0 && spent > 0 && type == 'expense';
+    final changePct = hasComp
+        ? ((spent - lastAmt) / lastAmt * 100).round() : 0;
+    final isUp = changePct > 0;
+
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(
+      onTap: () {
+        if (type == 'expense') {
+          _showQuickAdd(name, color, icon, isDark);
+        } else {
+          Navigator.push(context, MaterialPageRoute(
+              builder: (_) => CategoryDetailView(
+                  categoryColor: color,
+                  categoryName: name,
+                  categoryIcon: icon)));
+        }
+      },
+      onLongPress: () => Navigator.push(context, MaterialPageRoute(
           builder: (_) => CategoryDetailView(
-              categoryColor: color, categoryName: name, categoryIcon: icon))),
-      onLongPress: isCustom ? () => _showDeleteDialog(name) : null,
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF2A2A2A) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(
-              color: color.withOpacity(isDark ? 0.25 : 0.18),
-              blurRadius: 10, offset: const Offset(0, 4))],
+              categoryColor: color,
+              categoryName: name,
+              categoryIcon: icon))),
+      child: SizedBox(
+        width: 80,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Ring + icon + badge
+            Stack(alignment: Alignment.topRight, children: [
+              Stack(alignment: Alignment.center, children: [
+                SizedBox(
+                  width: 58, height: 58,
+                  child: CircularProgressIndicator(
+                    value: type == 'expense' ? ringPct : 0,
+                    strokeWidth: 3,
+                    backgroundColor:
+                        isDark ? Colors.grey[700]! : Colors.grey[200]!,
+                    valueColor: AlwaysStoppedAnimation(
+                        isOver ? Colors.red : color),
+                  ),
+                ),
+                Container(
+                  width: 46, height: 46,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                        colors: [color.withOpacity(0.85), color],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight),
+                    borderRadius: BorderRadius.circular(13),
+                    boxShadow: [BoxShadow(
+                        color: color.withOpacity(0.3),
+                        blurRadius: 6, offset: const Offset(0, 3))],
+                  ),
+                  child: Icon(icon, size: 20, color: Colors.white),
+                ),
+              ]),
+              // Badge vượt ngân sách
+              if (isOver)
+                Container(
+                  width: 16, height: 16,
+                  decoration: const BoxDecoration(
+                      color: Colors.red, shape: BoxShape.circle),
+                  child: const Center(child: Text('!',
+                      style: TextStyle(color: Colors.white,
+                          fontSize: 10, fontWeight: FontWeight.bold))),
+                ),
+            ]),
+            const SizedBox(height: 6),
+            // Tên
+            Text(name,
+                style: TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.grey[100] : const Color(0xFF1A1A1A)),
+                textAlign: TextAlign.center,
+                maxLines: 1, overflow: TextOverflow.ellipsis),
+            // Số tiền / so sánh
+            const SizedBox(height: 2),
+            if (hasComp)
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(
+                  isUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                  size: 9, color: isUp ? Colors.red : Colors.green),
+                Text('${changePct.abs()}%',
+                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600,
+                        color: isUp ? Colors.red : Colors.green)),
+              ])
+            else if (spent > 0 && type == 'expense')
+              Text('${_fmt(spent)}đ',
+                  style: TextStyle(
+                      fontSize: 9,
+                      color: isOver ? Colors.red : Colors.grey[500]),
+                  textAlign: TextAlign.center),
+          ],
         ),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                  colors: [color.withOpacity(0.85), color],
-                  begin: Alignment.topLeft, end: Alignment.bottomRight),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(icon, size: 28, color: Colors.white),
-          ),
-          const SizedBox(height: 10),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Text(name, style: TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w700,
-                color: isDark ? Colors.grey[100] : const Color(0xFF1A1A1A)),
-                textAlign: TextAlign.center, maxLines: 1,
-                overflow: TextOverflow.ellipsis),
-          ),
-        ]),
       ),
     );
   }
 
-  IconData _getIconFromString(String iconName) {
-    switch (iconName.toLowerCase()) {
-      case 'restaurant': case 'food': return Icons.restaurant;
-      case 'directions_bus': case 'transport': return Icons.directions_bus;
-      case 'medical_services': return Icons.medical_services;
-      case 'shopping_bag': return Icons.shopping_bag;
-      case 'home': return Icons.home;
-      case 'card_giftcard': return Icons.card_giftcard;
-      case 'savings': return Icons.savings;
-      case 'movie': return Icons.movie;
-      case 'account_balance_wallet': return Icons.account_balance_wallet;
-      case 'laptop_mac': return Icons.laptop_mac;
-      case 'trending_up': return Icons.trending_up;
-      default: return Icons.category;
-    }
-  }
-
-  void _showDeleteDialog(String categoryName) {
-    showDialog(context: context, builder: (_) => AlertDialog(
-      title: const Text('Xóa danh mục?'),
-      content: Text('Bạn có chắc muốn xóa "$categoryName"?'),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
-        TextButton(
-          onPressed: () { Navigator.pop(context); _deleteCategory(categoryName); },
-          child: const Text('Xóa', style: TextStyle(color: Colors.red)),
-        ),
-      ],
-    ));
-  }
-
-  Future<void> _deleteCategory(String categoryName) async {
-    try {
-      final userId = _auth.currentUser?.uid;
-      if (userId == null) return;
-      final snapshot = await _firestore
-          .collection('users').doc(userId).collection('categories')
-          .where('name', isEqualTo: categoryName).get();
-      for (var doc in snapshot.docs) { await doc.reference.delete(); }
-    } catch (e) { print('Error deleting category: $e'); }
-  }
-
-  Widget _buildMoreButton(String categoryType) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = categoryType == 'income'
-        ? const Color(0xFF2DC653) : const Color(0xFF4ECDC4);
+  // ── Add button (compact) ──────────────────────────────
+  Widget _buildAddBtn(String type, bool isDark, Color color) {
     return GestureDetector(
       onTap: () async {
-        final result = await showDialog<bool>(context: context,
-            builder: (_) => AddCategoryDialog(categoryType: categoryType));
-        if (result == true) setState(() {});
+        final ok = await showDialog<bool>(context: context,
+            builder: (_) => AddCategoryDialog(categoryType: type));
+        if (ok == true) setState(() {});
       },
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF2A2A2A) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: color.withOpacity(0.2),
-              blurRadius: 10, offset: const Offset(0, 4))],
-          border: Border.all(color: color.withOpacity(0.4),
-              width: 1.5, style: BorderStyle.solid),
-        ),
+      child: SizedBox(
+        width: 80,
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Container(
-            padding: const EdgeInsets.all(14),
+            width: 58, height: 58,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                  colors: [color.withOpacity(0.15), color.withOpacity(0.25)],
-                  begin: Alignment.topLeft, end: Alignment.bottomRight),
-              borderRadius: BorderRadius.circular(16),
+              color: isDark ? const Color(0xFF2A2A2A) : Colors.white,
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: color.withOpacity(0.4), width: 1.5),
+              boxShadow: [BoxShadow(
+                  color: color.withOpacity(0.15),
+                  blurRadius: 6, offset: const Offset(0, 3))],
             ),
-            child: Icon(Icons.add_rounded, size: 28, color: color),
+            child: Icon(Icons.add_rounded, size: 26, color: color),
           ),
-          const SizedBox(height: 10),
-          Text('Add New', style: TextStyle(fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: isDark ? Colors.grey[100] : const Color(0xFF1A1A1A))),
+          const SizedBox(height: 6),
+          Text('Thêm', style: TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w600, color: color)),
         ]),
       ),
     );
   }
 
-  Widget _buildBottomNavBar() {
+  // ── Quick add expense sheet ───────────────────────────
+  void _showQuickAdd(String category, Color color, IconData icon, bool isDark) {
+    final amtCtrl  = TextEditingController();
+    final noteCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) {
+          final amt    = double.tryParse(amtCtrl.text.replaceAll(',', '')) ?? 0;
+          final isOver = _totalIncome > 0 && amt > _totalIncome * 0.15;
+
+          return Container(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 28,
+              top: 20, left: 20, right: 20,
+            ),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              // Handle
+              Container(
+                width: 40, height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+              // Header
+              Row(children: [
+                Container(
+                  width: 48, height: 48,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                        colors: [color.withOpacity(0.8), color]),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Thêm Chi tiêu nhanh',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                        color: color.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8)),
+                    child: Text(category, style: TextStyle(
+                        fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+                  ),
+                ])),
+                GestureDetector(
+                  onTap: () => Navigator.pop(ctx),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                        color: Colors.grey[200], shape: BoxShape.circle),
+                    child: Icon(Icons.close_rounded,
+                        size: 18, color: Colors.grey[700]),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 16),
+              // Amount
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                      color: isOver ? Colors.red : color.withOpacity(0.2),
+                      width: isOver ? 1.5 : 1),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Số tiền',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                  const SizedBox(height: 6),
+                  Row(children: [
+                    Text('₫', style: TextStyle(
+                        fontSize: 26, fontWeight: FontWeight.bold, color: color)),
+                    const SizedBox(width: 8),
+                    Expanded(child: TextField(
+                      controller: amtCtrl,
+                      keyboardType: TextInputType.number,
+                      autofocus: true,
+                      onChanged: (_) => setS(() {}),
+                      style: TextStyle(
+                          fontSize: 26, fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black87),
+                      decoration: const InputDecoration(
+                          hintText: '0', border: InputBorder.none,
+                          isDense: true, contentPadding: EdgeInsets.zero),
+                    )),
+                  ]),
+                  if (isOver) ...[
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      const Icon(Icons.warning_rounded, color: Colors.red, size: 13),
+                      const SizedBox(width: 4),
+                      Text('Vượt 15% thu nhập tháng này!',
+                          style: TextStyle(fontSize: 11, color: Colors.red[600])),
+                    ]),
+                  ],
+                ]),
+              ),
+              const SizedBox(height: 12),
+              // Note
+              TextField(
+                controller: noteCtrl,
+                style: TextStyle(fontSize: 15,
+                    color: isDark ? Colors.white : Colors.black87),
+                decoration: InputDecoration(
+                  hintText: 'Ghi chú (tuỳ chọn)...',
+                  hintStyle: TextStyle(color: Colors.grey[400]),
+                  prefixIcon: Icon(Icons.edit_note_rounded, color: Colors.grey[400]),
+                  filled: true,
+                  fillColor: isDark ? Colors.grey[800] : Colors.grey[50],
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Save
+              SizedBox(
+                width: double.infinity, height: 50,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final amount = double.tryParse(
+                        amtCtrl.text.replaceAll(',', ''));
+                    if (amount == null || amount <= 0) return;
+                    await _saveExpense(
+                        amount: amount,
+                        category: category,
+                        note: noteCtrl.text.trim());
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    _loadData();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: color, elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text('Lưu Chi tiêu',
+                      style: TextStyle(color: Colors.white,
+                          fontSize: 16, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ]),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _saveExpense({
+    required double amount,
+    required String category,
+    required String note,
+  }) async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return;
+      final title = note.isEmpty ? category : note;
+      await _firestore
+          .collection('users').doc(uid).collection('transactions')
+          .add({
+        'type': 'expense', 'amount': amount,
+        'category': category, 'categoryName': category,
+        'title': title, 'note': title,
+        'date': Timestamp.fromDate(DateTime.now()),
+        'createdAt': Timestamp.now(),
+      });
+      await _firestore.collection('users').doc(uid).update({
+        'balance':      FieldValue.increment(-amount),
+        'totalExpense': FieldValue.increment(amount),
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Đã thêm ${_fmt(amount)}đ vào $category'),
+          backgroundColor: Colors.red[500],
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          margin: const EdgeInsets.all(12),
+        ));
+      }
+    } catch (e) { debugPrint('Error: $e'); }
+  }
+
+  // ── Lịch sử chi tiêu gần đây ────────────────────────
+  Widget _buildRecentHistory(bool isDark) {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return const SizedBox.shrink();
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // Header
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+                color: const Color(0xFF00CED1).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10)),
+            child: const Icon(Icons.history_rounded,
+                color: Color(0xFF00CED1), size: 20),
+          ),
+          const SizedBox(width: 12),
+          Text('Lịch sử chi tiêu', style: TextStyle(
+              fontSize: 18, fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
+        ]),
+        GestureDetector(
+          onTap: () => Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (_) => const TransactionView())),
+          child: const Text('Xem tất cả',
+              style: TextStyle(fontSize: 13,
+                  color: Color(0xFF00CED1), fontWeight: FontWeight.w500)),
+        ),
+      ]),
+      const SizedBox(height: 14),
+
+      StreamBuilder<QuerySnapshot>(
+        stream: _firestore
+            .collection('users').doc(uid).collection('transactions')
+            .orderBy('date', descending: true)
+            .limit(10)
+            .snapshots(),
+        builder: (ctx, snap) {
+          if (!snap.hasData || snap.data!.docs.isEmpty) {
+            return Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Center(child: Column(children: [
+                Icon(Icons.inbox_outlined, size: 40, color: Colors.grey[400]),
+                const SizedBox(height: 8),
+                Text('Chưa có giao dịch nào',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[500])),
+              ])),
+            );
+          }
+
+          final docs = snap.data!.docs;
+
+          return Container(
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),
+                  blurRadius: 10, offset: const Offset(0, 3))],
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: docs.length,
+              separatorBuilder: (_, __) => Divider(
+                  height: 1, thickness: 0.5,
+                  color: isDark ? Colors.grey[700] : Colors.grey[100]),
+              itemBuilder: (ctx, i) {
+                final d       = docs[i].data() as Map<String, dynamic>;
+                final isIncome = d['type'] == 'income' || d['isIncome'] == true;
+                final amount  = (d['amount'] as num?)?.toDouble().abs() ?? 0;
+                final title   = (d['title'] ?? d['note'] ?? d['category'] ?? 'Giao dịch').toString();
+                final cat     = (d['category'] ?? d['categoryName'] ?? 'Khác').toString();
+                final date    = (d['date'] as Timestamp?)?.toDate() ?? DateTime.now();
+                final color   = isIncome ? Colors.green[600]! : Colors.red[500]!;
+                final bgColor = isIncome
+                    ? Colors.green.withOpacity(0.08)
+                    : Colors.red.withOpacity(0.08);
+
+                // Format date
+                final now   = DateTime.now();
+                String dateStr;
+                if (date.year == now.year && date.month == now.month && date.day == now.day) {
+                  dateStr = 'Hôm nay • ${date.hour.toString().padLeft(2,'0')}:${date.minute.toString().padLeft(2,'0')}';
+                } else if (date.year == now.year && date.month == now.month && date.day == now.day - 1) {
+                  dateStr = 'Hôm qua • ${date.hour.toString().padLeft(2,'0')}:${date.minute.toString().padLeft(2,'0')}';
+                } else {
+                  dateStr = '${date.day}/${date.month} • ${date.hour.toString().padLeft(2,'0')}:${date.minute.toString().padLeft(2,'0')}';
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(children: [
+                    // Icon
+                    Container(
+                      width: 42, height: 42,
+                      decoration: BoxDecoration(
+                          color: bgColor, shape: BoxShape.circle),
+                      child: Icon(
+                        isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                        color: color, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    // Info
+                    Expanded(child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(title,
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white : Colors.black87),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 3),
+                      Row(children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                              color: color.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6)),
+                          child: Text(cat, style: TextStyle(
+                              fontSize: 10, color: color, fontWeight: FontWeight.w500)),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(dateStr, style: TextStyle(
+                            fontSize: 11, color: Colors.grey[500])),
+                      ]),
+                    ])),
+                    // Amount
+                    Text(
+                      '${isIncome ? '+' : '-'}${_fmt(amount)}đ',
+                      style: TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.bold,
+                          color: color)),
+                  ]),
+                );
+              },
+            ),
+          );
+        },
+      ),
+    ]);
+  }
+
+  // ── Bottom nav ────────────────────────────────────────────
+  Widget _buildBottomNav() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
@@ -764,23 +1138,15 @@ class _CategoriesViewState extends State<CategoriesView> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-            _buildNavItem(Icons.home_rounded, false,
-                isDark ? Colors.grey[400]! : Colors.grey[500]!,
-                label: 'Home',
+            _navItem(Icons.home_rounded, false, label: 'Home',
                 onTap: () => Navigator.pushReplacement(context,
                     MaterialPageRoute(builder: (_) => const HomeView()))),
-            _buildNavItem(Icons.assignment_rounded, false,
-                isDark ? Colors.grey[400]! : Colors.grey[500]!,
-                label: 'Plan',
+            _navItem(Icons.assignment_rounded, false, label: 'Plan',
                 onTap: () => Navigator.pushReplacement(context,
                     MaterialPageRoute(builder: (_) => const AnalysisView()))),
-            _buildVoiceNavItem(),
-            _buildNavItem(Icons.layers_rounded, true,
-                const Color(0xFF00CED1),
-                label: 'Category', onTap: () {}),
-            _buildNavItem(Icons.person_outline_rounded, false,
-                isDark ? Colors.grey[400]! : Colors.grey[500]!,
-                label: 'Profile',
+            _voiceItem(),
+            _navItem(Icons.layers_rounded, true, label: 'Category', onTap: () {}),
+            _navItem(Icons.person_outline_rounded, false, label: 'Profile',
                 onTap: () => Navigator.pushReplacement(context,
                     MaterialPageRoute(builder: (_) => const ProfileView()))),
           ]),
@@ -789,7 +1155,7 @@ class _CategoriesViewState extends State<CategoriesView> {
     );
   }
 
-  Widget _buildVoiceNavItem() {
+  Widget _voiceItem() {
     return GestureDetector(
       onTap: () => Navigator.pushNamed(context, '/test-voice'),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -806,34 +1172,34 @@ class _CategoriesViewState extends State<CategoriesView> {
           child: const Icon(Icons.mic_rounded, color: Colors.white, size: 26),
         ),
         const SizedBox(height: 4),
-        const Text('Voice', style: TextStyle(
-            fontSize: 10, fontWeight: FontWeight.w600,
-            color: Color(0xFF00CED1))),
+        const Text('Voice', style: TextStyle(fontSize: 10,
+            fontWeight: FontWeight.w600, color: Color(0xFF00CED1))),
       ]),
     );
   }
 
-  Widget _buildNavItem(IconData icon, bool isActive, Color color,
+  Widget _navItem(IconData icon, bool isActive,
       {VoidCallback? onTap, String label = ''}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    const teal   = Color(0xFF00CED1);
+    final color  = isActive ? teal
+        : (isDark ? Colors.grey[500]! : Colors.grey[400]!);
     return GestureDetector(
       onTap: onTap,
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: isActive ? color.withOpacity(0.12) : Colors.transparent,
+            color: isActive ? teal.withOpacity(0.12) : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: isActive ? color : color, size: 24),
+          child: Icon(icon, color: color, size: 24),
         ),
         if (label.isNotEmpty)
-          Text(label, style: TextStyle(
-              fontSize: 10,
+          Text(label, style: TextStyle(fontSize: 10,
               fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-              color: isActive ? color
-                  : isDark ? Colors.grey[500]! : Colors.grey[400]!)),
+              color: color)),
       ]),
     );
   }
-}
+} 
