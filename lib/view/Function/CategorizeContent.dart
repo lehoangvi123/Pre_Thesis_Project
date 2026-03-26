@@ -35,6 +35,11 @@ class _CategoriesViewState extends State<CategoriesView> {
   Map<String, double> _spentThis  = {};
   Map<String, double> _spentLast  = {};
 
+  // Insights data
+  Map<int, double> _spentByWeekday = {}; // 1=Mon..7=Sun
+  double _avgDailySpend = 0;
+  int    _daysWithSpend = 0;
+
   static const _defaultExpense = [
     {'name': 'Food',          'icon': 0xe56c, 'color': 0xFFFF6B6B},
     {'name': 'Transport',     'icon': 0xe1d5, 'color': 0xFF4ECDC4},
@@ -52,21 +57,20 @@ class _CategoriesViewState extends State<CategoriesView> {
     {'name': 'Investment', 'icon': 0xe6e1, 'color': 0xFFFFB703},
   ];
 
-  // Icon mapping từ tên string
   IconData _iconFromString(String s) {
     switch (s.toLowerCase()) {
-      case 'restaurant': case 'food':          return Icons.restaurant;
-      case 'directions_bus': case 'transport': return Icons.directions_bus;
-      case 'medical_services':                  return Icons.medical_services;
-      case 'shopping_bag': case 'groceries':    return Icons.shopping_bag;
-      case 'home': case 'rent':                 return Icons.home;
-      case 'card_giftcard': case 'gifts':       return Icons.card_giftcard;
-      case 'savings':                           return Icons.savings;
-      case 'movie': case 'entertainment':       return Icons.movie;
+      case 'restaurant': case 'food':              return Icons.restaurant;
+      case 'directions_bus': case 'transport':     return Icons.directions_bus;
+      case 'medical_services':                      return Icons.medical_services;
+      case 'shopping_bag': case 'groceries':        return Icons.shopping_bag;
+      case 'home': case 'rent':                     return Icons.home;
+      case 'card_giftcard': case 'gifts':           return Icons.card_giftcard;
+      case 'savings':                               return Icons.savings;
+      case 'movie': case 'entertainment':           return Icons.movie;
       case 'account_balance_wallet': case 'salary': return Icons.account_balance_wallet;
-      case 'laptop_mac': case 'freelance':      return Icons.laptop_mac;
-      case 'trending_up': case 'investment':    return Icons.trending_up;
-      default:                                  return Icons.category;
+      case 'laptop_mac': case 'freelance':          return Icons.laptop_mac;
+      case 'trending_up': case 'investment':        return Icons.trending_up;
+      default:                                      return Icons.category;
     }
   }
 
@@ -99,13 +103,13 @@ class _CategoriesViewState extends State<CategoriesView> {
   Future<void> _loadData() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
-    final now   = DateTime.now();
-    final s1    = DateTime(now.year, now.month, 1);
-    final e1    = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
-    final s2    = DateTime(now.year, now.month - 1, 1);
-    final e2    = DateTime(now.year, now.month, 0, 23, 59, 59);
+    final now = DateTime.now();
+    final s1  = DateTime(now.year, now.month, 1);
+    final e1  = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+    final s2  = DateTime(now.year, now.month - 1, 1);
+    final e2  = DateTime(now.year, now.month, 0, 23, 59, 59);
 
-    Future<Map<String, double>> fetch(DateTime s, DateTime e) async {
+    Future<Map<String, double>> fetchCat(DateTime s, DateTime e) async {
       final snap = await _firestore
           .collection('users').doc(uid).collection('transactions')
           .where('date', isGreaterThanOrEqualTo: s)
@@ -123,8 +127,43 @@ class _CategoriesViewState extends State<CategoriesView> {
       return map;
     }
 
-    final [thisM, lastM] = await Future.wait([fetch(s1, e1), fetch(s2, e2)]);
+    // Also load detailed transactions for insights
+    Future<void> fetchInsights() async {
+      final snap = await _firestore
+          .collection('users').doc(uid).collection('transactions')
+          .where('date', isGreaterThanOrEqualTo: s1)
+          .where('date', isLessThanOrEqualTo: e1)
+          .get();
+
+      final weekdayMap = <int, double>{};
+      final daySet     = <String>{};
+      double total     = 0;
+
+      for (final doc in snap.docs) {
+        final d = doc.data();
+        if (d['type'] == 'expense' || d['isIncome'] == false) {
+          final date = (d['date'] as Timestamp?)?.toDate();
+          if (date == null) continue;
+          final amt  = (d['amount'] as num?)?.toDouble().abs() ?? 0;
+          final wd   = date.weekday; // 1=Mon, 7=Sun
+          weekdayMap[wd] = (weekdayMap[wd] ?? 0) + amt;
+          daySet.add('${date.year}-${date.month}-${date.day}');
+          total += amt;
+        }
+      }
+
+      final days = daySet.length;
+      if (mounted) setState(() {
+        _spentByWeekday = weekdayMap;
+        _daysWithSpend  = days;
+        _avgDailySpend  = days > 0 ? total / days : 0;
+      });
+    }
+
+    final [thisM, lastM] = await Future.wait([
+      fetchCat(s1, e1), fetchCat(s2, e2)]);
     if (mounted) setState(() { _spentThis = thisM; _spentLast = lastM; });
+    await fetchInsights();
   }
 
   Future<void> _checkAchievements() async {
@@ -158,13 +197,13 @@ class _CategoriesViewState extends State<CategoriesView> {
 
     String msg; Color color; IconData icon;
     if (pct >= 90) {
-      msg = 'Cảnh báo! Đã chi ${pct.toStringAsFixed(0)}% thu nhập tháng này!';
+      msg = 'Warning! Spent ${pct.toStringAsFixed(0)}% of income this month!';
       color = Colors.red[700]!; icon = Icons.warning_rounded;
-      _saveNotif('🚨 Cảnh báo nghiêm trọng', msg);
+      _saveNotif('🚨 Critical spending alert', msg);
     } else if (pct >= 50) {
-      msg = 'Đã chi hơn 50% thu nhập tháng này!';
+      msg = 'You\'ve spent over 50% of your income this month!';
       color = Colors.orange[700]!; icon = Icons.info_rounded;
-      _saveNotif('⚡ Cảnh báo chi tiêu', msg);
+      _saveNotif('⚡ Spending alert', msg);
     } else return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -222,8 +261,11 @@ class _CategoriesViewState extends State<CategoriesView> {
                   }
                   return SingleChildScrollView(
                     controller: _scrollCtrl,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 16),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                       _buildHeader(isDark),
                       const SizedBox(height: 16),
                       if (_totalIncome > 0) ...[
@@ -250,7 +292,8 @@ class _CategoriesViewState extends State<CategoriesView> {
                         isDark: isDark,
                       ),
                       const SizedBox(height: 20),
-                      _buildRecentHistory(isDark),
+                      // ✅ Spending Insights replaces transaction history
+                      _buildSpendingInsights(isDark),
                       const SizedBox(height: 100),
                     ]),
                   );
@@ -264,16 +307,19 @@ class _CategoriesViewState extends State<CategoriesView> {
   // ── Header ────────────────────────────────────────────
   Widget _buildHeader(bool isDark) {
     return Row(children: [
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
         Text('Categories', style: TextStyle(
             fontSize: 28, fontWeight: FontWeight.bold,
             color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
         const SizedBox(height: 4),
         Text('Manage your categories', style: TextStyle(
-            fontSize: 14, color: isDark ? Colors.grey[400] : Colors.grey[600])),
+            fontSize: 14,
+            color: isDark ? Colors.grey[400] : Colors.grey[600])),
       ])),
       _hBtn(
-        gradient: const LinearGradient(colors: [Color(0xFF00D09E), Color(0xFF00A8AA)]),
+        gradient: const LinearGradient(
+            colors: [Color(0xFF00D09E), Color(0xFF00A8AA)]),
         icon: Icons.emoji_events, iconColor: Colors.amber,
         onTap: () => Navigator.push(context,
             MaterialPageRoute(builder: (_) => const AchievementsView())),
@@ -281,14 +327,14 @@ class _CategoriesViewState extends State<CategoriesView> {
       ),
       const SizedBox(width: 8),
       _hBtn(icon: Icons.swap_horiz_rounded,
-        onTap: () => Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (_) => const TransactionView())),
-        isDark: isDark),
+          onTap: () => Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (_) => const TransactionView())),
+          isDark: isDark),
       const SizedBox(width: 8),
       _hBtn(icon: Icons.notifications_outlined,
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const NotificationView())),
-        isDark: isDark),
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const NotificationView())),
+          isDark: isDark),
     ]);
   }
 
@@ -308,7 +354,8 @@ class _CategoriesViewState extends State<CategoriesView> {
               blurRadius: 8, offset: const Offset(0, 2))],
         ),
         child: Icon(icon,
-            color: iconColor ?? (isDark ? Colors.grey[300] : Colors.grey[700]),
+            color: iconColor
+                ?? (isDark ? Colors.grey[300] : Colors.grey[700]),
             size: 21),
       ),
     );
@@ -321,14 +368,17 @@ class _CategoriesViewState extends State<CategoriesView> {
     final IconData icon;
     final String text;
     if (pct >= 90) {
-      color = Colors.red[600]!; icon = Icons.warning_rounded;
-      text  = 'Vượt ngưỡng nguy hiểm!';
+      color = Colors.red[600]!;
+      icon  = Icons.warning_rounded;
+      text  = 'Critical! Over budget!';
     } else if (pct >= 50) {
-      color = Colors.orange[600]!; icon = Icons.info_rounded;
-      text  = 'Đã chi quá nửa thu nhập';
+      color = Colors.orange[600]!;
+      icon  = Icons.info_rounded;
+      text  = 'Spent over half of income';
     } else {
-      color = Colors.green[600]!; icon = Icons.check_circle_rounded;
-      text  = 'Chi tiêu đang ổn định';
+      color = Colors.green[600]!;
+      icon  = Icons.check_circle_rounded;
+      text  = 'Spending looks good';
     }
 
     return Container(
@@ -372,10 +422,10 @@ class _CategoriesViewState extends State<CategoriesView> {
         ),
         const SizedBox(height: 8),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('Đã chi: ${_fmt(_totalExpense)}đ',
+          Text('Spent: ${_fmt(_totalExpense)}đ',
               style: TextStyle(fontSize: 11,
                   color: isDark ? Colors.grey[400] : Colors.grey[600])),
-          Text('Thu nhập: ${_fmt(_totalIncome)}đ',
+          Text('Income: ${_fmt(_totalIncome)}đ',
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
                   color: isDark ? Colors.grey[300] : Colors.grey[700])),
         ]),
@@ -396,8 +446,8 @@ class _CategoriesViewState extends State<CategoriesView> {
               const SizedBox(width: 8),
               Expanded(child: Text(
                 pct >= 90
-                    ? 'Đã chi ${pct.toStringAsFixed(0)}% thu nhập! Dừng chi tiêu không cần thiết ngay.'
-                    : 'Đã chi hơn 50% thu nhập. Kiểm soát chi tiêu cẩn thận hơn!',
+                    ? 'You\'ve spent ${pct.toStringAsFixed(0)}% of income! Stop unnecessary spending now.'
+                    : 'Over 50% spent. Try to slow down your spending.',
                 style: TextStyle(fontSize: 11, height: 1.4, color: color),
               )),
             ]),
@@ -435,26 +485,30 @@ class _CategoriesViewState extends State<CategoriesView> {
                 color: Color(0xFFFF6B6B), size: 18),
           ),
           const SizedBox(width: 10),
-          Text('Top chi tiêu tháng này', style: TextStyle(
+          Text('Top spending this month', style: TextStyle(
               fontSize: 14, fontWeight: FontWeight.w600,
               color: isDark ? Colors.white : Colors.black87)),
         ]),
         const SizedBox(height: 14),
         ...top3.asMap().entries.map((e) {
-          final color = colors[e.key];
-          final ratio = maxAmt > 0 ? e.value.value / maxAmt : 0.0;
+          final color  = colors[e.key];
+          final ratio  = maxAmt > 0 ? e.value.value / maxAmt : 0.0;
           final pctStr = _totalExpense > 0
-              ? (e.value.value / _totalExpense * 100).toStringAsFixed(0) : '0';
+              ? (e.value.value / _totalExpense * 100).toStringAsFixed(0)
+              : '0';
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 Text('${e.key + 1}.',
                     style: TextStyle(fontSize: 12,
-                        fontWeight: FontWeight.bold, color: Colors.grey[500])),
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[500])),
                 const SizedBox(width: 6),
                 Expanded(child: Text(e.value.key,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w500),
                     overflow: TextOverflow.ellipsis)),
                 Text('${_fmt(e.value.value)}đ',
                     style: TextStyle(fontSize: 13,
@@ -485,7 +539,7 @@ class _CategoriesViewState extends State<CategoriesView> {
     );
   }
 
-  // ── Category section (horizontal scroll) ─────────────
+  // ── Category section ──────────────────────────────────
   Widget _buildSection({
     Key? key,
     required String title,
@@ -493,17 +547,20 @@ class _CategoriesViewState extends State<CategoriesView> {
     required String type,
     required bool isDark,
   }) {
-    final sectionColor = type == 'income' ? Colors.green[600]! : Colors.red[500]!;
+    final sectionColor =
+        type == 'income' ? Colors.green[600]! : Colors.red[500]!;
     final isHighlighted = widget.initialType == type;
 
     return Container(
       key: key,
-      decoration: isHighlighted ? BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: sectionColor.withOpacity(0.5), width: 2)) : null,
+      decoration: isHighlighted
+          ? BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color: sectionColor.withOpacity(0.5), width: 2))
+          : null,
       padding: isHighlighted ? const EdgeInsets.all(12) : EdgeInsets.zero,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Section header
         Row(children: [
           Container(
             padding: const EdgeInsets.all(8),
@@ -511,7 +568,9 @@ class _CategoriesViewState extends State<CategoriesView> {
                 color: sectionColor.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(10)),
             child: Icon(
-              type == 'income' ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+              type == 'income'
+                  ? Icons.arrow_upward_rounded
+                  : Icons.arrow_downward_rounded,
               color: sectionColor, size: 20),
           ),
           const SizedBox(width: 12),
@@ -520,19 +579,15 @@ class _CategoriesViewState extends State<CategoriesView> {
               color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
         ]),
         const SizedBox(height: 14),
-
-        // Hint scroll arrow
         Row(mainAxisAlignment: MainAxisAlignment.end, children: [
           Icon(Icons.swipe_rounded, size: 14, color: Colors.grey[400]),
           const SizedBox(width: 4),
-          Text('Vuốt để xem thêm',
+          Text('Swipe for more',
               style: TextStyle(fontSize: 11, color: Colors.grey[400])),
           const SizedBox(width: 2),
           Icon(Icons.chevron_right_rounded, size: 16, color: Colors.grey[400]),
         ]),
         const SizedBox(height: 8),
-
-        // Horizontal scroll list
         StreamBuilder<QuerySnapshot>(
           stream: _firestore
               .collection('users')
@@ -540,7 +595,6 @@ class _CategoriesViewState extends State<CategoriesView> {
               .collection('categories')
               .snapshots(),
           builder: (ctx, snap) {
-            // Parse custom categories
             final custom = <Map<String, dynamic>>[];
             if (snap.hasData) {
               for (final doc in snap.data!.docs) {
@@ -549,33 +603,31 @@ class _CategoriesViewState extends State<CategoriesView> {
                   if ((d['type'] ?? 'expense') != type) continue;
                   IconData icon = Icons.category;
                   if (d['icon'] is int) {
-                    icon = IconData(d['icon'] as int, fontFamily: 'MaterialIcons');
+                    icon = IconData(d['icon'] as int,
+                        fontFamily: 'MaterialIcons');
                   } else if (d['icon'] is String) {
                     icon = _iconFromString(d['icon'] as String);
                   }
                   int colorVal = 0xFF00CED1;
-                  if (d['color'] is int) colorVal = d['color'] as int;
-                  else if (d['color'] is String) {
+                  if (d['color'] is int)
+                    colorVal = d['color'] as int;
+                  else if (d['color'] is String)
                     colorVal = int.tryParse(d['color']) ?? colorVal;
-                  }
                   custom.add({
-                    'name': d['name'] ?? 'Untitled',
+                    'name':     d['name'] ?? 'Untitled',
                     'iconData': icon,
-                    'color': Color(colorVal),
+                    'color':    Color(colorVal),
                     'isCustom': true,
                   });
                 } catch (_) {}
               }
             }
-
-            // Build default items
             final defaultItems = defaults.map((d) => {
-              'name': d['name'] as String,
+              'name':     d['name'] as String,
               'iconData': _iconFromCode(d['icon'] as int),
-              'color': Color(d['color'] as int),
+              'color':    Color(d['color'] as int),
               'isCustom': false,
             }).toList();
-
             final all = [...defaultItems, ...custom];
 
             return Stack(
@@ -585,18 +637,17 @@ class _CategoriesViewState extends State<CategoriesView> {
                   height: 108,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 2, vertical: 4),
                     itemCount: all.length + 1,
                     separatorBuilder: (_, __) => const SizedBox(width: 14),
                     itemBuilder: (ctx, i) {
-                      if (i == all.length) {
+                      if (i == all.length)
                         return _buildAddBtn(type, isDark, sectionColor);
-                      }
                       return _buildCatCard(all[i], type, isDark);
                     },
                   ),
                 ),
-                // Gradient fade + arrow ở bên phải
                 if (all.length > 3)
                   Positioned(
                     right: 0,
@@ -607,8 +658,13 @@ class _CategoriesViewState extends State<CategoriesView> {
                           begin: Alignment.centerLeft,
                           end: Alignment.centerRight,
                           colors: [
-                            (isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF8F9FA)).withOpacity(0),
-                            (isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF8F9FA)),
+                            (isDark
+                                    ? const Color(0xFF1A1A1A)
+                                    : const Color(0xFFF8F9FA))
+                                .withOpacity(0),
+                            isDark
+                                ? const Color(0xFF1A1A1A)
+                                : const Color(0xFFF8F9FA),
                           ],
                         ),
                       ),
@@ -616,15 +672,16 @@ class _CategoriesViewState extends State<CategoriesView> {
                         child: Container(
                           width: 24, height: 24,
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                            color: isDark
+                                ? const Color(0xFF2C2C2C) : Colors.white,
                             shape: BoxShape.circle,
                             boxShadow: [BoxShadow(
                                 color: Colors.black.withOpacity(0.12),
-                                blurRadius: 6, offset: const Offset(0, 2))],
+                                blurRadius: 6,
+                                offset: const Offset(0, 2))],
                           ),
                           child: Icon(Icons.chevron_right_rounded,
-                              size: 16,
-                              color: sectionColor),
+                              size: 16, color: sectionColor),
                         ),
                       ),
                     ),
@@ -637,16 +694,17 @@ class _CategoriesViewState extends State<CategoriesView> {
     );
   }
 
-  // ── Category card (compact, horizontal) ──────────────
-  Widget _buildCatCard(Map<String, dynamic> cat, String type, bool isDark) {
-    final name     = cat['name'] as String;
-    final icon     = cat['iconData'] as IconData;
-    final color    = cat['color'] as Color;
+  // ── Category card ─────────────────────────────────────
+  Widget _buildCatCard(
+      Map<String, dynamic> cat, String type, bool isDark) {
+    final name  = cat['name'] as String;
+    final icon  = cat['iconData'] as IconData;
+    final color = cat['color'] as Color;
 
-    final spent    = _spentThis[name] ?? 0;
-    final budget   = _totalIncome > 0 ? _totalIncome * 0.15 : 0.0;
-    final ringPct  = budget > 0 ? (spent / budget).clamp(0.0, 1.0) : 0.0;
-    final isOver   = spent > budget && budget > 0 && type == 'expense';
+    final spent   = _spentThis[name] ?? 0;
+    final budget  = _totalIncome > 0 ? _totalIncome * 0.15 : 0.0;
+    final ringPct = budget > 0 ? (spent / budget).clamp(0.0, 1.0) : 0.0;
+    final isOver  = spent > budget && budget > 0 && type == 'expense';
 
     final lastAmt   = _spentLast[name] ?? 0;
     final hasComp   = lastAmt > 0 && spent > 0 && type == 'expense';
@@ -662,92 +720,91 @@ class _CategoriesViewState extends State<CategoriesView> {
           Navigator.push(context, MaterialPageRoute(
               builder: (_) => CategoryDetailView(
                   categoryColor: color,
-                  categoryName: name,
-                  categoryIcon: icon)));
+                  categoryName:  name,
+                  categoryIcon:  icon)));
         }
       },
       onLongPress: () => Navigator.push(context, MaterialPageRoute(
           builder: (_) => CategoryDetailView(
               categoryColor: color,
-              categoryName: name,
-              categoryIcon: icon))),
+              categoryName:  name,
+              categoryIcon:  icon))),
       child: SizedBox(
         width: 80,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Ring + icon + badge
-            Stack(alignment: Alignment.topRight, children: [
-              Stack(alignment: Alignment.center, children: [
-                SizedBox(
-                  width: 58, height: 58,
-                  child: CircularProgressIndicator(
-                    value: type == 'expense' ? ringPct : 0,
-                    strokeWidth: 3,
-                    backgroundColor:
-                        isDark ? Colors.grey[700]! : Colors.grey[200]!,
-                    valueColor: AlwaysStoppedAnimation(
-                        isOver ? Colors.red : color),
-                  ),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Stack(alignment: Alignment.topRight, children: [
+            Stack(alignment: Alignment.center, children: [
+              SizedBox(
+                width: 58, height: 58,
+                child: CircularProgressIndicator(
+                  value: type == 'expense' ? ringPct : 0,
+                  strokeWidth: 3,
+                  backgroundColor:
+                      isDark ? Colors.grey[700]! : Colors.grey[200]!,
+                  valueColor: AlwaysStoppedAnimation(
+                      isOver ? Colors.red : color),
                 ),
-                Container(
-                  width: 46, height: 46,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                        colors: [color.withOpacity(0.85), color],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight),
-                    borderRadius: BorderRadius.circular(13),
-                    boxShadow: [BoxShadow(
-                        color: color.withOpacity(0.3),
-                        blurRadius: 6, offset: const Offset(0, 3))],
-                  ),
-                  child: Icon(icon, size: 20, color: Colors.white),
+              ),
+              Container(
+                width: 46, height: 46,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                      colors: [color.withOpacity(0.85), color],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight),
+                  borderRadius: BorderRadius.circular(13),
+                  boxShadow: [BoxShadow(
+                      color: color.withOpacity(0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3))],
                 ),
-              ]),
-              // Badge vượt ngân sách
-              if (isOver)
-                Container(
-                  width: 16, height: 16,
-                  decoration: const BoxDecoration(
-                      color: Colors.red, shape: BoxShape.circle),
-                  child: const Center(child: Text('!',
-                      style: TextStyle(color: Colors.white,
-                          fontSize: 10, fontWeight: FontWeight.bold))),
-                ),
+                child: Icon(icon, size: 20, color: Colors.white),
+              ),
             ]),
-            const SizedBox(height: 6),
-            // Tên
-            Text(name,
-                style: TextStyle(
-                    fontSize: 11, fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.grey[100] : const Color(0xFF1A1A1A)),
-                textAlign: TextAlign.center,
-                maxLines: 1, overflow: TextOverflow.ellipsis),
-            // Số tiền / so sánh
-            const SizedBox(height: 2),
-            if (hasComp)
-              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Icon(
-                  isUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                  size: 9, color: isUp ? Colors.red : Colors.green),
-                Text('${changePct.abs()}%',
-                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600,
-                        color: isUp ? Colors.red : Colors.green)),
-              ])
-            else if (spent > 0 && type == 'expense')
-              Text('${_fmt(spent)}đ',
+            if (isOver)
+              Container(
+                width: 16, height: 16,
+                decoration: const BoxDecoration(
+                    color: Colors.red, shape: BoxShape.circle),
+                child: const Center(child: Text('!',
+                    style: TextStyle(color: Colors.white,
+                        fontSize: 10, fontWeight: FontWeight.bold))),
+              ),
+          ]),
+          const SizedBox(height: 6),
+          Text(name,
+              style: TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.w600,
+                  color: isDark
+                      ? Colors.grey[100] : const Color(0xFF1A1A1A)),
+              textAlign: TextAlign.center,
+              maxLines: 1, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 2),
+          if (hasComp)
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(
+                isUp
+                    ? Icons.arrow_upward_rounded
+                    : Icons.arrow_downward_rounded,
+                size: 9,
+                color: isUp ? Colors.red : Colors.green),
+              Text('${changePct.abs()}%',
                   style: TextStyle(
-                      fontSize: 9,
-                      color: isOver ? Colors.red : Colors.grey[500]),
-                  textAlign: TextAlign.center),
-          ],
-        ),
+                      fontSize: 9, fontWeight: FontWeight.w600,
+                      color: isUp ? Colors.red : Colors.green)),
+            ])
+          else if (spent > 0 && type == 'expense')
+            Text('${_fmt(spent)}đ',
+                style: TextStyle(
+                    fontSize: 9,
+                    color: isOver ? Colors.red : Colors.grey[500]),
+                textAlign: TextAlign.center),
+        ]),
       ),
     );
   }
 
-  // ── Add button (compact) ──────────────────────────────
+  // ── Add button ────────────────────────────────────────
   Widget _buildAddBtn(String type, bool isDark, Color color) {
     return GestureDetector(
       onTap: () async {
@@ -771,15 +828,16 @@ class _CategoriesViewState extends State<CategoriesView> {
             child: Icon(Icons.add_rounded, size: 26, color: color),
           ),
           const SizedBox(height: 6),
-          Text('Thêm', style: TextStyle(
+          Text('Add', style: TextStyle(
               fontSize: 11, fontWeight: FontWeight.w600, color: color)),
         ]),
       ),
     );
   }
 
-  // ── Quick add expense sheet ───────────────────────────
-  void _showQuickAdd(String category, Color color, IconData icon, bool isDark) {
+  // ── Quick add sheet ───────────────────────────────────
+  void _showQuickAdd(
+      String category, Color color, IconData icon, bool isDark) {
     final amtCtrl  = TextEditingController();
     final noteCtrl = TextEditingController();
 
@@ -789,7 +847,8 @@ class _CategoriesViewState extends State<CategoriesView> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          final amt    = double.tryParse(amtCtrl.text.replaceAll(',', '')) ?? 0;
+          final amt    = double.tryParse(
+              amtCtrl.text.replaceAll(',', '')) ?? 0;
           final isOver = _totalIncome > 0 && amt > _totalIncome * 0.15;
 
           return Container(
@@ -799,18 +858,14 @@ class _CategoriesViewState extends State<CategoriesView> {
             ),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              // Handle
-              Container(
-                width: 40, height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2)),
-              ),
-              // Header
+              Container(width: 40, height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2))),
               Row(children: [
                 Container(
                   width: 48, height: 48,
@@ -824,16 +879,19 @@ class _CategoriesViewState extends State<CategoriesView> {
                 const SizedBox(width: 12),
                 Expanded(child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Thêm Chi tiêu nhanh',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Text('Quick Add Expense',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                         color: color.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(8)),
                     child: Text(category, style: TextStyle(
-                        fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+                        fontSize: 11, color: color,
+                        fontWeight: FontWeight.w600)),
                   ),
                 ])),
                 GestureDetector(
@@ -848,7 +906,6 @@ class _CategoriesViewState extends State<CategoriesView> {
                 ),
               ]),
               const SizedBox(height: 16),
-              // Amount
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -858,13 +915,15 @@ class _CategoriesViewState extends State<CategoriesView> {
                       color: isOver ? Colors.red : color.withOpacity(0.2),
                       width: isOver ? 1.5 : 1),
                 ),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Số tiền',
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Amount',
                       style: TextStyle(fontSize: 12, color: Colors.grey[500])),
                   const SizedBox(height: 6),
                   Row(children: [
                     Text('₫', style: TextStyle(
-                        fontSize: 26, fontWeight: FontWeight.bold, color: color)),
+                        fontSize: 26, fontWeight: FontWeight.bold,
+                        color: color)),
                     const SizedBox(width: 8),
                     Expanded(child: TextField(
                       controller: amtCtrl,
@@ -882,24 +941,26 @@ class _CategoriesViewState extends State<CategoriesView> {
                   if (isOver) ...[
                     const SizedBox(height: 6),
                     Row(children: [
-                      const Icon(Icons.warning_rounded, color: Colors.red, size: 13),
+                      const Icon(Icons.warning_rounded,
+                          color: Colors.red, size: 13),
                       const SizedBox(width: 4),
-                      Text('Vượt 15% thu nhập tháng này!',
-                          style: TextStyle(fontSize: 11, color: Colors.red[600])),
+                      Text('Over 15% of monthly income!',
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.red[600])),
                     ]),
                   ],
                 ]),
               ),
               const SizedBox(height: 12),
-              // Note
               TextField(
                 controller: noteCtrl,
                 style: TextStyle(fontSize: 15,
                     color: isDark ? Colors.white : Colors.black87),
                 decoration: InputDecoration(
-                  hintText: 'Ghi chú (tuỳ chọn)...',
+                  hintText: 'Note (optional)...',
                   hintStyle: TextStyle(color: Colors.grey[400]),
-                  prefixIcon: Icon(Icons.edit_note_rounded, color: Colors.grey[400]),
+                  prefixIcon: Icon(Icons.edit_note_rounded,
+                      color: Colors.grey[400]),
                   filled: true,
                   fillColor: isDark ? Colors.grey[800] : Colors.grey[50],
                   border: OutlineInputBorder(
@@ -910,7 +971,6 @@ class _CategoriesViewState extends State<CategoriesView> {
                 ),
               ),
               const SizedBox(height: 20),
-              // Save
               SizedBox(
                 width: double.infinity, height: 50,
                 child: ElevatedButton(
@@ -930,7 +990,7 @@ class _CategoriesViewState extends State<CategoriesView> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                   ),
-                  child: const Text('Lưu Chi tiêu',
+                  child: const Text('Save Expense',
                       style: TextStyle(color: Colors.white,
                           fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
@@ -966,165 +1026,196 @@ class _CategoriesViewState extends State<CategoriesView> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Đã thêm ${_fmt(amount)}đ vào $category'),
+          content: Text('Added ${_fmt(amount)}đ to $category'),
           backgroundColor: Colors.red[500],
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
           margin: const EdgeInsets.all(12),
         ));
       }
     } catch (e) { debugPrint('Error: $e'); }
   }
 
-  // ── Lịch sử chi tiêu gần đây ────────────────────────
-  Widget _buildRecentHistory(bool isDark) {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return const SizedBox.shrink();
+  // ══════════════════════════════════════════════════════
+  // ✅ SPENDING INSIGHTS — replaces transaction history
+  // ══════════════════════════════════════════════════════
+  Widget _buildSpendingInsights(bool isDark) {
+    if (_spentThis.isEmpty) return const SizedBox.shrink();
+
+    const teal   = Color(0xFF00CED1);
+    const purple = Color(0xFF8B5CF6);
+
+    // ── Build insight cards ──────────────────────────
+    final insights = <_InsightItem>[];
+
+    // 1. Biggest category
+    if (_spentThis.isNotEmpty) {
+      final top = _spentThis.entries.reduce(
+          (a, b) => a.value > b.value ? a : b);
+      insights.add(_InsightItem(
+        icon: '💸',
+        color: const Color(0xFFFF6B6B),
+        title: 'You spend the most on ${top.key}',
+        desc: '${_fmt(top.value)}đ this month'
+            '${_totalExpense > 0 ? ' — ${(top.value / _totalExpense * 100).toStringAsFixed(0)}% of all expenses' : ''}',
+      ));
+    }
+
+    // 2. vs last month top category
+    if (_spentLast.isNotEmpty) {
+      final topThis = _spentThis.entries.reduce(
+          (a, b) => a.value > b.value ? a : b);
+      final topLast = _spentLast.entries.reduce(
+          (a, b) => a.value > b.value ? a : b);
+      if (topThis.key == topLast.key) {
+        final diff = topThis.value - topLast.value;
+        final pct  = topLast.value > 0
+            ? (diff / topLast.value * 100).abs().toStringAsFixed(0) : '0';
+        insights.add(_InsightItem(
+          icon: diff > 0 ? '📈' : '📉',
+          color: diff > 0 ? Colors.red[500]! : Colors.green[600]!,
+          title: diff > 0
+              ? '${topThis.key} spending increased by $pct%'
+              : '${topThis.key} spending decreased by $pct%',
+          desc: diff > 0
+              ? 'Try to cut back on ${topThis.key} next month.'
+              : 'Great job reducing ${topThis.key} spending!',
+        ));
+      }
+    }
+
+    // 3. Average daily spend
+    if (_avgDailySpend > 0) {
+      final perDay = _avgDailySpend;
+      insights.add(_InsightItem(
+        icon: '📅',
+        color: teal,
+        title: 'Average daily spending: ${_fmt(perDay)}đ',
+        desc: 'Based on $_daysWithSpend days with transactions this month.',
+      ));
+    }
+
+    // 4. Busiest weekday
+    if (_spentByWeekday.isNotEmpty) {
+      final busiest = _spentByWeekday.entries.reduce(
+          (a, b) => a.value > b.value ? a : b);
+      const days = ['', 'Monday', 'Tuesday', 'Wednesday',
+        'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      final dayName = days[busiest.key];
+      final quietest = _spentByWeekday.entries.reduce(
+          (a, b) => a.value < b.value ? a : b);
+      final quietName = days[quietest.key];
+      insights.add(_InsightItem(
+        icon: '🗓️',
+        color: purple,
+        title: '$dayName is your biggest spending day',
+        desc: '${_fmt(busiest.value)}đ spent on ${dayName}s. '
+              '$quietName is your most frugal day.',
+      ));
+    }
+
+    // 5. Category comparison vs last month
+    if (_spentLast.isNotEmpty) {
+      int improvedCount = 0;
+      for (final cat in _spentThis.keys) {
+        final thisAmt = _spentThis[cat] ?? 0;
+        final lastAmt = _spentLast[cat] ?? 0;
+        if (lastAmt > 0 && thisAmt < lastAmt) improvedCount++;
+      }
+      if (improvedCount > 0) {
+        insights.add(_InsightItem(
+          icon: '🏆',
+          color: Colors.green[600]!,
+          title: '$improvedCount ${improvedCount == 1 ? 'category' : 'categories'} improved vs last month',
+          desc: 'You spent less in $improvedCount spending ${improvedCount == 1 ? 'area' : 'areas'} compared to last month. Keep it up!',
+        ));
+      }
+    }
+
+    // 6. Saving rate insight
+    if (_totalIncome > 0 && _totalExpense > 0) {
+      final saved    = _totalIncome - _totalExpense;
+      final saveRate = (saved / _totalIncome * 100);
+      if (saved > 0) {
+        insights.add(_InsightItem(
+          icon: '💰',
+          color: Colors.green[600]!,
+          title: 'You\'ve saved ${_fmt(saved)}đ this month',
+          desc: 'Saving rate: ${saveRate.toStringAsFixed(1)}%.'
+                '${saveRate >= 20 ? ' Excellent! You\'re on track.' : ' Try to reach 20% for a healthy budget.'}',
+        ));
+      } else {
+        insights.add(_InsightItem(
+          icon: '⚠️',
+          color: Colors.red[500]!,
+          title: 'Spending exceeds income by ${_fmt(saved.abs())}đ',
+          desc: 'You\'re overspending this month. Review your biggest categories to cut back.',
+        ));
+      }
+    }
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // Header
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Row(children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-                color: const Color(0xFF00CED1).withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10)),
-            child: const Icon(Icons.history_rounded,
-                color: Color(0xFF00CED1), size: 20),
-          ),
-          const SizedBox(width: 12),
-          Text('Lịch sử chi tiêu', style: TextStyle(
-              fontSize: 18, fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
-        ]),
-        GestureDetector(
-          onTap: () => Navigator.pushReplacement(context,
-              MaterialPageRoute(builder: (_) => const TransactionView())),
-          child: const Text('Xem tất cả',
-              style: TextStyle(fontSize: 13,
-                  color: Color(0xFF00CED1), fontWeight: FontWeight.w500)),
+      // Section header
+      Row(children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+              color: teal.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10)),
+          child: const Icon(Icons.lightbulb_outline_rounded,
+              color: teal, size: 20),
         ),
+        const SizedBox(width: 12),
+        Text('Spending Insights', style: TextStyle(
+            fontSize: 18, fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
       ]),
-      const SizedBox(height: 14),
+      const SizedBox(height: 12),
 
-      StreamBuilder<QuerySnapshot>(
-        stream: _firestore
-            .collection('users').doc(uid).collection('transactions')
-            .orderBy('date', descending: true)
-            .limit(10)
-            .snapshots(),
-        builder: (ctx, snap) {
-          if (!snap.hasData || snap.data!.docs.isEmpty) {
-            return Container(
-              padding: const EdgeInsets.all(24),
+      // Insight cards
+      ...insights.map((item) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: item.color.withOpacity(0.2), width: 1),
+            boxShadow: [BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.15 : 0.04),
+                blurRadius: 8, offset: const Offset(0, 2))],
+          ),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // Emoji icon
+            Container(
+              width: 40, height: 40,
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Center(child: Column(children: [
-                Icon(Icons.inbox_outlined, size: 40, color: Colors.grey[400]),
-                const SizedBox(height: 8),
-                Text('Chưa có giao dịch nào',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[500])),
-              ])),
-            );
-          }
-
-          final docs = snap.data!.docs;
-
-          return Container(
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),
-                  blurRadius: 10, offset: const Offset(0, 3))],
+                  color: item.color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10)),
+              child: Center(child: Text(item.icon,
+                  style: const TextStyle(fontSize: 20))),
             ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: docs.length,
-              separatorBuilder: (_, __) => Divider(
-                  height: 1, thickness: 0.5,
-                  color: isDark ? Colors.grey[700] : Colors.grey[100]),
-              itemBuilder: (ctx, i) {
-                final d       = docs[i].data() as Map<String, dynamic>;
-                final isIncome = d['type'] == 'income' || d['isIncome'] == true;
-                final amount  = (d['amount'] as num?)?.toDouble().abs() ?? 0;
-                final title   = (d['title'] ?? d['note'] ?? d['category'] ?? 'Giao dịch').toString();
-                final cat     = (d['category'] ?? d['categoryName'] ?? 'Khác').toString();
-                final date    = (d['date'] as Timestamp?)?.toDate() ?? DateTime.now();
-                final color   = isIncome ? Colors.green[600]! : Colors.red[500]!;
-                final bgColor = isIncome
-                    ? Colors.green.withOpacity(0.08)
-                    : Colors.red.withOpacity(0.08);
-
-                // Format date
-                final now   = DateTime.now();
-                String dateStr;
-                if (date.year == now.year && date.month == now.month && date.day == now.day) {
-                  dateStr = 'Hôm nay • ${date.hour.toString().padLeft(2,'0')}:${date.minute.toString().padLeft(2,'0')}';
-                } else if (date.year == now.year && date.month == now.month && date.day == now.day - 1) {
-                  dateStr = 'Hôm qua • ${date.hour.toString().padLeft(2,'0')}:${date.minute.toString().padLeft(2,'0')}';
-                } else {
-                  dateStr = '${date.day}/${date.month} • ${date.hour.toString().padLeft(2,'0')}:${date.minute.toString().padLeft(2,'0')}';
-                }
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(children: [
-                    // Icon
-                    Container(
-                      width: 42, height: 42,
-                      decoration: BoxDecoration(
-                          color: bgColor, shape: BoxShape.circle),
-                      child: Icon(
-                        isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                        color: color, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    // Info
-                    Expanded(child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(title,
-                          style: TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white : Colors.black87),
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 3),
-                      Row(children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                              color: color.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6)),
-                          child: Text(cat, style: TextStyle(
-                              fontSize: 10, color: color, fontWeight: FontWeight.w500)),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(dateStr, style: TextStyle(
-                            fontSize: 11, color: Colors.grey[500])),
-                      ]),
-                    ])),
-                    // Amount
-                    Text(
-                      '${isIncome ? '+' : '-'}${_fmt(amount)}đ',
-                      style: TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.bold,
-                          color: color)),
-                  ]),
-                );
-              },
-            ),
-          );
-        },
-      ),
+            const SizedBox(width: 12),
+            Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(item.title, style: TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : Colors.black87)),
+              const SizedBox(height: 4),
+              Text(item.desc, style: TextStyle(
+                  fontSize: 12, height: 1.5,
+                  color: isDark ? Colors.grey[400] : Colors.grey[600])),
+            ])),
+          ]),
+        ),
+      )).toList(),
     ]);
   }
 
-  // ── Bottom nav ────────────────────────────────────────────
+  // ── Bottom nav ────────────────────────────────────────
   Widget _buildBottomNav() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
@@ -1137,7 +1228,8 @@ class _CategoriesViewState extends State<CategoriesView> {
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+          child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
             _navItem(Icons.home_rounded, false, label: 'Home',
                 onTap: () => Navigator.pushReplacement(context,
                     MaterialPageRoute(builder: (_) => const HomeView()))),
@@ -1145,7 +1237,8 @@ class _CategoriesViewState extends State<CategoriesView> {
                 onTap: () => Navigator.pushReplacement(context,
                     MaterialPageRoute(builder: (_) => const AnalysisView()))),
             _voiceItem(),
-            _navItem(Icons.layers_rounded, true, label: 'Category', onTap: () {}),
+            _navItem(Icons.layers_rounded, true,
+                label: 'Category', onTap: () {}),
             _navItem(Icons.person_outline_rounded, false, label: 'Profile',
                 onTap: () => Navigator.pushReplacement(context,
                     MaterialPageRoute(builder: (_) => const ProfileView()))),
@@ -1155,34 +1248,32 @@ class _CategoriesViewState extends State<CategoriesView> {
     );
   }
 
-  Widget _voiceItem() {
-    return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/test-voice'),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          width: 52, height: 52,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-                colors: [Color(0xFF00CED1), Color(0xFF8B5CF6)]),
-            shape: BoxShape.circle,
-            boxShadow: [BoxShadow(
-                color: const Color(0xFF00CED1).withOpacity(0.45),
-                blurRadius: 12, offset: const Offset(0, 4))],
-          ),
-          child: const Icon(Icons.mic_rounded, color: Colors.white, size: 26),
+  Widget _voiceItem() => GestureDetector(
+    onTap: () => Navigator.pushNamed(context, '/test-voice'),
+    child: Column(mainAxisSize: MainAxisSize.min, children: [
+      Container(
+        width: 52, height: 52,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+              colors: [Color(0xFF00CED1), Color(0xFF8B5CF6)]),
+          shape: BoxShape.circle,
+          boxShadow: [BoxShadow(
+              color: const Color(0xFF00CED1).withOpacity(0.45),
+              blurRadius: 12, offset: const Offset(0, 4))],
         ),
-        const SizedBox(height: 4),
-        const Text('Voice', style: TextStyle(fontSize: 10,
-            fontWeight: FontWeight.w600, color: Color(0xFF00CED1))),
-      ]),
-    );
-  }
+        child: const Icon(Icons.mic_rounded, color: Colors.white, size: 26),
+      ),
+      const SizedBox(height: 4),
+      const Text('Voice', style: TextStyle(fontSize: 10,
+          fontWeight: FontWeight.w600, color: Color(0xFF00CED1))),
+    ]),
+  );
 
   Widget _navItem(IconData icon, bool isActive,
       {VoidCallback? onTap, String label = ''}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    const teal   = Color(0xFF00CED1);
-    final color  = isActive ? teal
+    const teal  = Color(0xFF00CED1);
+    final color = isActive ? teal
         : (isDark ? Colors.grey[500]! : Colors.grey[400]!);
     return GestureDetector(
       onTap: onTap,
@@ -1202,4 +1293,16 @@ class _CategoriesViewState extends State<CategoriesView> {
       ]),
     );
   }
-} 
+}
+
+// ── Data class ────────────────────────────────────────
+class _InsightItem {
+  final String icon;
+  final Color  color;
+  final String title;
+  final String desc;
+  const _InsightItem({
+    required this.icon, required this.color,
+    required this.title, required this.desc,
+  });
+}
