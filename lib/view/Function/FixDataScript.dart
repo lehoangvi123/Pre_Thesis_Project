@@ -27,7 +27,7 @@ class _FixDataScreenState extends State<FixDataScreen> {
       details = '';
     });
 
-    try {
+    try { 
       String? userId = _auth.currentUser?.uid;
       if (userId == null) {
         setState(() {
