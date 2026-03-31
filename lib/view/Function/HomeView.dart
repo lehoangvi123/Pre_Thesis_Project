@@ -365,25 +365,11 @@ class _HomeViewState extends State<HomeView> {
   // ── Mini Calendar widget ─────────────────────────────
   Widget _buildMiniCalendar(bool isDark) {
     final now          = DateTime.now();
-    final year         = now.year;
-    final month        = now.month;
-    final today        = now.day;
-    final firstWeekday = DateTime(year, month, 1).weekday % 7;
-    final daysInMonth  = DateTime(year, month + 1, 0).day;
-
+    final firstWeekday = DateTime(now.year, now.month, 1).weekday % 7;
+    final daysInMonth  = DateTime(now.year, now.month + 1, 0).day;
     const months   = ['','Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5',
       'Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
     const weekdays = ['CN','T2','T3','T4','T5','T6','T7'];
-
-    // Max expense for heatmap intensity
-    final maxSpend = _dailySpend.values.isEmpty
-        ? 1.0 : _dailySpend.values.reduce((a, b) => a > b ? a : b);
-
-    String fmtShort(double v) {
-      if (v >= 1000000) return '${(v/1000000).toStringAsFixed(1)}M';
-      if (v >= 1000)    return '${(v/1000).round()}k';
-      return '${v.round()}';
-    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -401,40 +387,27 @@ class _HomeViewState extends State<HomeView> {
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Row(children: [
             Container(
-              padding: const EdgeInsets.all(7),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                   color: const Color(0xFF00CED1).withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(8)),
               child: const Icon(Icons.calendar_month_rounded,
-                  color: Color(0xFF00CED1), size: 18),
+                  color: Color(0xFF00CED1), size: 16),
             ),
-            const SizedBox(width: 10),
-            Text('${months[month]} $year',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600,
+            const SizedBox(width: 8),
+            Text('${months[now.month]} ${now.year}',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
                     color: isDark ? Colors.white : Colors.black87)),
           ]),
           GestureDetector(
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const CalendarView())),
             child: const Text('Xem chi tiết',
-                style: TextStyle(fontSize: 12,
+                style: TextStyle(fontSize: 11,
                     color: Color(0xFF00CED1), fontWeight: FontWeight.w500)),
           ),
         ]),
-        const SizedBox(height: 12),
-
-        // Legend row
-        if (_dailySpend.isNotEmpty || _dailyIncome.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(children: [
-              _legendDot(Colors.red[400]!, 'Chi tiêu'),
-              const SizedBox(width: 12),
-              _legendDot(Colors.green[500]!, 'Thu nhập'),
-              const SizedBox(width: 12),
-              _legendDot(const Color(0xFF00CED1), 'Hôm nay'),
-            ]),
-          ),
+        const SizedBox(height: 10),
 
         // Weekday headers
         Row(children: weekdays.map((d) => Expanded(
@@ -442,271 +415,79 @@ class _HomeViewState extends State<HomeView> {
               style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
                   color: d == 'CN' ? Colors.red[400] : Colors.grey[500]))),
         )).toList()),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
 
-        // Days grid
+        // Days grid — static, no data, no tap
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 7,
-            mainAxisSpacing: 2,
-            crossAxisSpacing: 2,
-            childAspectRatio: 0.62,
+            childAspectRatio: 1.2,
           ),
           itemCount: firstWeekday + daysInMonth,
           itemBuilder: (ctx, i) {
             if (i < firstWeekday) return const SizedBox.shrink();
-            final day      = i - firstWeekday + 1;
-            final isToday  = day == today;
-            final isSun    = (i % 7) == 0;
-            final isFuture = day > today;
-            final spent    = _dailySpend[day]  ?? 0;
-            final income   = _dailyIncome[day] ?? 0;
-            final hasSpent = spent  > 0 && !isFuture;
-            final hasInc   = income > 0 && !isFuture;
-
-            // Heatmap: opacity 0.15 → 0.70 based on spend intensity
-            final intensity = hasSpent && maxSpend > 0
-                ? (spent / maxSpend).clamp(0.15, 0.70) : 0.0;
-
-            return GestureDetector(
-              onTap: () {
-                final txs = _dailyTxs[day] ?? [];
-                if (txs.isEmpty && !isToday) return;
-                _showDaySheet(day, month, year, txs, isDark);
-              },
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Day circle with heatmap color
-                  Container(
-                    width: 28, height: 28,
-                    decoration: BoxDecoration(
-                      color: isToday
-                          ? const Color(0xFF00CED1)
-                          : hasSpent
-                              ? Colors.red.withOpacity(intensity)
-                              : Colors.transparent,
-                      shape: BoxShape.circle,
-                      border: hasInc && !isToday && !hasSpent
-                          ? Border.all(color: Colors.green[400]!, width: 1.5)
-                          : hasInc && hasSpent && !isToday
-                              ? Border.all(color: Colors.green[400]!, width: 1.5)
-                              : null,
-                    ),
-                    child: Center(child: Text('$day',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: isToday || hasSpent || hasInc
-                              ? FontWeight.bold : FontWeight.normal,
-                          color: isToday
-                              ? Colors.white
-                              : isFuture
-                                  ? (isDark ? Colors.grey[600] : Colors.grey[300])
-                                  : isSun
-                                      ? Colors.red[400]
-                                      : (isDark ? Colors.grey[200] : Colors.grey[800]),
-                        ))),
-                  ),
-                  const SizedBox(height: 2),
-                  // Amount label or dots
-                  if (hasSpent || hasInc)
-                    Column(children: [
-                      if (hasSpent)
-                        Text(fmtShort(spent),
-                            style: TextStyle(
-                                fontSize: 7, fontWeight: FontWeight.w700,
-                                color: isToday
-                                    ? const Color(0xFF00CED1)
-                                    : Colors.red[400]),
-                            textAlign: TextAlign.center),
-                      if (hasInc)
-                        Text('+${fmtShort(income)}',
-                            style: TextStyle(
-                                fontSize: 7, fontWeight: FontWeight.w700,
-                                color: Colors.green[500]),
-                            textAlign: TextAlign.center),
-                    ])
-                  else
-                    const SizedBox(height: 14),
-                ],
+            final day     = i - firstWeekday + 1;
+            final isToday = day == now.day;
+            final isSun   = (i % 7) == 0;
+            return Center(
+              child: Container(
+                width: 28, height: 28,
+                decoration: BoxDecoration(
+                  color: isToday ? const Color(0xFF00CED1) : Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(child: Text('$day',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                        color: isToday
+                            ? Colors.white
+                            : isSun
+                                ? Colors.red[400]
+                                : (isDark ? Colors.grey[300] : Colors.grey[700])))),
               ),
             );
           },
         ),
+
+        // ── CTA banner ───────────────────────────────
+        const SizedBox(height: 12),
+        GestureDetector(
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const CalendarView())),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                  colors: [Color(0xFF00CED1), Color(0xFF0097A7)],
+                  begin: Alignment.centerLeft, end: Alignment.centerRight),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(children: [
+              const Icon(Icons.touch_app_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              const Expanded(child: Text(
+                '📊 Xem thu chi theo từng ngày chi tiết hơn',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                    color: Colors.white),
+              )),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(20)),
+                child: const Text('Mở ngay',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
+                        color: Colors.white)),
+              ),
+            ]),
+          ),
+        ),
       ]),
     );
   }
-
-  Widget _legendDot(Color color, String label) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(width: 8, height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-      const SizedBox(width: 4),
-      Text(label, style: TextStyle(fontSize: 9, color: Colors.grey[500])),
-    ],
-  );
-
-  // ── Day transaction sheet ─────────────────────────────
-  void _showDaySheet(int day, int month, int year,
-      List<Map<String, dynamic>> txs, bool isDark) {
-    const months = ['','Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5',
-      'Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
-
-    double totalExp = 0, totalInc = 0;
-    for (final t in txs) {
-      final isInc = t['type'] == 'income' || t['isIncome'] == true;
-      final amt   = (t['amount'] as num?)?.toDouble().abs() ?? 0;
-      if (isInc) totalInc += amt; else totalExp += amt;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(children: [
-          // Handle
-          Container(width: 40, height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2))),
-
-          // Header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-            child: Row(children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                    color: const Color(0xFF00CED1).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12)),
-                child: Text('$day', style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold,
-                    color: Color(0xFF00CED1))),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('$day ${months[month]} $year',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black87)),
-                if (txs.isNotEmpty) Text('${txs.length} giao dịch',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[500])),
-              ])),
-            ]),
-          ),
-
-          // Summary row
-          if (txs.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF3A3A3A) : Colors.grey[50],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-                _daySummaryItem('Chi tiêu', totalExp, Colors.red[500]!),
-                Container(width: 1, height: 32, color: Colors.grey[300]),
-                _daySummaryItem('Thu nhập', totalInc, Colors.green[600]!),
-                Container(width: 1, height: 32, color: Colors.grey[300]),
-                _daySummaryItem('Còn lại', totalInc - totalExp,
-                    totalInc >= totalExp ? Colors.green[600]! : Colors.red[500]!),
-              ]),
-            ),
-
-          // Transaction list
-          Expanded(
-            child: txs.isEmpty
-                ? Center(child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Icon(Icons.inbox_outlined, size: 40, color: Colors.grey[400]),
-                  const SizedBox(height: 8),
-                  Text('Không có giao dịch',
-                      style: TextStyle(color: Colors.grey[500])),
-                ]))
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                    itemCount: txs.length,
-                    separatorBuilder: (_, __) => Divider(height: 1,
-                        color: isDark ? Colors.grey[700] : Colors.grey[100]),
-                    itemBuilder: (ctx, i) {
-                      final t     = txs[i];
-                      final isInc = t['type'] == 'income' || t['isIncome'] == true;
-                      final amt   = (t['amount'] as num?)?.toDouble().abs() ?? 0;
-                      final title = (t['title'] ?? t['note'] ?? t['category'] ?? 'Giao dịch').toString();
-                      final cat   = (t['category'] ?? 'Khác').toString();
-                      final date  = (t['date'] as Timestamp?)?.toDate() ?? DateTime.now();
-                      final color = isInc ? Colors.green[600]! : Colors.red[500]!;
-                      final timeStr = '${date.hour.toString().padLeft(2,'0')}:${date.minute.toString().padLeft(2,'0')}';
-
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Row(children: [
-                          Container(width: 38, height: 38,
-                            decoration: BoxDecoration(
-                                color: color.withOpacity(0.1),
-                                shape: BoxShape.circle),
-                            child: Icon(isInc
-                                ? Icons.arrow_downward_rounded
-                                : Icons.arrow_upward_rounded,
-                                color: color, size: 18)),
-                          const SizedBox(width: 10),
-                          Expanded(child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                            Text(title, style: TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w600,
-                                color: isDark ? Colors.white : Colors.black87),
-                                maxLines: 1, overflow: TextOverflow.ellipsis),
-                            const SizedBox(height: 3),
-                            Row(children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                    color: color.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(6)),
-                                child: Text(cat, style: TextStyle(
-                                    fontSize: 10, color: color,
-                                    fontWeight: FontWeight.w500)),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(timeStr, style: TextStyle(
-                                  fontSize: 10, color: Colors.grey[500])),
-                            ]),
-                          ])),
-                          Text('${isInc ? '+' : '-'}${_fmt(amt)}đ',
-                              style: TextStyle(fontSize: 13,
-                                  fontWeight: FontWeight.bold, color: color)),
-                        ]),
-                      );
-                    },
-                  ),
-          ),
-        ]),
-      ),
-    );
-  }
-
-  Widget _daySummaryItem(String label, double amount, Color color) =>
-      Column(children: [
-        Text(_fmt(amount.abs()) + 'đ',
-            style: TextStyle(fontSize: 13,
-                fontWeight: FontWeight.bold, color: color)),
-        const SizedBox(height: 2),
-        Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[500])),
-      ]);
 
   Widget _hIcon(IconData icon, bool isDark, {required VoidCallback onTap}) =>
       GestureDetector(
@@ -2024,18 +1805,29 @@ class _HomeViewState extends State<HomeView> {
       Expanded(child: GestureDetector(
         onTap: () => _showAddSheet(isIncome: true, isDark: isDark),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 13),
+          padding: const EdgeInsets.symmetric(vertical: 15),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1A3A2A) : const Color(0xFFE8F5E9),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.green[400]!.withOpacity(0.5)),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2DC653), Color(0xFF00A86B)],
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(
+                color: const Color(0xFF2DC653).withOpacity(0.45),
+                blurRadius: 12, offset: const Offset(0, 5))],
           ),
           child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.trending_up_rounded, color: Colors.green[600], size: 18),
+            Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.25),
+                  shape: BoxShape.circle),
+              child: const Icon(Icons.add_rounded, color: Colors.white, size: 16),
+            ),
             const SizedBox(width: 8),
-            Text('Thu nhập', style: TextStyle(
-                fontSize: 14, fontWeight: FontWeight.w600,
-                color: Colors.green[700])),
+            const Text('Thu nhập', style: TextStyle(
+                fontSize: 15, fontWeight: FontWeight.bold,
+                color: Colors.white, letterSpacing: 0.3)),
           ]),
         ),
       )),
@@ -2043,17 +1835,29 @@ class _HomeViewState extends State<HomeView> {
       Expanded(child: GestureDetector(
         onTap: () => _showAddSheet(isIncome: false, isDark: isDark),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 13),
+          padding: const EdgeInsets.symmetric(vertical: 15),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF3A1A1A) : const Color(0xFFFFEBEE),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.red[400]!.withOpacity(0.5)),
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFF5252), Color(0xFFE53935)],
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(
+                color: const Color(0xFFFF5252).withOpacity(0.45),
+                blurRadius: 12, offset: const Offset(0, 5))],
           ),
           child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.trending_down_rounded, color: Colors.red[600], size: 18),
+            Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.25),
+                  shape: BoxShape.circle),
+              child: const Icon(Icons.remove_rounded, color: Colors.white, size: 16),
+            ),
             const SizedBox(width: 8),
-            Text('Chi tiêu', style: TextStyle(
-                fontSize: 14, fontWeight: FontWeight.w600, color: Colors.red[700])),
+            const Text('Chi tiêu', style: TextStyle(
+                fontSize: 15, fontWeight: FontWeight.bold,
+                color: Colors.white, letterSpacing: 0.3)),
           ]),
         ),
       )),
@@ -2066,11 +1870,13 @@ class _HomeViewState extends State<HomeView> {
     String selCat  = isIncome ? 'Lương' : 'Ăn uống';
 
     final expCats = [
-      {'icon': '🍜', 'name': 'Ăn uống'}, {'icon': '🚗', 'name': 'Di chuyển'},
-      {'icon': '🏠', 'name': 'Nhà ở'},   {'icon': '💊', 'name': 'Sức khoẻ'},
-      {'icon': '🛍️', 'name': 'Mua sắm'}, {'icon': '🎬', 'name': 'Giải trí'},
-      {'icon': '💡', 'name': 'Hóa đơn'}, {'icon': '📚', 'name': 'Giáo dục'},
-      {'icon': '📦', 'name': 'Khác'},
+      {'icon': '🍜', 'name': 'Ăn uống'},          {'icon': '🚗', 'name': 'Di chuyển'},
+      {'icon': '🏠', 'name': 'Nhà ở'},             {'icon': '💊', 'name': 'Sức khoẻ'},
+      {'icon': '🛍️', 'name': 'Mua sắm cá nhân'},  {'icon': '🎬', 'name': 'Giải trí & xã hội'},
+      {'icon': '💡', 'name': 'Hóa đơn tiện ích'},  {'icon': '📚', 'name': 'Giáo dục'},
+      {'icon': '💰', 'name': 'Tiết kiệm'},          {'icon': '📈', 'name': 'Đầu tư & học tập'},
+      {'icon': '🛡️', 'name': 'Quỹ dự phòng'},      {'icon': '👨‍👩‍👧', 'name': 'Chi phí gia đình'},
+      {'icon': '👶', 'name': 'Chi phí con cái'},    {'icon': '📦', 'name': 'Khác'},
     ];
     final incCats = [
       {'icon': '💼', 'name': 'Lương'},    {'icon': '🎁', 'name': 'Thưởng'},

@@ -57,20 +57,31 @@ class _CategoriesViewState extends State<CategoriesView>
   static const _purple = Color(0xFF8B5CF6);
 
   static const _defaultExpense = [
-    {'name': 'Food',          'icon': 0xe56c, 'color': 0xFFFF6B6B},
-    {'name': 'Transport',     'icon': 0xe1d5, 'color': 0xFF4ECDC4},
-    {'name': 'Medicine',      'icon': 0xf3f5, 'color': 0xFFFF8B94},
-    {'name': 'Groceries',     'icon': 0xf1cc, 'color': 0xFFFFBE0B},
-    {'name': 'Rent',          'icon': 0xe318, 'color': 0xFF8B5CF6},
-    {'name': 'Gifts',         'icon': 0xe1f0, 'color': 0xFFFF6FC8},
-    {'name': 'Savings',       'icon': 0xe586, 'color': 0xFF06D6A0},
-    {'name': 'Entertainment', 'icon': 0xe417, 'color': 0xFF118AB2},
+    {'name': 'Ăn uống',         'icon': 0xe56c, 'color': 0xFFFF6B6B},
+    {'name': 'Di chuyển',       'icon': 0xe1d5, 'color': 0xFF4ECDC4},
+    {'name': 'Sức khoẻ',        'icon': 0xf3f5, 'color': 0xFFFF8B94},
+    {'name': 'Mua sắm',         'icon': 0xf1cc, 'color': 0xFFFFBE0B},
+    {'name': 'Nhà ở',           'icon': 0xe318, 'color': 0xFF8B5CF6},
+    {'name': 'Giải trí & xã hội','icon': 0xe417, 'color': 0xFF118AB2},
+    {'name': 'Tiết kiệm',       'icon': 0xe586, 'color': 0xFF06D6A0},
+    {'name': 'Hóa đơn tiện ích','icon': 0xe1d0, 'color': 0xFFFF9800},
+    {'name': 'Giáo dục',        'icon': 0xe80c, 'color': 0xFF5C6BC0},
+    {'name': 'Đầu tư & học tập','icon': 0xe6e1, 'color': 0xFF26C6DA},
+    {'name': 'Quỹ dự phòng',    'icon': 0xe8e1, 'color': 0xFFEC407A},
+    {'name': 'Mua sắm cá nhân', 'icon': 0xe8cc, 'color': 0xFFFFBE0B},
+    {'name': 'Chi phí gia đình','icon': 0xe88a, 'color': 0xFF42A5F5},
+    {'name': 'Chi phí con cái', 'icon': 0xe80e, 'color': 0xFFAB47BC},
+    {'name': 'Khác',            'icon': 0xe574, 'color': 0xFF90A4AE},
   ];
 
   static const _defaultIncome = [
-    {'name': 'Salary',     'icon': 0xe84f, 'color': 0xFF2DC653},
+    {'name': 'Lương',      'icon': 0xe84f, 'color': 0xFF2DC653},
     {'name': 'Freelance',  'icon': 0xe331, 'color': 0xFF00B4D8},
-    {'name': 'Investment', 'icon': 0xe6e1, 'color': 0xFFFFB703},
+    {'name': 'Đầu tư',     'icon': 0xe6e1, 'color': 0xFFFFB703},
+    {'name': 'Thưởng',     'icon': 0xe1f0, 'color': 0xFFFF6FC8},
+    {'name': 'Kinh doanh', 'icon': 0xe8a1, 'color': 0xFFFF9800},
+    {'name': 'Cho thuê',   'icon': 0xe318, 'color': 0xFF8B5CF6},
+    {'name': 'Khác',       'icon': 0xe574, 'color': 0xFF90A4AE},
   ];
 
   @override
@@ -139,6 +150,7 @@ class _CategoriesViewState extends State<CategoriesView>
 
   IconData _iconFromString(String s) {
     switch (s.toLowerCase()) {
+      // English names
       case 'restaurant': case 'food':              return Icons.restaurant;
       case 'directions_bus': case 'transport':     return Icons.directions_bus;
       case 'medical_services':                      return Icons.medical_services;
@@ -150,6 +162,24 @@ class _CategoriesViewState extends State<CategoriesView>
       case 'account_balance_wallet': case 'salary': return Icons.account_balance_wallet;
       case 'laptop_mac': case 'freelance':          return Icons.laptop_mac;
       case 'trending_up': case 'investment':        return Icons.trending_up;
+      // Vietnamese names
+      case 'ăn uống':                               return Icons.restaurant;
+      case 'di chuyển':                             return Icons.directions_bus;
+      case 'sức khoẻ': case 'sức khỏe':            return Icons.medical_services;
+      case 'mua sắm': case 'mua sắm cá nhân':      return Icons.shopping_bag;
+      case 'nhà ở':                                 return Icons.home;
+      case 'giải trí & xã hội': case 'giải trí':   return Icons.movie;
+      case 'tiết kiệm':                             return Icons.savings;
+      case 'hóa đơn tiện ích': case 'hóa đơn':     return Icons.electric_bolt;
+      case 'giáo dục':                              return Icons.school;
+      case 'đầu tư & học tập': case 'đầu tư':      return Icons.trending_up;
+      case 'quỹ dự phòng':                          return Icons.security;
+      case 'chi phí gia đình':                      return Icons.family_restroom;
+      case 'chi phí con cái':                       return Icons.child_care;
+      case 'lương':                                 return Icons.account_balance_wallet;
+      case 'thưởng':                                return Icons.card_giftcard;
+      case 'kinh doanh':                            return Icons.storefront;
+      case 'cho thuê':                              return Icons.home;
       default:                                      return Icons.category;
     }
   }
@@ -1350,9 +1380,26 @@ class _CategoriesViewState extends State<CategoriesView>
                 color: sectionColor, size: 20),
           ),
           const SizedBox(width: 12),
-          Text(title, style: TextStyle(
+          Expanded(child: Text(title, style: TextStyle(
               fontSize: 20, fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A)))),
+          GestureDetector(
+            onTap: () => _showAllCategoriesSheet(
+                type, defaults, isDark, sectionColor),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                  color: sectionColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('Xem tất cả', style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600,
+                    color: sectionColor)),
+                const SizedBox(width: 3),
+                Icon(Icons.chevron_right_rounded, size: 14, color: sectionColor),
+              ]),
+            ),
+          ),
         ]),
         const SizedBox(height: 14),
         Row(mainAxisAlignment: MainAxisAlignment.end, children: [
@@ -1518,6 +1565,235 @@ class _CategoriesViewState extends State<CategoriesView>
                 color: isOver ? Colors.red : Colors.grey[500]),
                 textAlign: TextAlign.center),
         ]),
+      ),
+    );
+  }
+
+  // ── Show all categories bottom sheet ────────────────
+  void _showAllCategoriesSheet(String type,
+      List<Map<String, dynamic>> defaults, bool isDark, Color sectionColor) {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (ctx, scrollCtrl) => Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(children: [
+            // Handle
+            Container(width: 40, height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2))),
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              child: Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                      color: sectionColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: Icon(type == 'income'
+                      ? Icons.arrow_upward_rounded
+                      : Icons.arrow_downward_rounded,
+                      color: sectionColor, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(type == 'income' ? 'Tất cả Thu nhập' : 'Tất cả Chi tiêu',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black87)),
+                  Text('Nhấn để thêm giao dịch, giữ để xem chi tiết',
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                ])),
+                const SizedBox(width: 0),
+              ]),
+            ),
+            Divider(height: 1, color: isDark ? Colors.grey[700] : Colors.grey[200]),
+            // Grid list
+            Expanded(child: StreamBuilder<QuerySnapshot>(
+              stream: _firestore.collection('users').doc(uid)
+                  .collection('categories').snapshots(),
+              builder: (ctx2, snap) {
+                final custom = <Map<String, dynamic>>[];
+                if (snap.hasData) {
+                  for (final doc in snap.data!.docs) {
+                    try {
+                      final d = doc.data() as Map<String, dynamic>;
+                      if ((d['type'] ?? 'expense') != type) continue;
+                      IconData icon = Icons.category;
+                      if (d['icon'] is int)
+                        icon = IconData(d['icon'] as int, fontFamily: 'MaterialIcons');
+                      else if (d['icon'] is String)
+                        icon = _iconFromString(d['icon'] as String);
+                      int colorVal = 0xFF00CED1;
+                      if (d['color'] is int) colorVal = d['color'] as int;
+                      else if (d['color'] is String)
+                        colorVal = int.tryParse(d['color']) ?? colorVal;
+                      custom.add({
+                        'name': d['name'] ?? 'Untitled',
+                        'iconData': icon, 'color': Color(colorVal),
+                        'docId': doc.id,
+                      });
+                    } catch (_) {}
+                  }
+                }
+                final defaultItems = defaults.map((d) => {
+                  'name': d['name'] as String,
+                  'iconData': _iconFromCode(d['icon'] as int),
+                  'color': Color(d['color'] as int),
+                  'docId': null,
+                }).toList();
+
+                // Lọc trùng: nếu custom có tên giống default thì ưu tiên custom
+                final customNames = custom.map((c) => c['name']).toSet();
+                final filtered = defaultItems
+                    .where((d) => !customNames.contains(d['name']))
+                    .toList();
+                final all = [...filtered, ...custom];
+
+                return GridView.builder(
+                  controller: scrollCtrl,
+                  padding: const EdgeInsets.all(20),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.75,
+                  ),
+                  itemCount: all.length + 1, // +1 cho nút thêm
+                  itemBuilder: (ctx3, i) {
+                    // Nút thêm danh mục ở cuối
+                    if (i == all.length) {
+                      return GestureDetector(
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          final ok = await showDialog<bool>(context: context,
+                              builder: (_) => AddCategoryDialog(categoryType: type));
+                          if (ok == true) setState(() {});
+                        },
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 58, height: 58,
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF2A2A2A) : Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                    color: sectionColor.withOpacity(0.4), width: 2),
+                                boxShadow: [BoxShadow(
+                                    color: sectionColor.withOpacity(0.15),
+                                    blurRadius: 8, offset: const Offset(0, 3))],
+                              ),
+                              child: Icon(Icons.add_rounded,
+                                  size: 28, color: sectionColor),
+                            ),
+                            const SizedBox(height: 8),
+                            Text('Thêm mới',
+                                style: TextStyle(fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: sectionColor),
+                                textAlign: TextAlign.center),
+                          ],
+                        ),
+                      );
+                    }
+
+                    final cat   = all[i];
+                    final name  = cat['name'] as String;
+                    final icon  = cat['iconData'] as IconData;
+                    final color = cat['color'] as Color;
+                    final spent = _spentThis[name] ?? 0;
+                    final isOver = spent > (_totalIncome * 0.15) &&
+                        _totalIncome > 0 && type == 'expense';
+
+                    return GestureDetector(
+                      onTap: () {
+                        if (type == 'expense') {
+                          Navigator.pop(ctx);
+                          _showQuickAdd(name, color, icon, isDark);
+                        } else {
+                          Navigator.pop(ctx);
+                          Navigator.push(context, MaterialPageRoute(
+                              builder: (_) => CategoryDetailView(
+                                  categoryColor: color,
+                                  categoryName: name,
+                                  categoryIcon: icon)));
+                        }
+                      },
+                      onLongPress: () {
+                        Navigator.pop(ctx);
+                        Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => CategoryDetailView(
+                                categoryColor: color,
+                                categoryName: name,
+                                categoryIcon: icon)));
+                      },
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Stack(alignment: Alignment.topRight, children: [
+                            Container(
+                              width: 58, height: 58,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                    colors: [color.withOpacity(0.85), color],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [BoxShadow(
+                                    color: color.withOpacity(0.35),
+                                    blurRadius: 8, offset: const Offset(0, 3))],
+                              ),
+                              child: Icon(icon, size: 26, color: Colors.white),
+                            ),
+                            if (isOver)
+                              Container(
+                                width: 16, height: 16,
+                                decoration: const BoxDecoration(
+                                    color: Colors.red, shape: BoxShape.circle),
+                                child: const Center(child: Text('!',
+                                    style: TextStyle(color: Colors.white,
+                                        fontSize: 10, fontWeight: FontWeight.bold))),
+                              ),
+                          ]),
+                          const SizedBox(height: 8),
+                          Text(name,
+                              style: TextStyle(
+                                  fontSize: 11, fontWeight: FontWeight.w600,
+                                  color: isDark
+                                      ? Colors.grey[200] : Colors.grey[800]),
+                              textAlign: TextAlign.center,
+                              maxLines: 2, overflow: TextOverflow.ellipsis),
+                          if (spent > 0 && type == 'expense') ...[
+                            const SizedBox(height: 2),
+                            Text('${_fmt(spent)}đ',
+                                style: TextStyle(
+                                    fontSize: 9,
+                                    color: isOver ? Colors.red : Colors.grey[500]),
+                                textAlign: TextAlign.center),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            )),
+          ]),
+        ),
       ),
     );
   }
