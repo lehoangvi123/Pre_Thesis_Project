@@ -1,4 +1,4 @@
-// lib/view/AnalysisView.dart
+// lib/view/Function/AnalysisView.dart
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,6 +13,7 @@ import './analysis_widgets.dart';
 import './Spend_rule_view.dart';
 import './Plan_entry_view.dart';
 import './Plan_form_data.dart';
+import './Plan_edit_view.dart';
 
 class AnalysisView extends StatefulWidget {
   const AnalysisView({Key? key}) : super(key: key);
@@ -184,7 +185,7 @@ OUTPUT — JSON THUẦN
   }
 
   // ══════════════════════════════════════════════════════
-  // FALLBACK — % để tổng luôn = 100%
+  // FALLBACK
   // ══════════════════════════════════════════════════════
   Map<String, dynamic> _fallbackPlan(Map<String, dynamic> d) {
     final city        = d['city']          as String? ?? 'HCM';
@@ -384,7 +385,7 @@ OUTPUT — JSON THUẦN
 }
 
 // ══════════════════════════════════════════════════════════
-// RESULT SCREEN — StatefulWidget với tab cá nhân / gia đình
+// RESULT SCREEN
 // ══════════════════════════════════════════════════════════
 class _PlanResultScreen extends StatefulWidget {
   final Map<String, dynamic> plan;
@@ -401,7 +402,12 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
   static const _purple = Color(0xFF8B5CF6);
   static const _orange = Color(0xFFFF9800);
 
-  int _tabIndex = 0; // 0 = cá nhân, 1 = gia đình
+  int _tabIndex = 0;
+
+  // ── THÊM MỚI: state cho edit & save ──────────────────
+  Map<String, int> _editedAmounts = {};
+  bool _isSaved = false;
+  // ─────────────────────────────────────────────────────
 
   Map<String, dynamic> get plan     => widget.plan;
   Map<String, dynamic> get formData => widget.formData;
@@ -416,19 +422,72 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
   }
 
-  // ── Thu nhập gia đình ─────────────────────────────────
+  // ── THÊM MỚI: lưu plan đã chỉnh lên Firestore ────────
+  Future<void> _saveEditedPlan(BuildContext context) async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+
+      final editedTable = (plan['expense_table'] as List).map((r) {
+        final row = Map<String, dynamic>.from(r as Map);
+        if (_editedAmounts.containsKey(row['category'])) {
+          row['amount'] = _editedAmounts[row['category']];
+        }
+        return row;
+      }).toList();
+
+      final editedPlan = Map<String, dynamic>.from(plan);
+      editedPlan['expense_table'] = editedTable;
+
+      await FirebaseFirestore.instance
+          .collection('users').doc(uid)
+          .collection('plans').doc('current_plan')
+          .update({
+            'plan': editedPlan,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+      setState(() => _isSaved = true);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(children: [
+              Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Text('Đã lưu kế hoạch thành công!'),
+            ]),
+            backgroundColor: _teal,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi lưu: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    }
+  }
+  // ─────────────────────────────────────────────────────
+
   double get _rec1 => (plan['recommended_income'] as num?)?.toDouble() ?? 0;
-  // Vợ/chồng ước tính ~75% — thực tế thường thấp hơn 1 chút
   double get _rec2 => (_rec1 * 0.75).roundToDouble();
   double get _recFamily => _rec1 + _rec2;
 
-  // ── Kế hoạch chi tiêu gia đình ───────────────────────
   List<Map<String, dynamic>> get _familyTable {
     final base = (plan['expense_table'] as List? ?? []);
-    // Hệ số nhân theo category
     const mult = <String, double>{
       'Nhà ở':              1.0,
-      'Ăn uống':            1.0, // sẽ tính riêng dưới
+      'Ăn uống':            1.0,
       'Di chuyển':          1.4,
       'Hóa đơn tiện ích':   1.4,
       'Mua sắm cá nhân':    1.6,
@@ -441,8 +500,7 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
       'Chi phí con cái':    1.0,
     };
 
-    // Hệ số ăn uống theo số con
-    double foodMult = 1.8; // 2 người không con
+    double foodMult = 1.8;
     if (_hasChildren == 'Có 1 con')          foodMult = 2.3;
     if (_hasChildren == 'Có 2 con trở lên')  foodMult = 3.0;
 
@@ -460,7 +518,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
       });
     }
 
-    // Thêm Chi phí con cái nếu chưa có
     if (_hasKids && !base.any((r) => r['category'] == 'Chi phí con cái')) {
       final childAmt = _hasChildren == 'Có 2 con trở lên' ? 9000000 : 5000000;
       result.add({
@@ -531,7 +588,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
     );
   }
 
-  // ── Header ────────────────────────────────────────────
   Widget _header(BuildContext ctx, bool isDark) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
@@ -566,7 +622,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
     );
   }
 
-  // ── Tab switcher ──────────────────────────────────────
   Widget _tabSwitcher(bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -617,7 +672,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
     );
   }
 
-  // ── Summary card ──────────────────────────────────────
   Widget _summaryCard(bool isDark) {
     final s = plan['summary'] as String? ?? '';
     if (s.isEmpty) return const SizedBox.shrink();
@@ -643,7 +697,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
     );
   }
 
-  // ── Income card — cá nhân ─────────────────────────────
   Widget _incomeCard(bool isDark) {
     final rec    = _rec1;
     final reason = plan['income_reason'] as String? ?? '';
@@ -681,7 +734,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
     );
   }
 
-  // ── Income card — gia đình ────────────────────────────
   Widget _familyIncomeCard(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(18),
@@ -704,29 +756,18 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
         ]),
         const SizedBox(height: 16),
-
-        // 2 cột: 1 người và cả 2
         Row(children: [
           Expanded(child: _incomeMiniCard(
-            label: 'Bạn (ước tính)',
-            amount: _rec1,
-            color: _teal,
-            sub: '100%',
-            isDark: isDark,
+            label: 'Bạn (ước tính)', amount: _rec1,
+            color: _teal, sub: '100%', isDark: isDark,
           )),
           const SizedBox(width: 10),
           Expanded(child: _incomeMiniCard(
-            label: 'Vợ / Chồng',
-            amount: _rec2,
-            color: _purple,
-            sub: '~75% của bạn',
-            isDark: isDark,
+            label: 'Vợ / Chồng', amount: _rec2,
+            color: _purple, sub: '~75% của bạn', isDark: isDark,
           )),
         ]),
-
         const SizedBox(height: 12),
-
-        // Tổng gia đình
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -750,7 +791,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
             ])),
           ]),
         ),
-
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.all(10),
@@ -760,8 +800,7 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
             border: Border.all(color: _orange.withOpacity(0.2)),
           ),
           child: Row(children: [
-            const Icon(Icons.info_outline_rounded,
-                size: 14, color: _orange),
+            const Icon(Icons.info_outline_rounded, size: 14, color: _orange),
             const SizedBox(width: 6),
             Expanded(child: Text(
               _hasKids
@@ -776,11 +815,8 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
   }
 
   Widget _incomeMiniCard({
-    required String label,
-    required double amount,
-    required Color color,
-    required String sub,
-    required bool isDark,
+    required String label, required double amount,
+    required Color color, required String sub, required bool isDark,
   }) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -790,19 +826,40 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
         border: Border.all(color: color.withOpacity(0.2)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: TextStyle(
-            fontSize: 11, color: Colors.grey[500])),
+        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[500])),
         const SizedBox(height: 6),
         Text('${_fmt(amount)}đ',
-            style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
         const SizedBox(height: 2),
         Text(sub, style: TextStyle(fontSize: 10, color: Colors.grey[400])),
       ]),
     );
   }
 
-  // ── Expense table helper ──────────────────────────────
+  // ══════════════════════════════════════════════════════
+  // MỞ TRANG CHỈNH SỬA
+  // ══════════════════════════════════════════════════════
+  Future<void> _openEditPage(List<Map<String, dynamic>> rows) async {
+    final result = await Navigator.push<Map<String, int>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PlanEditView(
+          rows: rows,
+          initialEdits: Map<String, int>.from(_editedAmounts),
+        ),
+      ),
+    );
+    if (result != null) {
+      setState(() {
+        _editedAmounts = result;
+        _isSaved = false;
+      });
+    }
+  }
+
+  // ══════════════════════════════════════════════════════
+  // EXPENSE TABLE — NÚT "CHỈNH SỬA" MỞ TRANG RIÊNG
+  // ══════════════════════════════════════════════════════
   Widget _buildExpenseTableWidget(
       List<Map<String, dynamic>> rows,
       double totalIncome,
@@ -823,6 +880,7 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
             color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
       ),
       child: Column(children: [
+        // ── Header bảng + nút Chỉnh sửa ──
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           child: Row(children: [
@@ -831,15 +889,61 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
               decoration: BoxDecoration(
                   color: _purple.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.table_chart_rounded,
-                  color: _purple, size: 20),
+              child: const Icon(Icons.table_chart_rounded, color: _purple, size: 20),
             ),
             const SizedBox(width: 10),
             const Expanded(child: Text('Kế hoạch chi tiêu chi tiết',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
+
+            // NÚT CHỈNH SỬA → mở trang riêng
+            GestureDetector(
+              onTap: () => _openEditPage(rows),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _purple.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: _purple.withOpacity(0.25)),
+                ),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.edit_rounded, size: 11, color: _purple),
+                  SizedBox(width: 3),
+                  Text('Chỉnh sửa',
+                      style: TextStyle(fontSize: 11,
+                          fontWeight: FontWeight.w600, color: _purple)),
+                ]),
+              ),
+            ),
           ]),
         ),
+
+        // Thông báo nếu có mục đã chỉnh
+        if (_editedAmounts.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: _orange.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _orange.withOpacity(0.2)),
+              ),
+              child: Row(children: [
+                const Icon(Icons.info_outline_rounded,
+                    size: 14, color: _orange),
+                const SizedBox(width: 6),
+                Text(
+                  '${_editedAmounts.length} mục đã được chỉnh sửa',
+                  style: const TextStyle(fontSize: 11, color: _orange,
+                      fontWeight: FontWeight.w500),
+                ),
+              ]),
+            ),
+          ),
+
         const SizedBox(height: 12),
+
+        // ── Column header ──
         Container(
           color: isDark ? const Color(0xFF3A3A3A) : const Color(0xFFF5F5F5),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -852,37 +956,61 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
                 color: Colors.grey, letterSpacing: 0.5),
                 textAlign: TextAlign.right)),
             SizedBox(width: 8),
-            SizedBox(width: 38, child: Text('%', style: TextStyle(
+            SizedBox(width: 42, child: Text('%', style: TextStyle(
                 fontSize: 10, fontWeight: FontWeight.w700,
                 color: Colors.grey, letterSpacing: 0.5),
                 textAlign: TextAlign.center)),
           ]),
         ),
+
+        // ── Các dòng danh mục ──
         ...rows.asMap().entries.map((e) {
-          final i       = e.key;
-          final row     = e.value;
-          final amount  = (row['amount'] as num?)?.toDouble() ?? 0;
-          final percent = (row['percent'] as num?)?.toInt()    ?? 0;
-          final color   = rowColors[i % rowColors.length];
-          final isLast  = i == rows.length - 1;
+          final i        = e.key;
+          final row      = e.value;
+          final category = row['category'] as String? ?? '';
+          final origAmt  = (row['amount'] as num?)?.toDouble() ?? 0;
+
+          final displayAmt = (_editedAmounts[category] ?? origAmt).toInt();
+          final percent    = (row['percent'] as num?)?.toInt() ?? 0;
+          final color      = rowColors[i % rowColors.length];
+          final isLast     = i == rows.length - 1;
+          final isEdited   = _editedAmounts.containsKey(category);
+
           return Column(children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+                // Dòng chính: dot + tên + số tiền + badge %
                 Row(children: [
                   Container(width: 8, height: 8,
                       decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
                   const SizedBox(width: 8),
-                  Expanded(flex: 5, child: Text(row['category'] ?? '',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
-                  Expanded(flex: 4, child: Text('${_fmt(amount)} đ',
-                      style: TextStyle(fontSize: 13,
-                          fontWeight: FontWeight.w700, color: color),
-                      textAlign: TextAlign.right)),
+                  Expanded(flex: 5, child: Text(category,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w500))),
+                  Expanded(flex: 4, child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end, children: [
+                    if (isEdited)
+                      Container(
+                        margin: const EdgeInsets.only(right: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: _orange.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('✏️',
+                            style: TextStyle(fontSize: 9)),
+                      ),
+                    Text('${_fmt(displayAmt)} đ',
+                        style: TextStyle(fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: isEdited ? _orange : color)),
+                  ])),
                   const SizedBox(width: 8),
                   Container(
-                    width: 38, height: 22,
+                    width: 42, height: 24,
                     decoration: BoxDecoration(
                         color: color.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(6)),
@@ -891,16 +1019,18 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
                             fontWeight: FontWeight.w700, color: color))),
                   ),
                 ]),
+
                 const SizedBox(height: 6),
                 Padding(
                   padding: const EdgeInsets.only(left: 16),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start, children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(2),
                       child: LinearProgressIndicator(
                         value: (percent / 100).clamp(0.0, 1.0),
-                        backgroundColor: isDark ? Colors.grey[700] : Colors.grey[100],
+                        backgroundColor:
+                            isDark ? Colors.grey[700] : Colors.grey[100],
                         valueColor: AlwaysStoppedAnimation(color),
                         minHeight: 4,
                       ),
@@ -908,7 +1038,8 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
                     if ((row['note'] ?? '').toString().isNotEmpty) ...[
                       const SizedBox(height: 3),
                       Text(row['note'].toString(),
-                          style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey[500])),
                     ],
                   ]),
                 ),
@@ -919,9 +1050,10 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
                   color: isDark ? Colors.grey[700] : Colors.grey[100]),
           ]);
         }).toList(),
-        // Footer tổng
+
+        // ── Footer: tổng thu nhập ──
         Container(
-          margin: const EdgeInsets.all(14),
+          margin: const EdgeInsets.fromLTRB(14, 14, 14, 8),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           decoration: BoxDecoration(
             color: accentColor.withOpacity(0.08),
@@ -942,24 +1074,52 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
                     color: accentColor, fontSize: 15)),
           ]),
         ),
+
+        // ── NÚT LƯU KẾ HOẠCH ──
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          child: SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _isSaved ? null : () => _saveEditedPlan(context),
+              icon: Icon(
+                _isSaved
+                    ? Icons.check_circle_rounded
+                    : Icons.save_alt_rounded,
+                color: Colors.white, size: 18,
+              ),
+              label: Text(
+                _isSaved ? 'Đã lưu kế hoạch ✓' : 'Lưu kế hoạch',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isSaved ? Colors.grey[400] : _purple,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ),
+        ),
       ]),
     );
   }
 
-  // ── Expense table — cá nhân ───────────────────────────
   Widget _expenseTable(bool isDark) {
     final rows = (plan['expense_table'] as List? ?? [])
         .map((r) => Map<String, dynamic>.from(r as Map)).toList();
     return _buildExpenseTableWidget(rows, _rec1, isDark, accentColor: _teal);
   }
 
-  // ── Expense table — gia đình ──────────────────────────
   Widget _familyExpenseTable(bool isDark) {
     return _buildExpenseTableWidget(
         _familyTable, _recFamily, isDark, accentColor: _orange);
   }
 
-  // ── Tính toán tips cụ thể từ số liệu plan ────────────
   List<_TipItem> _buildContextualTips() {
     final table   = (plan['expense_table'] as List? ?? []);
     final rec     = _rec1;
@@ -968,7 +1128,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
     final eating  = formData['eatingHabit']   as String? ?? 'mixed';
     final living  = formData['livingStatus']  as String? ?? 'Renting';
 
-    // Lấy số tiền từng khoản
     double getAmt(String cat) {
       for (final r in table) {
         if ((r['category'] as String? ?? '') == cat)
@@ -987,18 +1146,15 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
 
     final tips = <_TipItem>[];
 
-    // 1. Tiết kiệm — luôn đứng đầu
     if (saving > 0) {
       tips.add(_TipItem(
-        icon: '💰',
-        color: _teal,
+        icon: '💰', color: _teal,
         title: 'Tiết kiệm ${_fmt(saving)}đ ngay đầu tháng',
         desc: 'Ngay khi nhận lương, chuyển ${_fmt(saving)}đ vào tài khoản tiết kiệm riêng TRƯỚC khi chi bất cứ thứ gì. '
               'Đây là khoản bắt buộc, không phải "còn lại mới tiết kiệm".',
       ));
     }
 
-    // 2. Ăn uống — cụ thể theo thói quen
     if (food > 0) {
       String foodTip;
       if (eating == 'eatout' || eating == 'Hay ăn ngoài') {
@@ -1018,7 +1174,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
           title: 'Kiểm soát ăn uống — khoản dễ vượt nhất', desc: foodTip));
     }
 
-    // 3. Nhà ở — nếu đang thuê
     if (rent > 0 && (living == 'Renting' || living == 'Boarding' || living == 'NoHouse')) {
       final rentPct = rec > 0 ? (rent / rec * 100).round() : 0;
       String rentTip;
@@ -1033,7 +1188,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
           title: 'Nhà ở — khoản cố định cần giữ ổn định', desc: rentTip));
     }
 
-    // 4. Giải trí — cảnh báo nếu chiếm nhiều
     if (ent > 0) {
       final entPct = rec > 0 ? (ent / rec * 100).round() : 0;
       if (entPct >= 8) {
@@ -1041,8 +1195,7 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
           icon: '🎬', color: const Color(0xFF8B5CF6),
           title: 'Giảm giải trí xuống còn ${_fmt(ent)}đ/tháng',
           desc: 'Cà phê + phim + ăn chơi đang chiếm $entPct% thu nhập. '
-                'Đặt giới hạn cứng ${_fmt(ent)}đ — khi hết là hết, không rút thêm. '
-                'Thử app theo dõi chi tiêu ngay trong ngày.',
+                'Đặt giới hạn cứng ${_fmt(ent)}đ — khi hết là hết, không rút thêm.',
         ));
       } else {
         tips.add(_TipItem(
@@ -1054,7 +1207,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
       }
     }
 
-    // 5. Gợi ý tăng thu nhập theo nghề
     if (occ == 'Student') {
       tips.add(_TipItem(
         icon: '📱', color: const Color(0xFF00BCD4),
@@ -1080,7 +1232,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
       ));
     }
 
-    // 6. Đầu tư — hướng dẫn bắt đầu
     if (invest > 0 && rec < 15000000) {
       tips.add(_TipItem(
         icon: '📈', color: const Color(0xFF4CAF50),
@@ -1091,14 +1242,11 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
       ));
     }
 
-    return tips.take(4).toList(); // Tối đa 4 tips
+    return tips.take(4).toList();
   }
 
-  String _getCityName(String city) {
-    return PlanFormData.cityName(city);
-  }
+  String _getCityName(String city) => PlanFormData.cityName(city);
 
-  // ── Lộ trình tháng này/tháng sau ─────────────────────
   List<_ActionItem> _buildMonthlyActions() {
     final table  = (plan['expense_table'] as List? ?? []);
     final rec    = _rec1;
@@ -1117,7 +1265,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
 
     final totalFixed = table.fold<double>(0, (sum, r) {
       final cat = (r as Map)['category'] as String? ?? '';
-      // Chỉ tính các khoản thiết yếu
       if (['Nhà ở','Di chuyển','Hóa đơn tiện ích'].contains(cat))
         return sum + ((r['amount'] as num?)?.toDouble() ?? 0);
       return sum;
@@ -1127,35 +1274,27 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
 
     return [
       _ActionItem(
-        week: 'Ngày nhận lương',
-        icon: '💸',
-        color: _teal,
+        week: 'Ngày nhận lương', icon: '💸', color: _teal,
         action: 'Chuyển ${_fmt(saving + emerg)}đ vào tiết kiệm',
         detail: '${_fmt(saving)}đ tiết kiệm + ${_fmt(emerg)}đ quỹ dự phòng. '
                 'Làm ngay, không để qua hôm sau.',
       ),
       _ActionItem(
-        week: 'Tuần 1-4',
-        icon: '📊',
-        color: const Color(0xFF8B5CF6),
+        week: 'Tuần 1-4', icon: '📊', color: const Color(0xFF8B5CF6),
         action: 'Chi tiêu sinh hoạt tối đa ${_fmt(leftAfterFixed)}đ',
         detail: 'Sau khi trừ khoản cố định (nhà, điện nước, di chuyển) và tiết kiệm, '
                 'bạn còn ${_fmt(leftAfterFixed)}đ cho ăn uống, mua sắm, giải trí. '
                 'Chia đều ~${_fmt((leftAfterFixed / 4).round())}đ/tuần.',
       ),
       _ActionItem(
-        week: 'Cuối tháng',
-        icon: '📋',
-        color: const Color(0xFFFF9800),
+        week: 'Cuối tháng', icon: '📋', color: const Color(0xFFFF9800),
         action: 'Kiểm tra xem có vượt kế hoạch không',
         detail: 'Nhìn lại 3 khoản dễ vượt nhất: ăn uống, giải trí, mua sắm. '
                 'Nếu vượt → tháng sau cắt đúng khoản đó, không cắt tiết kiệm.',
       ),
       if (invest > 0)
         _ActionItem(
-          week: 'Sau 3 tháng',
-          icon: '🎯',
-          color: const Color(0xFF4CAF50),
+          week: 'Sau 3 tháng', icon: '🎯', color: const Color(0xFF4CAF50),
           action: 'Bắt đầu đầu tư ${_fmt(invest)}đ/tháng',
           detail: 'Sau 3 tháng đã có quỹ dự phòng (≈${_fmt(emerg * 3)}đ), '
                   'mới nên bắt đầu dùng ${_fmt(invest)}đ/tháng để mua quỹ mở hoặc gửi kỳ hạn. '
@@ -1164,7 +1303,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
     ];
   }
 
-  // ── Tips card — data-driven ───────────────────────────
   Widget _tipsCard(bool isDark) {
     final tips = _buildContextualTips();
     if (tips.isEmpty) return const SizedBox.shrink();
@@ -1198,8 +1336,7 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
             Expanded(child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(tip.title, style: TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w600,
-                  color: tip.color)),
+                  fontSize: 13, fontWeight: FontWeight.w600, color: tip.color)),
               const SizedBox(height: 3),
               Text(tip.desc, style: TextStyle(
                   fontSize: 12, height: 1.5,
@@ -1211,7 +1348,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
     );
   }
 
-  // ── Goal card — monthly action plan ──────────────────
   Widget _goalCard(bool isDark) {
     final actions = _buildMonthlyActions();
     return Container(
@@ -1219,8 +1355,7 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-            color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
+        border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Row(children: [
@@ -1235,31 +1370,24 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
           final action = e.value;
           final isLast = i == actions.length - 1;
           return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Timeline
             Column(children: [
               Container(
                 width: 32, height: 32,
-                decoration: BoxDecoration(
-                    color: action.color,
-                    shape: BoxShape.circle),
+                decoration: BoxDecoration(color: action.color, shape: BoxShape.circle),
                 child: Center(child: Text(action.icon,
                     style: const TextStyle(fontSize: 15))),
               ),
               if (!isLast)
-                Container(
-                  width: 2, height: 48,
-                  color: action.color.withOpacity(0.25),
-                ),
+                Container(width: 2, height: 48,
+                    color: action.color.withOpacity(0.25)),
             ]),
             const SizedBox(width: 12),
             Expanded(
               child: Padding(
                 padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start, children: [
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                         color: action.color.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(6)),
@@ -1283,7 +1411,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
     );
   }
 
-  // ── Spend rule button ─────────────────────────────────
   Widget _spendRuleBtn(BuildContext ctx) {
     return SizedBox(
       width: double.infinity, height: 48,
@@ -1363,8 +1490,7 @@ class _SharedBottomNavBar extends StatelessWidget {
   Widget _item(BuildContext ctx, IconData icon, String label,
       int index, VoidCallback onTap) {
     final active = index == activeIndex;
-    final color  = active ? _teal
-        : (isDark ? Colors.grey[500]! : Colors.grey[400]!);
+    final color  = active ? _teal : (isDark ? Colors.grey[500]! : Colors.grey[400]!);
     return GestureDetector(
       onTap: onTap,
       child: Column(mainAxisSize: MainAxisSize.min, children: [
