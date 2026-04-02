@@ -422,30 +422,50 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
   }
 
-  // ── THÊM MỚI: lưu plan đã chỉnh lên Firestore ────────
+  // ── Lưu plan đã chỉnh lên Firestore ──────────────────
   Future<void> _saveEditedPlan(BuildContext context) async {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return;
 
+      // 1. Cập nhật các row gốc với số tiền đã chỉnh
       final editedTable = (plan['expense_table'] as List).map((r) {
         final row = Map<String, dynamic>.from(r as Map);
-        if (_editedAmounts.containsKey(row['category'])) {
-          row['amount'] = _editedAmounts[row['category']];
+        final cat = row['category'] as String? ?? '';
+        if (_editedAmounts.containsKey(cat)) {
+          row['amount'] = _editedAmounts[cat];
         }
         return row;
       }).toList();
 
+      // 2. Thêm các khoản tự thêm (__extra__xxx)
+      for (final entry in _editedAmounts.entries) {
+        if (entry.key.startsWith('__extra__')) {
+          final cat = entry.key.replaceFirst('__extra__', '');
+          editedTable.add({
+            'category': cat,
+            'amount': entry.value,
+            'percent': 0,
+            'note': 'Tự thêm',
+          });
+        }
+      }
+
+      // 3. Cập nhật recommended_income nếu người dùng đã nhập thu nhập mới
       final editedPlan = Map<String, dynamic>.from(plan);
       editedPlan['expense_table'] = editedTable;
+      if (_editedAmounts.containsKey('__income__')) {
+        editedPlan['recommended_income'] = _editedAmounts['__income__'];
+      }
 
+      // 4. Lưu lên Firestore — dùng set với merge để tránh lỗi document chưa tồn tại
       await FirebaseFirestore.instance
           .collection('users').doc(uid)
           .collection('plans').doc('current_plan')
-          .update({
+          .set({
             'plan': editedPlan,
             'updatedAt': FieldValue.serverTimestamp(),
-          });
+          }, SetOptions(merge: true));
 
       setState(() => _isSaved = true);
 
@@ -479,7 +499,13 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
   }
   // ─────────────────────────────────────────────────────
 
-  double get _rec1 => (plan['recommended_income'] as num?)?.toDouble() ?? 0;
+  // Ưu tiên thu nhập đã chỉnh sửa, nếu không thì dùng plan gốc
+  double get _rec1 {
+    if (_editedAmounts.containsKey('__income__')) {
+      return (_editedAmounts['__income__'] as num).toDouble();
+    }
+    return (plan['recommended_income'] as num?)?.toDouble() ?? 0;
+  }
   double get _rec2 => (_rec1 * 0.75).roundToDouble();
   double get _recFamily => _rec1 + _rec2;
 
@@ -698,15 +724,23 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
   }
 
   Widget _incomeCard(bool isDark) {
-    final rec    = _rec1;
-    final reason = plan['income_reason'] as String? ?? '';
+    final rec       = _rec1;
+    final isEdited  = _editedAmounts.containsKey('__income__');
+    final reason    = isEdited
+        ? 'Thu nhập bạn đã chỉnh sửa thủ công.'
+        : (plan['income_reason'] as String? ?? '');
+    final title     = isEdited ? 'Thu nhập của bạn' : 'Mức thu nhập phù hợp';
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-            color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
+            color: isEdited
+                ? _teal.withOpacity(0.4)
+                : (isDark ? Colors.grey[700]! : Colors.grey[200]!),
+            width: isEdited ? 1.5 : 1),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -715,11 +749,25 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
             decoration: BoxDecoration(
                 color: _teal.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10)),
-            child: const Icon(Icons.trending_up, color: _teal, size: 20),
+            child: Icon(
+              isEdited ? Icons.edit_rounded : Icons.trending_up,
+              color: _teal, size: 20),
           ),
           const SizedBox(width: 10),
-          const Text('Mức thu nhập phù hợp',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          Expanded(child: Text(title,
+              style: const TextStyle(
+                  fontSize: 15, fontWeight: FontWeight.w600))),
+          if (isEdited)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _teal.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text('Đã chỉnh',
+                  style: TextStyle(fontSize: 10, color: _teal,
+                      fontWeight: FontWeight.w600)),
+            ),
         ]),
         const SizedBox(height: 12),
         Text('${_fmt(rec)} đ / tháng',
@@ -844,8 +892,10 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => PlanEditView(
-          rows: rows,
+          // Dùng _displayRows để khoản tự thêm vẫn hiện khi mở lần 2
+          rows: _displayRows,
           initialEdits: Map<String, int>.from(_editedAmounts),
+          recommendedIncome: _rec1.toInt(),
         ),
       ),
     );
@@ -1109,10 +1159,38 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
     );
   }
 
-  Widget _expenseTable(bool isDark) {
+  // Rows hiển thị = rows gốc + khoản __extra__ người dùng tự thêm
+  List<Map<String, dynamic>> get _displayRows {
     final rows = (plan['expense_table'] as List? ?? [])
         .map((r) => Map<String, dynamic>.from(r as Map)).toList();
-    return _buildExpenseTableWidget(rows, _rec1, isDark, accentColor: _teal);
+
+    // Cập nhật amount từ _editedAmounts cho rows gốc
+    for (final row in rows) {
+      final cat = row['category'] as String? ?? '';
+      if (_editedAmounts.containsKey(cat)) {
+        row['amount'] = _editedAmounts[cat];
+      }
+    }
+
+    // Thêm khoản __extra__ vào cuối
+    for (final entry in _editedAmounts.entries) {
+      if (entry.key.startsWith('__extra__')) {
+        final cat = entry.key.replaceFirst('__extra__', '');
+        rows.add({
+          'category': cat,
+          'amount': entry.value,
+          'percent': _rec1 > 0
+              ? (entry.value / _rec1 * 100).round()
+              : 0,
+          'note': '+ Tự thêm',
+        });
+      }
+    }
+    return rows;
+  }
+
+  Widget _expenseTable(bool isDark) {
+    return _buildExpenseTableWidget(_displayRows, _rec1, isDark, accentColor: _teal);
   }
 
   Widget _familyExpenseTable(bool isDark) {
