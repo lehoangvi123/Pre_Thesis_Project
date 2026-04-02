@@ -57,11 +57,46 @@ class _HomeViewState extends State<HomeView> {
   void initState() {
     super.initState();
     userId = FirebaseAuth.instance.currentUser?.uid;
-    _loadUserName();
-    _checkLoginStreak();
-    _loadStreakData();
-    _loadDailySpend().then((_) => _loadMonthReport());
-    _triggerGreeting();
+    _initAll();
+  }
+
+  Future<void> _initAll() async {
+    // Gọi song song, không block nhau
+    await Future.wait([
+      _loadUserName(),
+      _loadStreakOnce(),  // gộp checkLoginStreak + loadStreakData thành 1
+      _loadDailySpend(),
+    ]);
+    await _loadMonthReport();
+    if (mounted) _triggerGreeting();
+  }
+
+  // Gộp 2 streak calls thành 1 để tránh double Firestore read
+  Future<void> _loadStreakOnce() async {
+    try {
+      final data   = await LoginStreakService().checkAndUpdateStreak();
+      final streak = data['currentStreak'] ?? 0;
+      final best   = data['bestStreak']    ?? 0;
+      if (mounted) {
+        setState(() {
+          _currentStreak = streak;
+          _bestStreak    = best;
+        });
+        if (streak > 1) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Row(children: [
+              const Text('🔥', style: TextStyle(fontSize: 20)),
+              const SizedBox(width: 12),
+              Expanded(child: Text('Login streak: $streak days! Keep it up!',
+                  style: const TextStyle(fontWeight: FontWeight.bold))),
+            ]),
+            backgroundColor: Colors.orange[600],
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ));
+        }
+      }
+    } catch (_) {}
   }
 
   // ── Greeting logic ────────────────────────────────────
@@ -126,46 +161,18 @@ class _HomeViewState extends State<HomeView> {
       if (user != null) {
         final doc = await FirebaseFirestore.instance
             .collection('users').doc(user.uid).get();
+        final name = doc.exists
+            ? ((doc.data() as Map)['name'] ?? user.displayName ?? 'User')
+            : (user.displayName ?? user.email?.split('@')[0] ?? 'User');
+        // Chỉ setState 1 lần duy nhất
         if (mounted) setState(() {
-          userName = doc.exists
-              ? ((doc.data() as Map)['name'] ?? user.displayName ?? 'User')
-              : (user.displayName ?? user.email?.split('@')[0] ?? 'User');
+          userName          = name;
           isLoadingUserName = false;
         });
       }
     } catch (_) {
       if (mounted) setState(() => isLoadingUserName = false);
     }
-  }
-
-  Future<void> _checkLoginStreak() async {
-    try {
-      final data   = await LoginStreakService().checkAndUpdateStreak();
-      final streak = data['currentStreak'] ?? 0;
-      if (mounted && streak > 1) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Row(children: [
-            const Text('🔥', style: TextStyle(fontSize: 20)),
-            const SizedBox(width: 12),
-            Expanded(child: Text('Login streak: $streak days! Keep it up!',
-                style: const TextStyle(fontWeight: FontWeight.bold))),
-          ]),
-          backgroundColor: Colors.orange[600],
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ));
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _loadStreakData() async {
-    try {
-      final data = await LoginStreakService().checkAndUpdateStreak();
-      if (mounted) setState(() {
-        _currentStreak = data['currentStreak'] ?? 0;
-        _bestStreak    = data['bestStreak'] ?? 0;
-      });
-    } catch (_) {}
   }
 
   Future<void> _loadDailySpend() async {
