@@ -1,11 +1,35 @@
 // lib/view/Function/PlanEditView.dart
-//
-// Màn hình chỉnh sửa kế hoạch chi tiêu.
-// Navigator.push từ _PlanResultScreen, trả về Map<String,int> editedAmounts
-// khi người dùng nhấn "Lưu & Quay lại".
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+/// Format số với dấu phẩy: 1882353 → 1,882,353
+class _ThousandsFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return newValue.copyWith(text: '');
+    final formatted = _fmt(digits);
+    return newValue.copyWith(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+
+  static String _fmt(String digits) {
+    final buf = StringBuffer();
+    for (int i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) buf.write(',');
+      buf.write(digits[i]);
+    }
+    return buf.toString();
+  }
+}
+
+int _parseNum(String text) =>
+    int.tryParse(text.replaceAll(',', '')) ?? 0;
+
+String _fmtNum(int n) => _ThousandsFormatter._fmt(n.toString());
 
 class PlanEditView extends StatefulWidget {
   final List<Map<String, dynamic>> rows;
@@ -48,13 +72,27 @@ class _PlanEditViewState extends State<PlanEditView> {
   void initState() {
     super.initState();
     final initIncome = widget.initialEdits['__income__'] ?? widget.recommendedIncome;
-    _incomeCtrl = TextEditingController(text: initIncome.toString());
+    _incomeCtrl = TextEditingController(text: _fmtNum(initIncome));
+
+    // Tổng gốc từ rows để scale
+    final origTotal = widget.rows.fold<int>(0, (s, r) =>
+        s + ((r['amount'] as num?)?.toInt() ?? 0));
 
     for (final row in widget.rows) {
       final cat     = row['category'] as String? ?? '';
       final origAmt = (row['amount'] as num?)?.toInt() ?? 0;
-      final initVal = widget.initialEdits[cat] ?? origAmt;
-      _ctrls[cat]   = TextEditingController(text: initVal.toString());
+
+      int initVal;
+      if (widget.initialEdits.containsKey(cat)) {
+        // Lần 2 mở: dùng giá trị đã chỉnh
+        initVal = widget.initialEdits[cat]!;
+      } else if (origTotal > 0 && origTotal != initIncome && initIncome > 0) {
+        // Lần đầu mở: scale tổng = recommendedIncome
+        initVal = (origAmt / origTotal * initIncome).round();
+      } else {
+        initVal = origAmt;
+      }
+      _ctrls[cat] = TextEditingController(text: _fmtNum(initVal));
     }
   }
 
@@ -73,15 +111,12 @@ class _PlanEditViewState extends State<PlanEditView> {
   }
 
   int get _total {
-    int sum = _ctrls.values.fold(0, (s, c) =>
-        s + (int.tryParse(c.text.replaceAll(',', '')) ?? 0));
-    sum += _extraCtrls.values.fold(0, (s, c) =>
-        s + (int.tryParse(c.text.replaceAll(',', '')) ?? 0));
+    int sum = _ctrls.values.fold(0, (s, c) => s + _parseNum(c.text));
+    sum += _extraCtrls.values.fold(0, (s, c) => s + _parseNum(c.text));
     return sum;
   }
 
-  int get _income =>
-      int.tryParse(_incomeCtrl.text.replaceAll(',', '')) ?? 0;
+  int get _income => _parseNum(_incomeCtrl.text);
 
   int get _remaining => _income - _total;
 
@@ -92,13 +127,13 @@ class _PlanEditViewState extends State<PlanEditView> {
 
     for (final row in widget.rows) {
       final cat = row['category'] as String? ?? '';
-      final val = int.tryParse(_ctrls[cat]?.text.replaceAll(',', '') ?? '');
-      if (val != null) result[cat] = val;
+      final val = _parseNum(_ctrls[cat]?.text ?? '');
+      if (val > 0) result[cat] = val;
     }
 
     for (final extra in _extraRows) {
       final cat = extra['category'] as String? ?? '';
-      final val = int.tryParse(_extraCtrls[cat]?.text.replaceAll(',', '') ?? '');
+      final val = _parseNum(_extraCtrls[cat]?.text ?? '');
       if (val != null && cat.isNotEmpty) result['__extra__$cat'] = val;
     }
 
@@ -107,11 +142,11 @@ class _PlanEditViewState extends State<PlanEditView> {
 
   void _reset() {
     setState(() {
-      _incomeCtrl.text = widget.recommendedIncome.toString();
+      _incomeCtrl.text = _fmtNum(widget.recommendedIncome);
       for (final row in widget.rows) {
         final cat     = row['category'] as String? ?? '';
         final origAmt = (row['amount'] as num?)?.toInt() ?? 0;
-        _ctrls[cat]?.text = origAmt.toString();
+        _ctrls[cat]?.text = _fmtNum(origAmt);
       }
       for (final c in _extraCtrls.values) c.dispose();
       _extraCtrls.clear();
@@ -142,10 +177,8 @@ class _PlanEditViewState extends State<PlanEditView> {
                 crossAxisAlignment: CrossAxisAlignment.start, children: [
               Center(child: Container(
                 width: 40, height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
+                decoration: BoxDecoration(color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2)),
               )),
               const SizedBox(height: 20),
               const Text('Thêm khoản chi mới',
@@ -154,7 +187,6 @@ class _PlanEditViewState extends State<PlanEditView> {
               Text('Nhập tên và số tiền khoản chi bạn muốn thêm',
                   style: TextStyle(fontSize: 12, color: Colors.grey[500])),
               const SizedBox(height: 20),
-
               TextFormField(
                 controller: nameCtrl,
                 autofocus: true,
@@ -185,13 +217,11 @@ class _PlanEditViewState extends State<PlanEditView> {
                   return null;
                 },
               ),
-
               const SizedBox(height: 14),
-
               TextFormField(
                 controller: amountCtrl,
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: [_ThousandsFormatter()],
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
                     color: isDark ? Colors.white : Colors.black87),
                 decoration: InputDecoration(
@@ -212,13 +242,11 @@ class _PlanEditViewState extends State<PlanEditView> {
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Vui lòng nhập số tiền';
-                  if ((int.tryParse(v) ?? 0) <= 0) return 'Số tiền phải lớn hơn 0';
+                  if (_parseNum(v) <= 0) return 'Số tiền phải lớn hơn 0';
                   return null;
                 },
               ),
-
               const SizedBox(height: 20),
-
               SizedBox(
                 width: double.infinity, height: 50,
                 child: ElevatedButton.icon(
@@ -228,7 +256,7 @@ class _PlanEditViewState extends State<PlanEditView> {
                       final amt  = int.tryParse(amountCtrl.text) ?? 0;
                       setState(() {
                         _extraRows.add({'category': name, 'amount': amt});
-                        _extraCtrls[name] = TextEditingController(text: amt.toString());
+                        _extraCtrls[name] = TextEditingController(text: _fmtNum(amt));
                       });
                       Navigator.pop(context);
                     }
@@ -378,7 +406,7 @@ class _PlanEditViewState extends State<PlanEditView> {
                 child: TextField(
                   controller: _incomeCtrl,
                   keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  inputFormatters: [_ThousandsFormatter()],
                   onChanged: (_) => setState(() {}),
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
                       color: isDark ? Colors.white : Colors.black87),
@@ -486,9 +514,7 @@ class _PlanEditViewState extends State<PlanEditView> {
       margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF2C2C2C)
-            : const Color(0xFFF0FAFA),
+        color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0FAFA),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _teal.withOpacity(0.2)),
       ),
@@ -500,11 +526,8 @@ class _PlanEditViewState extends State<PlanEditView> {
             'Đây là tổng chi tiêu do app đề xuất, trong đó đã có khoản Tiết kiệm. '
             'Bạn có thể thêm những khoản chi mà bạn mong muốn — '
             'đó là cách phù hợp nhất để kế hoạch sát với thực tế của bạn! 😊',
-            style: TextStyle(
-              fontSize: 12,
-              height: 1.5,
-              color: isDark ? Colors.grey[300] : const Color(0xFF2C7873),
-            ),
+            style: TextStyle(fontSize: 12, height: 1.5,
+                color: isDark ? Colors.grey[300] : const Color(0xFF2C7873)),
           ),
         ),
       ]),
@@ -566,7 +589,7 @@ class _PlanEditViewState extends State<PlanEditView> {
               child: TextField(
                 controller: ctrl,
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: [_ThousandsFormatter()],
                 onChanged: (_) => setState(() {}),
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
                     color: isDark ? Colors.white : Colors.black87),
@@ -587,7 +610,7 @@ class _PlanEditViewState extends State<PlanEditView> {
             ),
             const SizedBox(width: 10),
             GestureDetector(
-              onTap: () => setState(() => ctrl.text = origAmt.toString()),
+              onTap: () => setState(() => ctrl.text = _fmtNum(origAmt)),
               child: Container(
                 width: 36, height: 36,
                 decoration: BoxDecoration(
@@ -651,7 +674,7 @@ class _PlanEditViewState extends State<PlanEditView> {
           TextField(
             controller: ctrl,
             keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            inputFormatters: [_ThousandsFormatter()],
             onChanged: (_) => setState(() {}),
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
                 color: isDark ? Colors.white : Colors.black87),
