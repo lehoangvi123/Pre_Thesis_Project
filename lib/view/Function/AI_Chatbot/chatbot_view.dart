@@ -62,160 +62,109 @@ class _ChatbotViewState extends State<ChatbotView>
   // DETECT mục chi tiêu + số tiền từ AI response
   // ══════════════════════════════════════════════════════
   List<Map<String, dynamic>> _detectPlanItems(String text) {
-    // ── Bảng mapping: từ khóa nhỏ → danh mục lớn ──────────
-    final categoryMapping = <String, String>{
-      // Ăn uống
-      'thực phẩm': 'Ăn uống', 'ăn uống': 'Ăn uống', 'ăn ngoài': 'Ăn uống',
-      'tiệc': 'Ăn uống', 'café': 'Ăn uống', 'cà phê': 'Ăn uống',
-      // Hóa đơn tiện ích
-      'điện': 'Hóa đơn tiện ích', 'nước': 'Hóa đơn tiện ích',
-      'gas': 'Hóa đơn tiện ích', 'thuê nhà': 'Nhà ở', 'tiền nhà': 'Nhà ở',
-      'internet': 'Dịch vụ & Internet', 'điện thoại': 'Dịch vụ & Internet',
-      'streaming': 'Dịch vụ & Internet', 'netflix': 'Dịch vụ & Internet',
-      // Di chuyển
-      'xăng': 'Di chuyển', 'xe': 'Di chuyển', 'grab': 'Di chuyển',
-      'bảo dưỡng': 'Di chuyển', 'vận chuyển': 'Di chuyển',
-      // Giải trí
-      'du lịch': 'Giải trí', 'phim': 'Giải trí', 'game': 'Giải trí',
-      'thể thao': 'Giải trí & Thể thao', 'gym': 'Giải trí & Thể thao',
-      'mua sắm': 'Mua sắm', 'quần áo': 'Mua sắm', 'quà': 'Mua sắm',
-      // Sức khỏe
-      'y tế': 'Sức khỏe', 'bệnh viện': 'Sức khỏe', 'thuốc': 'Sức khỏe',
-      'bảo hiểm': 'Bảo hiểm & Dự phòng',
-      // Học tập
-      'học phí': 'Học tập & Phát triển', 'sách': 'Học tập & Phát triển',
-      'khóa học': 'Học tập & Phát triển',
-      // Tiết kiệm
-      'tiết kiệm': 'Tiết kiệm', 'đầu tư': 'Đầu tư',
-      'tiết kiệm ngắn hạn': 'Tiết kiệm', 'tiết kiệm dài hạn': 'Tiết kiệm',
-    };
-
     final iconMap = <String, String>{
-      'Ăn uống': '🍜', 'Hóa đơn tiện ích': '💡', 'Nhà ở': '🏠',
-      'Dịch vụ & Internet': '📱', 'Di chuyển': '🚗',
-      'Giải trí': '🎬', 'Giải trí & Thể thao': '🎯',
-      'Mua sắm': '🛍️', 'Sức khỏe': '💊',
-      'Bảo hiểm & Dự phòng': '🛡️', 'Học tập & Phát triển': '📚',
-      'Tiết kiệm': '💰', 'Đầu tư': '📈',
-      'Chi phí cần thiết': '🏠', 'Chi phí linh hoạt': '🎯',
-      'Tiết kiệm và Đầu tư': '💰',
+      'sinh hoạt': '🏠', 'cần thiết': '🏠', 'nhà': '🏠',
+      'ăn uống': '🍜', 'thực phẩm': '🍜',
+      'giao thông': '🚗', 'di chuyển': '🚗',
+      'giải trí': '🎬', 'linh hoạt': '🎯',
+      'tiết kiệm': '💰', 'đầu tư': '📈', 'tiết kiệm và đầu tư': '💰',
+      'học tập': '📚', 'phát triển': '📚',
+      'sức khoẻ': '💊', 'y tế': '💊',
+      'tiện ích': '💡', 'dịch vụ': '📱',
+      'dự phòng': '🛡️', 'mua sắm': '🛍️',
     };
 
     String getIcon(String name) {
-      if (iconMap.containsKey(name)) return iconMap[name]!;
       final lower = name.toLowerCase();
       for (final kv in iconMap.entries) {
-        if (lower.contains(kv.key.toLowerCase())) return kv.value;
+        if (lower.contains(kv.key)) return kv.value;
       }
       return '📌';
     }
 
-    // Tìm danh mục lớn phù hợp cho 1 keyword nhỏ
-    String mapToCategory(String keyword) {
-      final lower = keyword.toLowerCase().trim();
-      for (final kv in categoryMapping.entries) {
-        if (lower.contains(kv.key)) return kv.value;
+    // Parse số tiền — chỉ lấy trong range hợp lệ
+    double? parseTrieu(String raw) {
+      // Range "X-Y triệu"
+      final r = RegExp(r'(\d+(?:[,\.]\d+)?)\s*[-–]\s*(\d+(?:[,\.]\d+)?)\s*(?:triệu|tr)\b',
+          caseSensitive: false).firstMatch(raw);
+      if (r != null) {
+        final a = double.tryParse(r.group(1)!.replaceAll(',', '.')) ?? 0;
+        final b = double.tryParse(r.group(2)!.replaceAll(',', '.')) ?? 0;
+        if (a > 0 && b > 0 && b <= 100) return ((a + b) / 2) * 1000000;
       }
-      return '';
-    }
-
-    // Parse số tiền
-    double? parseAmount(String raw) {
-      raw = raw.trim();
-      final bigNum = RegExp(r'(\d[\d\.]+\d)\s*(?:đồng|đ|VND)?', caseSensitive: false)
-          .firstMatch(raw);
-      if (bigNum != null) {
-        final cleaned = bigNum.group(1)!.replaceAll('.', '');
-        final v = double.tryParse(cleaned);
-        if (v != null && v >= 10000) return v;
-      }
-      final triMatch = RegExp(r'(\d+(?:[,\.]\d+)?)\s*(?:triệu|tr)', caseSensitive: false)
-          .firstMatch(raw);
-      if (triMatch != null) {
-        final v = double.tryParse(triMatch.group(1)!.replaceAll(',', '.'));
-        if (v != null) return v * 1000000;
+      // "X triệu"
+      final s = RegExp(r'(\d+(?:[,\.]\d+)?)\s*(?:triệu|tr)\b',
+          caseSensitive: false).firstMatch(raw);
+      if (s != null) {
+        final v = double.tryParse(s.group(1)!.replaceAll(',', '.'));
+        if (v != null && v > 0 && v <= 100) return v * 1000000;
       }
       return null;
     }
 
-    // ── BƯỚC 1: Tìm các mục LỚN có số tiền ────────────────
-    // VD: "1. **Chi phí cần thiết (50%):** 7.500.000 đồng"
-    final bigItems = <String, double>{};  // category → amount
-    final p1 = RegExp(
-      r'\d+\.\s*\*{0,2}([^\*\n\d]{3,60})\*{0,2}\s*[:\-–]\s*([\d\.]+\s*(?:đồng|đ|triệu|tr|VND)?)',
-      caseSensitive: false,
-    );
-    for (final m in p1.allMatches(text)) {
-      final rawName = m.group(1)!
-          .replaceAll(RegExp(r'\(\d+[-–]?\d*%\)'), '')
-          .replaceAll('**', '').replaceAll(RegExp(r'[:\-–]'), '')
-          .replaceAll(RegExp(r'\s+'), ' ').trim();
-      final amt = parseAmount(m.group(2) ?? '');
-      if (rawName.length >= 3 && amt != null && amt > 0) {
-        bigItems[rawName] = amt;
-      }
-    }
-
-    // ── BƯỚC 2: Tìm các mục NHỎ và gom vào danh mục lớn ──
-    // VD: "* Thực phẩm, ăn uống: 2.000.000 đồng"
-    // VD: "- Điện, nước, gas: 3.000.000 đồng"
-    final subGroups = <String, double>{};  // bigCategory → total amount
-    final p2 = RegExp(
-      r'[*\-•]\s*([^:\n]{3,80})\s*[:\-–]\s*([\d\.]+\s*(?:đồng|đ|triệu|tr)?)',
-      caseSensitive: false,
-    );
-    for (final m in p2.allMatches(text)) {
-      final rawKeywords = m.group(1) ?? '';
-      final amt = parseAmount(m.group(2) ?? '');
-      if (amt == null || amt <= 0) continue;
-
-      // Tách nhiều keyword (VD: "điện, nước, gas")
-      final keywords = rawKeywords.split(RegExp(r'[,/;]'));
-      String bigCat = '';
-      for (final kw in keywords) {
-        bigCat = mapToCategory(kw);
-        if (bigCat.isNotEmpty) break;
-      }
-      if (bigCat.isEmpty) continue;
-
-      subGroups[bigCat] = (subGroups[bigCat] ?? 0) + amt;
-    }
-
-    // ── BƯỚC 3: Merge kết quả ──────────────────────────────
-    final merged = <String, double>{};
-
-    // Ưu tiên mục LỚN nếu có
-    merged.addAll(bigItems);
-
-    // Nếu không có mục lớn → dùng mục nhỏ đã gom
-    if (merged.isEmpty && subGroups.isNotEmpty) {
-      merged.addAll(subGroups);
-    }
-
-    // Nếu có cả hai → cập nhật amount từ subGroups vào bigItems
-    // (sub items thường chi tiết hơn → ưu tiên nếu khác biệt > 10%)
-    if (bigItems.isNotEmpty && subGroups.isNotEmpty) {
-      for (final kv in subGroups.entries) {
-        if (!merged.containsKey(kv.key)) {
-          merged[kv.key] = kv.value;
-        }
-      }
-    }
-
-    // Convert sang List
-    final seenNames = <String>{};
     final items = <Map<String, dynamic>>[];
-    for (final kv in merged.entries) {
-      final name = kv.key;
-      if (seenNames.contains(name.toLowerCase())) continue;
-      seenNames.add(name.toLowerCase());
+    final seenNames = <String>{};
+    final skipWords = ['thu nhập', 'lương', 'tổng thu', 'số dư', 'còn lại',
+        'mức thu', 'ví dụ', 'gợi ý', 'nguyên tắc'];
+
+    void tryAdd(String rawName, double amount) {
+      final name = rawName
+          .replaceAll(RegExp(r'\(\d+[-–]?\d*%\)'), '')
+          .replaceAll('**', '').replaceAll('*', '')
+          .replaceAll(RegExp(r'^[\d\.\-\s•:–]+'), '')
+          .replaceAll(RegExp(r'[:\-–]+$'), '')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      if (name.length < 3 || name.length > 60) return;
+      if (amount <= 0 || amount > 50000000) return;
+      final key = name.toLowerCase();
+      if (seenNames.contains(key)) return;
+      if (skipWords.any((w) => key.contains(w))) return;
+      seenNames.add(key);
       items.add({
         'category': name,
-        'amount':   kv.value.toInt(),
+        'amount':   amount.toInt(),
         'icon':     getIcon(name),
         'note':     '',
         'percent':  0,
+        'subItems': <Map<String, dynamic>>[],
       });
+    }
+
+    // ── PASS 1: "50% (5 triệu đồng) cho **tên**" ─────────
+    // Format: X% (Y triệu) cho tên
+    final p1 = RegExp(
+      r'\d+%\s*\(([^)]+)\)\s*cho\s*\*{0,2}([^\n*]{3,50})\*{0,2}',
+      caseSensitive: false,
+    );
+    for (final m in p1.allMatches(text)) {
+      final amt  = parseTrieu(m.group(1) ?? '');
+      final name = m.group(2)?.trim() ?? '';
+      if (amt != null) tryAdd(name, amt);
+    }
+
+    // ── PASS 2: "Tên (X%): Y triệu" ──────────────────────
+    final p2 = RegExp(
+      r'\*{0,2}([A-Za-zÀ-ỹ][A-Za-zÀ-ỹ\s&\/]{2,40}?)\s*(?:\(\d+%\))?\s*\*{0,2}\s*[:\-–]\s*([^\n]{1,30})',
+      caseSensitive: false,
+    );
+    if (items.length < 2) {
+      for (final m in p2.allMatches(text)) {
+        final amt = parseTrieu(m.group(2) ?? '');
+        if (amt != null) tryAdd(m.group(1) ?? '', amt);
+      }
+    }
+
+    // ── PASS 3: "1. Tên: X triệu" (có số thứ tự) ─────────
+    if (items.length < 2) {
+      final p3 = RegExp(
+        r'^\s*\d+[\.)]\s*\*{0,2}([^:\*\n\d]{3,50})\*{0,2}\s*[:\-–]\s*([^\n]{1,30})',
+        multiLine: true,
+      );
+      for (final m in p3.allMatches(text)) {
+        final amt = parseTrieu(m.group(2) ?? '');
+        if (amt != null) tryAdd(m.group(1) ?? '', amt);
+      }
     }
 
     // Tính %
@@ -231,20 +180,52 @@ class _ChatbotViewState extends State<ChatbotView>
     return items;
   }
 
+  // Detect thu nhập từ câu hỏi người dùng (VD: "lương 10 triệu")
+  int _detectIncomeFromMessages() {
+    // Tìm trong các message của user
+    for (int i = _messages.length - 1; i >= 0; i--) {
+      final msg = _messages[i];
+      if (!msg.isUser) continue;
+      final text = msg.message.toLowerCase();
+      // Pattern: "lương X triệu", "thu nhập X triệu", "X triệu 1 tháng"
+      final patterns = [
+        RegExp(r'(?:lương|thu nhập|kiếm|nhận)\s*(\d+(?:[,\.]\d+)?)\s*(?:triệu|tr)', caseSensitive: false),
+        RegExp(r'(\d+(?:[,\.]\d+)?)\s*(?:triệu|tr)\s*(?:1 tháng|một tháng|mỗi tháng|\/tháng)', caseSensitive: false),
+        RegExp(r'(\d+(?:[,\.]\d+)?)\s*(?:triệu|tr)', caseSensitive: false),
+      ];
+      for (final p in patterns) {
+        final m = p.firstMatch(text);
+        if (m != null) {
+          final v = double.tryParse(m.group(1)!.replaceAll(',', '.'));
+          if (v != null && v > 0 && v <= 100) return (v * 1000000).toInt();
+        }
+      }
+    }
+    return 0;
+  }
+
   // ══════════════════════════════════════════════════════
   // BOTTOM SHEET chỉnh sửa & lưu kế hoạch
   // ══════════════════════════════════════════════════════
   void _showSavePlanSheet(List<Map<String, dynamic>> items) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    // Controllers cho từng item
-    final controllers = {
+
+    // Controllers cho từng item gốc
+    final controllers = <String, TextEditingController>{
       for (final item in items)
         item['category'] as String:
             TextEditingController(text: '${item['amount']}')
     };
-    // Income controller
-    final totalAmt = items.fold<int>(0, (s, i) => s + (i['amount'] as int));
-    final incomeCtrl = TextEditingController(text: '$totalAmt');
+    // Lấy income detect được từ câu hỏi user, fallback = tổng các mục
+    final detectedIncome = items.isNotEmpty
+        ? (items.first['_income'] as int? ?? 0)
+        : 0;
+    final fallbackIncome = items.fold<int>(0, (s, i) => s + (i['amount'] as int));
+    final incomeCtrl = TextEditingController(
+        text: '${detectedIncome > 0 ? detectedIncome : fallbackIncome}');
+
+    // Extra items người dùng thêm
+    final extraItems  = <Map<String, String>>[];  // [{name, amount}]
 
     String _fmt(dynamic v) {
       final n = (v is num) ? v.toInt() : int.tryParse(v.toString()) ?? 0;
@@ -261,8 +242,13 @@ class _ChatbotViewState extends State<ChatbotView>
           int getIncome() =>
               int.tryParse(incomeCtrl.text.replaceAll(',', '')) ?? 0;
 
-          int getTotal() => controllers.values.fold(0, (s, c) =>
-              s + (int.tryParse(c.text.replaceAll(',', '')) ?? 0));
+          int getTotal() {
+            int t = controllers.values.fold(0,
+                (s, c) => s + (int.tryParse(c.text.replaceAll(',', '')) ?? 0));
+            t += extraItems.fold(0,
+                (s, e) => s + (int.tryParse(e['amount']!.replaceAll(',', '')) ?? 0));
+            return t;
+          }
 
           final income    = getIncome();
           final total     = getTotal();
@@ -270,294 +256,398 @@ class _ChatbotViewState extends State<ChatbotView>
           final isOver    = remaining < 0;
 
           return Container(
-            height: MediaQuery.of(context).size.height * 0.88,
+            height: MediaQuery.of(context).size.height * 0.9,
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: Column(children: [
               // Handle
               Center(child: Container(
                 width: 40, height: 4,
                 margin: const EdgeInsets.only(top: 14, bottom: 10),
-                decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                decoration: BoxDecoration(color: Colors.grey[300],
                     borderRadius: BorderRadius.circular(2)),
               )),
 
               // Header
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                 child: Row(children: [
                   const Text('💾', style: TextStyle(fontSize: 22)),
                   const SizedBox(width: 10),
                   Expanded(child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                      crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text('Lưu vào kế hoạch',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     Text('Chỉnh sửa rồi lưu theo ý bạn',
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey[500])),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[500])),
                   ])),
                   GestureDetector(
                     onTap: () => Navigator.pop(ctx),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
+                    child: Container(padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                           color: Colors.grey[200], shape: BoxShape.circle),
                       child: Icon(Icons.close_rounded,
-                          size: 18, color: Colors.grey[700]),
-                    ),
+                          size: 18, color: Colors.grey[700])),
                   ),
                 ]),
               ),
 
-              const SizedBox(height: 12),
-
-              // Thanh thu nhập + tổng
+              // Thu nhập
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(children: [
-                  // Thu nhập
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00CED1).withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: const Color(0xFF00CED1).withOpacity(0.3)),
-                    ),
-                    child: Row(children: [
-                      const Icon(Icons.account_balance_wallet_rounded,
-                          color: Color(0xFF00CED1), size: 18),
-                      const SizedBox(width: 8),
-                      const Text('Thu nhập / tháng',
-                          style: TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w600)),
-                      const Spacer(),
-                      SizedBox(
-                        width: 120,
-                        child: TextField(
-                          controller: incomeCtrl,
-                          keyboardType: TextInputType.number,
-                          textAlign: TextAlign.right,
-                          onChanged: (_) => setS(() {}),
-                          style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF00CED1)),
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                            suffixText: 'đ',
-                            suffixStyle: TextStyle(
-                                color: Color(0xFF00CED1),
-                                fontWeight: FontWeight.bold),
-                            contentPadding: EdgeInsets.zero,
-                          ),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00CED1).withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF00CED1).withOpacity(0.3)),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.account_balance_wallet_rounded,
+                        color: Color(0xFF00CED1), size: 18),
+                    const SizedBox(width: 8),
+                    const Expanded(child: Text('Thu nhập / tháng',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+                    SizedBox(width: 130,
+                      child: TextField(
+                        controller: incomeCtrl,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.right,
+                        onChanged: (_) => setS(() {}),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold,
+                            color: Color(0xFF00CED1)),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none, isDense: true,
+                          suffixText: 'đ',
+                          suffixStyle: TextStyle(color: Color(0xFF00CED1),
+                              fontWeight: FontWeight.bold),
+                          contentPadding: EdgeInsets.zero,
                         ),
                       ),
-                    ]),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Tổng chi + còn lại
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isOver
-                          ? Colors.red.withOpacity(0.08)
-                          : Colors.green.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: isOver
-                              ? Colors.red.withOpacity(0.3)
-                              : Colors.green.withOpacity(0.3)),
                     ),
-                    child: Row(children: [
-                      Icon(
-                        isOver
-                            ? Icons.warning_amber_rounded
-                            : Icons.check_circle_rounded,
-                        color: isOver ? Colors.red : Colors.green,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(
-                        isOver
-                            ? 'Vượt quá ${_fmt(remaining.abs())}đ'
-                            : 'Còn lại ${_fmt(remaining)}đ → vào Tiết kiệm',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: isOver ? Colors.red : Colors.green,
-                            fontWeight: FontWeight.w500),
-                      )),
-                      Text('Tổng: ${_fmt(total)}đ',
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: isOver ? Colors.red : Colors.green)),
-                    ]),
-                  ),
-                ]),
+                  ]),
+                ),
               ),
 
-              const SizedBox(height: 8),
+              // Thanh tổng
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isOver
+                        ? Colors.red.withOpacity(0.08)
+                        : Colors.green.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isOver
+                        ? Colors.red.withOpacity(0.3)
+                        : Colors.green.withOpacity(0.3)),
+                  ),
+                  child: Row(children: [
+                    Icon(isOver
+                        ? Icons.warning_amber_rounded
+                        : Icons.check_circle_rounded,
+                        color: isOver ? Colors.red : Colors.green, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(
+                      isOver
+                          ? '⚠️ Vượt ${_fmt(remaining.abs())}đ so với thu nhập!'
+                          : '✅ Còn lại ${_fmt(remaining)}đ → vào Tiết kiệm',
+                      style: TextStyle(fontSize: 12,
+                          color: isOver ? Colors.red : Colors.green,
+                          fontWeight: FontWeight.w500),
+                    )),
+                    Text('${_fmt(total)}đ',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold,
+                            color: isOver ? Colors.red : Colors.green)),
+                  ]),
+                ),
+              ),
+
               Divider(height: 1, color: Colors.grey[200]),
 
-              // Danh sách mục chỉnh sửa
-              Expanded(child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-                itemCount: items.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) {
-                  final item = items[i];
-                  final cat  = item['category'] as String;
-                  final ctrl = controllers[cat]!;
-                  final colors = [
-                    const Color(0xFF00CED1), const Color(0xFF4CAF50),
-                    const Color(0xFFFF9800), const Color(0xFF8B5CF6),
-                    const Color(0xFFE91E63), const Color(0xFFFF5722),
-                    const Color(0xFF009688), const Color(0xFF2196F3),
-                  ];
-                  final color = colors[i % colors.length];
+              // Danh sách mục
+              Expanded(child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                children: [
 
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF2C2C2C)
-                          : Colors.grey[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: color.withOpacity(0.25)),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      child: Row(children: [
-                        // Icon + tên
-                        Text(item['icon'] as String,
-                            style: const TextStyle(fontSize: 20)),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(cat,
-                            style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: isDark
-                                    ? Colors.white
-                                    : Colors.black87))),
+                  // ── Mục gốc từ AI ─────────────────────────
+                  ...items.asMap().entries.map((e) {
+                    final i    = e.key;
+                    final item = e.value;
+                    final cat  = item['category'] as String;
+                    final ctrl = controllers[cat]!;
+                    final subItems = (item['subItems'] as List?)
+                        ?.cast<Map<String, dynamic>>() ?? [];
+                    final colors = [
+                      const Color(0xFF00CED1), const Color(0xFF4CAF50),
+                      const Color(0xFFFF9800), const Color(0xFF8B5CF6),
+                      const Color(0xFFE91E63), const Color(0xFFFF5722),
+                      const Color(0xFF009688), const Color(0xFF2196F3),
+                    ];
+                    final color = colors[i % colors.length];
+                    final curAmt = int.tryParse(ctrl.text.replaceAll(',', '')) ?? 0;
+                    final inc    = getIncome();
+                    final isItemOver = inc > 0 && curAmt > inc;
 
-                        // Input số tiền
-                        SizedBox(
-                          width: 110,
-                          child: TextField(
-                            controller: ctrl,
-                            keyboardType: TextInputType.number,
-                            textAlign: TextAlign.right,
-                            onChanged: (_) => setS(() {}),
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: color),
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                              isDense: true,
-                              suffixText: 'đ',
-                              suffixStyle: TextStyle(
-                                  color: color,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12),
-                              contentPadding: EdgeInsets.zero,
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                            color: isItemOver
+                                ? Colors.red.withOpacity(0.4)
+                                : color.withOpacity(0.25)),
+                      ),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                          child: Row(children: [
+                            Text(item['icon'] as String,
+                                style: const TextStyle(fontSize: 20)),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(cat,
+                                style: TextStyle(fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? Colors.white : Colors.black87))),
+
+                            // Input số tiền
+                            SizedBox(width: 120,
+                              child: TextField(
+                                controller: ctrl,
+                                keyboardType: TextInputType.number,
+                                textAlign: TextAlign.right,
+                                onChanged: (_) => setS(() {}),
+                                style: TextStyle(fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: isItemOver ? Colors.red : color),
+                                decoration: InputDecoration(
+                                  border: InputBorder.none, isDense: true,
+                                  suffixText: 'đ',
+                                  suffixStyle: TextStyle(
+                                      color: isItemOver ? Colors.red : color,
+                                      fontWeight: FontWeight.bold, fontSize: 12),
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                              ),
+                            ),
+
+                            // Xóa
+                            GestureDetector(
+                              onTap: () => setS(() {
+                                items.removeAt(i);
+                                controllers.remove(cat);
+                              }),
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: 8),
+                                child: Icon(Icons.remove_circle_outline_rounded,
+                                    size: 20, color: Colors.grey[400]),
+                              ),
+                            ),
+                          ]),
+                        ),
+
+                        // Sub-items
+                        if (subItems.isNotEmpty) ...[
+                          Divider(height: 1, color: color.withOpacity(0.12)),
+                          ...subItems.map((sub) => Padding(
+                            padding: const EdgeInsets.fromLTRB(44, 5, 14, 5),
+                            child: Row(children: [
+                              Container(width: 5, height: 5,
+                                  margin: const EdgeInsets.only(right: 8),
+                                  decoration: BoxDecoration(
+                                      color: color.withOpacity(0.4),
+                                      shape: BoxShape.circle)),
+                              Expanded(child: Text(sub['name'] as String,
+                                  style: TextStyle(fontSize: 12,
+                                      color: Colors.grey[500]))),
+                              Text('${_fmt(sub['amount'] as int)}đ',
+                                  style: TextStyle(fontSize: 12,
+                                      color: color.withOpacity(0.7),
+                                      fontWeight: FontWeight.w500)),
+                            ]),
+                          )),
+                          const SizedBox(height: 6),
+                        ],
+                      ]),
+                    );
+                  }).toList(),
+
+                  // ── Mục tự thêm ───────────────────────────
+                  ...extraItems.asMap().entries.map((e) {
+                    final i    = e.key;
+                    final item = e.value;
+                    final color = const Color(0xFFFF9800);
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: color.withOpacity(0.4), width: 1.5),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                        child: Row(children: [
+                          const Text('📌', style: TextStyle(fontSize: 20)),
+                          const SizedBox(width: 10),
+
+                          // Tên — editable
+                          Expanded(
+                            child: TextField(
+                              onChanged: (v) => setS(() => item['name'] = v),
+                              controller: TextEditingController(text: item['name'])
+                                ..selection = TextSelection.collapsed(
+                                    offset: item['name']!.length),
+                              style: TextStyle(fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white : Colors.black87),
+                              decoration: InputDecoration(
+                                hintText: 'Tên mục mới...',
+                                hintStyle: TextStyle(color: Colors.grey[400],
+                                    fontSize: 12),
+                                border: InputBorder.none, isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
                             ),
                           ),
-                        ),
 
-                        // Xóa item
-                        GestureDetector(
-                          onTap: () => setS(() => items.removeAt(i)),
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 8),
-                            child: Icon(Icons.remove_circle_outline_rounded,
-                                size: 18, color: Colors.grey[400]),
+                          // Số tiền — editable
+                          SizedBox(width: 110,
+                            child: TextField(
+                              onChanged: (v) {
+                                setS(() => item['amount'] = v);
+                              },
+                              controller: TextEditingController(text: item['amount'])
+                                ..selection = TextSelection.collapsed(
+                                    offset: item['amount']!.length),
+                              keyboardType: TextInputType.number,
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFFF9800)),
+                              decoration: const InputDecoration(
+                                border: InputBorder.none, isDense: true,
+                                suffixText: 'đ',
+                                suffixStyle: TextStyle(color: Color(0xFFFF9800),
+                                    fontWeight: FontWeight.bold, fontSize: 12),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
                           ),
-                        ),
+
+                          // Xóa
+                          GestureDetector(
+                            onTap: () => setS(() => extraItems.removeAt(i)),
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Icon(Icons.remove_circle_outline_rounded,
+                                  size: 20, color: Colors.red[300]),
+                            ),
+                          ),
+                        ]),
+                      ),
+                    );
+                  }).toList(),
+
+                  // ── Nút thêm mục mới ──────────────────────
+                  GestureDetector(
+                    onTap: () => setS(() => extraItems.add({'name': '', 'amount': ''})),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                            color: const Color(0xFF00CED1).withOpacity(0.4),
+                            width: 1.5),
+                      ),
+                      child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                        Icon(Icons.add_rounded, color: Color(0xFF00CED1), size: 20),
+                        SizedBox(width: 8),
+                        Text('Thêm mục chi tiêu',
+                            style: TextStyle(fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF00CED1))),
                       ]),
                     ),
-                  );
-                },
+                  ),
+                  const SizedBox(height: 8),
+                ],
               )),
 
               // Bottom buttons
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                 child: Column(children: [
                   Divider(height: 1, color: Colors.grey[200]),
                   const SizedBox(height: 12),
                   Row(children: [
-                    // Huỷ
                     GestureDetector(
                       onTap: () => Navigator.pop(ctx),
                       child: Container(
                         width: 48, height: 52,
                         decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF2C2C2C)
-                              : Colors.grey[100],
+                          color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100],
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                              color: isDark
-                                  ? Colors.grey[700]!
-                                  : Colors.grey[200]!),
+                              color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
                         ),
                         child: Icon(Icons.close_rounded,
-                            color: isDark
-                                ? Colors.grey[400]
-                                : Colors.grey[600]),
+                            color: isDark ? Colors.grey[400] : Colors.grey[600]),
                       ),
                     ),
                     const SizedBox(width: 12),
-
-                    // Lưu kế hoạch
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => _savePlanToFirestore(
-                          ctx,
-                          items,
-                          controllers,
-                          getIncome(),
-                          remaining,
-                        ),
-                        child: Container(
+                        onTap: isOver ? null : () {
+                          // Merge controllers + extraItems
+                          final allControllers = Map<String, TextEditingController>.from(controllers);
+                          final allItems = List<Map<String, dynamic>>.from(items);
+                          for (final extra in extraItems) {
+                            final name = extra['name']!.trim();
+                            if (name.isEmpty) continue;
+                            allControllers[name] = TextEditingController(
+                                text: extra['amount']!.replaceAll(',', ''));
+                            allItems.add({
+                              'category': name,
+                              'amount': int.tryParse(extra['amount']!.replaceAll(',', '')) ?? 0,
+                              'icon': '📌',
+                              'note': '',
+                              'percent': 0,
+                            });
+                          }
+                          _savePlanToFirestore(ctx, allItems, allControllers,
+                              getIncome(), remaining);
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
                           height: 52,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFF00CED1),
-                                  Color(0xFF8B5CF6)
-                                ]),
+                            gradient: isOver ? null : const LinearGradient(
+                                colors: [Color(0xFF00CED1), Color(0xFF8B5CF6)]),
+                            color: isOver ? Colors.grey[300] : null,
                             borderRadius: BorderRadius.circular(14),
-                            boxShadow: [BoxShadow(
+                            boxShadow: isOver ? [] : [BoxShadow(
                                 color: const Color(0xFF00CED1).withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3))],
+                                blurRadius: 8, offset: const Offset(0, 3))],
                           ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.save_alt_rounded,
-                                  color: Colors.white, size: 20),
-                              SizedBox(width: 8),
-                              Text('Lưu kế hoạch',
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700)),
-                            ],
-                          ),
+                          child: Row(mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                            Icon(isOver ? Icons.block_rounded : Icons.save_alt_rounded,
+                                color: isOver ? Colors.grey[500] : Colors.white,
+                                size: 20),
+                            const SizedBox(width: 8),
+                            Text(isOver ? 'Vượt ngân sách — không thể lưu' : 'Lưu kế hoạch',
+                                style: TextStyle(
+                                    color: isOver ? Colors.grey[500] : Colors.white,
+                                    fontSize: 15, fontWeight: FontWeight.w700)),
+                          ]),
                         ),
                       ),
                     ),
@@ -570,6 +660,7 @@ class _ChatbotViewState extends State<ChatbotView>
       ),
     );
   }
+
 
   // ══════════════════════════════════════════════════════
   // SAVE lên Firestore
@@ -723,13 +814,16 @@ class _ChatbotViewState extends State<ChatbotView>
         ));
       });
 
-      for (int i = 0; i < aiResponse.length; i++) {
-        await Future.delayed(const Duration(milliseconds: 8));
+      // Stream theo chunk 5 ký tự, delay 15ms — mượt hơn char-by-char
+      const chunkSize = 5;
+      for (int i = 0; i < aiResponse.length; i += chunkSize) {
+        await Future.delayed(const Duration(milliseconds: 15));
         if (!mounted) return;
+        final chunk = aiResponse.substring(0, i + chunkSize > aiResponse.length
+            ? aiResponse.length : i + chunkSize);
         setState(() {
-          _streamingText = aiResponse.substring(0, i + 1);
-          final idx =
-              _messages.indexWhere((m) => m.id == streamId);
+          _streamingText = chunk;
+          final idx = _messages.indexWhere((m) => m.id == streamId);
           if (idx != -1) {
             _messages[idx] = ChatMessage(
               id: streamId,
@@ -739,17 +833,37 @@ class _ChatbotViewState extends State<ChatbotView>
             );
           }
         });
-        if (i % 40 == 0) _scrollToBottom();
+        if (i % 100 == 0) _scrollToBottom();
+      }
+      // Đảm bảo hiện đủ toàn bộ text
+      if (mounted) {
+        setState(() {
+          final idx = _messages.indexWhere((m) => m.id == streamId);
+          if (idx != -1) {
+            _messages[idx] = ChatMessage(
+              id: streamId,
+              message: aiResponse,
+              isUser: false,
+              timestamp: _messages[idx].timestamp,
+            );
+          }
+        });
       }
 
       if (!mounted) return;
 
       // Detect plan items sau khi stream xong
       final planItems = _detectPlanItems(aiResponse);
+      // Gắn income vào mỗi item để dùng khi mở sheet
+      final detectedIncome = _detectIncomeFromMessages();
       setState(() {
         _isStreaming = false;
         _streamingMessageId = null;
         if (planItems.isNotEmpty) {
+          // Lưu income vào item đầu tiên để truyền sang sheet
+          if (detectedIncome > 0) {
+            planItems.first['_income'] = detectedIncome;
+          }
           _detectedPlans[streamId] = planItems;
         }
       });
@@ -857,15 +971,15 @@ class _ChatbotViewState extends State<ChatbotView>
                 List<Map<String, dynamic>>.from(
                   _lastDetectedPlan.map((e) => Map<String, dynamic>.from(e)))),
               child: Container(
-                margin: const EdgeInsets.only(right: 4),
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
+                margin: const EdgeInsets.only(right: 8),
+                width: 28, height: 28,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
                       colors: [Color(0xFF00CED1), Color(0xFF8B5CF6)]),
-                  borderRadius: BorderRadius.circular(20),
+                  shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.save_alt_rounded,
-                    color: Colors.white, size: 16),
+                    color: Colors.white, size: 14),
               ),
             ),
           if (_messages.isNotEmpty)
@@ -1036,6 +1150,8 @@ class _ChatbotViewState extends State<ChatbotView>
   }
 
   // ── AI message + nút Lưu kế hoạch ────────────────────
+
+
   Widget _buildAIMessage(
       ChatMessage msg, bool isDark, Color textColor, Color subColor,
       {bool isStreaming = false}) {
@@ -1076,12 +1192,10 @@ class _ChatbotViewState extends State<ChatbotView>
                 onLongPress: () {
                   Clipboard.setData(ClipboardData(text: msg.message));
                   ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Đã sao chép'),
-                          duration: Duration(seconds: 1)));
+                    const SnackBar(content: Text('Đã sao chép'),
+                        duration: Duration(seconds: 1)));
                 },
-                child: _buildFormattedText(
-                    msg.message, textColor, isStreaming),
+                child: _buildFormattedText(msg.message, textColor, isStreaming),
               ),
 
             // ── NÚT LƯU KẾ HOẠCH ─────────────────────
