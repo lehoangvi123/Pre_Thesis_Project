@@ -1,4 +1,4 @@
-// lib/view/HomeView.dart
+// lib/view/HomeView.dart — OPTIMIZED VERSION
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -47,11 +47,24 @@ class _HomeViewState extends State<HomeView> {
   List<Map<String, dynamic>> _recentTxs = [];
   bool _reportLoading = true;
 
-  // ── GREETING BANNER ──────────────────────────────────
+  // Plan data — load một lần, không dùng StreamBuilder
+  Map<String, dynamic> _planData     = {};
+  List                 _planTable    = [];
+  double               _planIncome   = 0;
+  String               _planDateStr  = '';
+  Map<String, double>  _planSpentMap = {};
+  bool                 _planLoaded   = false;
+
+  // Greeting
   bool   _showGreeting  = false;
   String _greetingMsg   = '';
   String _greetingEmoji = '';
-  // ─────────────────────────────────────────────────────
+
+  // Balance data
+  double _balance  = 0;
+  double _totInc   = 0;
+  double _totExp   = 0;
+  bool   _balLoaded = false;
 
   @override
   void initState() {
@@ -61,27 +74,86 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Future<void> _initAll() async {
-    // Gọi song song, không block nhau
     await Future.wait([
       _loadUserName(),
-      _loadStreakOnce(),  // gộp checkLoginStreak + loadStreakData thành 1
+      _loadStreakOnce(),
+      _loadBalanceOnce(),    // thay StreamBuilder bằng Future
       _loadDailySpend(),
     ]);
-    await _loadMonthReport();
+    await Future.wait([
+      _loadMonthReport(),
+      _loadPlanData(),       // load plan 1 lần
+    ]);
     if (mounted) _triggerGreeting();
   }
 
-  // Gộp 2 streak calls thành 1 để tránh double Firestore read
+  // ── Load balance một lần (thay StreamBuilder) ─────────
+  Future<void> _loadBalanceOnce() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users').doc(uid).get();
+      if (!doc.exists) return;
+      final d = doc.data() as Map<String, dynamic>? ?? {};
+      if (mounted) setState(() {
+        _balance   = (d['balance']      ?? 0).toDouble();
+        _totInc    = (d['totalIncome']  ?? 0).toDouble();
+        _totExp    = (d['totalExpense'] ?? 0).toDouble();
+        _balLoaded = true;
+      });
+    } catch (_) {}
+  }
+
+  // ── Load plan data một lần ────────────────────────────
+  Future<void> _loadPlanData() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users').doc(uid)
+          .collection('plans').doc('current_plan').get();
+      if (!doc.exists || !mounted) return;
+
+      final data     = doc.data() as Map<String, dynamic>;
+      final plan     = data['plan'] as Map<String, dynamic>? ?? {};
+      final table    = plan['expense_table'] as List? ?? [];
+      final recInc   = (plan['recommended_income'] as num?)?.toDouble() ?? 0;
+      final created  = data['createdAt'] as Timestamp?;
+      final dateStr  = created != null
+          ? '${created.toDate().day}/${created.toDate().month}/${created.toDate().year}'
+          : '';
+
+      // Tính spent từ _dailyTxs (đã load sẵn)
+      final spentMap = <String, double>{};
+      for (final dayTxs in _dailyTxs.values) {
+        for (final d in dayTxs) {
+          final isExp = d['type'] == 'expense' || d['isIncome'] == false;
+          if (!isExp) continue;
+          final cat = (d['category'] ?? d['categoryName'] ?? '').toString();
+          final amt = (d['amount'] as num?)?.toDouble().abs() ?? 0;
+          spentMap[cat] = (spentMap[cat] ?? 0) + amt;
+        }
+      }
+
+      if (mounted) setState(() {
+        _planData     = plan;
+        _planTable    = table;
+        _planIncome   = recInc;
+        _planDateStr  = dateStr;
+        _planSpentMap = spentMap;
+        _planLoaded   = true;
+      });
+    } catch (_) {}
+  }
+
   Future<void> _loadStreakOnce() async {
     try {
       final data   = await LoginStreakService().checkAndUpdateStreak();
       final streak = data['currentStreak'] ?? 0;
       final best   = data['bestStreak']    ?? 0;
       if (mounted) {
-        setState(() {
-          _currentStreak = streak;
-          _bestStreak    = best;
-        });
+        setState(() { _currentStreak = streak; _bestStreak = best; });
         if (streak > 1) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Row(children: [
@@ -99,48 +171,38 @@ class _HomeViewState extends State<HomeView> {
     } catch (_) {}
   }
 
-  // ── Greeting logic ────────────────────────────────────
   void _triggerGreeting() {
     final hour = DateTime.now().hour;
     final pool = <String, List<Map<String, String>>>{
       'morning': [
-        {'e': '☀️', 'm': 'Chào buổi sáng! Hôm nay bạn dự định chi tiêu như thế nào?'},
-        {'e': '☕', 'm': 'Sáng ngon lành! Đừng quên ghi lại mọi khoản chi hôm nay nhé!'},
-        {'e': '🌞', 'm': 'Chào ngày mới! Kiểm soát tài chính từ sớm — bí quyết của người giỏi!'},
-        {'e': '🌅', 'm': 'Good morning! Một ngày mới, hãy quản lý tài chính thật tốt nhé~'},
+        {'e':'☀️','m':'Chào buổi sáng! Hôm nay bạn dự định chi tiêu như thế nào?'},
+        {'e':'☕','m':'Sáng ngon lành! Đừng quên ghi lại mọi khoản chi hôm nay nhé!'},
+        {'e':'🌞','m':'Chào ngày mới! Kiểm soát tài chính từ sớm — bí quyết của người giỏi!'},
       ],
       'noon': [
-        {'e': '🍜', 'm': 'Vừa ăn trưa xong? Nhớ ghi lại khoản chi vừa rồi nhé!'},
-        {'e': '💡', 'm': 'Tip nhỏ: Ghi chép ngay sau khi chi — đừng để quên nhé!'},
-        {'e': '🌤️', 'm': 'Buổi trưa năng động! Chi tiêu của bạn trong tầm kiểm soát chứ?'},
+        {'e':'🍜','m':'Vừa ăn trưa xong? Nhớ ghi lại khoản chi vừa rồi nhé!'},
+        {'e':'💡','m':'Tip nhỏ: Ghi chép ngay sau khi chi — đừng để quên nhé!'},
       ],
       'afternoon': [
-        {'e': '🎯', 'm': 'Buổi chiều hiệu quả! Hãy xem lại kế hoạch chi tiêu hôm nay~'},
-        {'e': '💪', 'm': 'Kiểm soát tài chính hôm nay = tự do tài chính ngày mai!'},
-        {'e': '📊', 'm': 'Còn vài tiếng nữa hết ngày — chi tiêu của bạn có ổn không?'},
+        {'e':'🎯','m':'Buổi chiều hiệu quả! Hãy xem lại kế hoạch chi tiêu hôm nay~'},
+        {'e':'💪','m':'Kiểm soát tài chính hôm nay = tự do tài chính ngày mai!'},
       ],
       'evening': [
-        {'e': '🌙', 'm': 'Tổng kết ngày hôm nay nào! Bạn đã chi tiêu thế nào?'},
-        {'e': '✨', 'm': 'Buổi tối bình yên! Đừng quên ghi đầy đủ chi tiêu trong ngày nhé~'},
-        {'e': '🎉', 'm': 'Mỗi đồng được ghi lại là một bước tiến đến mục tiêu!'},
-        {'e': '🌃', 'm': 'Hôm nay kiếm được bao nhiêu? Ghi lại để không bị quên!'},
+        {'e':'🌙','m':'Tổng kết ngày hôm nay nào! Bạn đã chi tiêu thế nào?'},
+        {'e':'✨','m':'Buổi tối bình yên! Đừng quên ghi đầy đủ chi tiêu trong ngày nhé~'},
+        {'e':'🎉','m':'Mỗi đồng được ghi lại là một bước tiến đến mục tiêu!'},
       ],
       'night': [
-        {'e': '🌙', 'm': 'Khuya rồi! Trước khi ngủ, hãy kiểm tra lại chi tiêu hôm nay nhé~'},
-        {'e': '😴', 'm': 'Sắp ngủ rồi à? Ghi lại chi tiêu cuối ngày để sáng mai nhẹ đầu hơn!'},
-        {'e': '⭐', 'm': 'Ngày hôm nay của bạn thế nào? Tài chính ổn chứ?'},
+        {'e':'🌙','m':'Khuya rồi! Trước khi ngủ, hãy kiểm tra lại chi tiêu hôm nay nhé~'},
+        {'e':'😴','m':'Sắp ngủ rồi à? Ghi lại chi tiêu cuối ngày để sáng mai nhẹ đầu hơn!'},
       ],
     };
-
-    final key = hour >= 5 && hour < 11  ? 'morning'
-        : hour >= 11 && hour < 14       ? 'noon'
-        : hour >= 14 && hour < 18       ? 'afternoon'
-        : hour >= 18 && hour < 22       ? 'evening'
-        : 'night';
-
+    final key  = hour >= 5 && hour < 11 ? 'morning'
+        : hour >= 11 && hour < 14 ? 'noon'
+        : hour >= 14 && hour < 18 ? 'afternoon'
+        : hour >= 18 && hour < 22 ? 'evening' : 'night';
     final list = pool[key]!;
     final item = list[DateTime.now().millisecond % list.length];
-
     Future.delayed(const Duration(milliseconds: 800), () {
       if (mounted) setState(() {
         _greetingEmoji = item['e']!;
@@ -148,12 +210,10 @@ class _HomeViewState extends State<HomeView> {
         _showGreeting  = true;
       });
     });
-
     Future.delayed(const Duration(milliseconds: 5800), () {
       if (mounted) setState(() => _showGreeting = false);
     });
   }
-  // ─────────────────────────────────────────────────────
 
   Future<void> _loadUserName() async {
     try {
@@ -164,15 +224,9 @@ class _HomeViewState extends State<HomeView> {
         final name = doc.exists
             ? ((doc.data() as Map)['name'] ?? user.displayName ?? 'User')
             : (user.displayName ?? user.email?.split('@')[0] ?? 'User');
-        // Chỉ setState 1 lần duy nhất
-        if (mounted) setState(() {
-          userName          = name;
-          isLoadingUserName = false;
-        });
+        if (mounted) setState(() { userName = name; isLoadingUserName = false; });
       }
-    } catch (_) {
-      if (mounted) setState(() => isLoadingUserName = false);
-    }
+    } catch (_) { if (mounted) setState(() => isLoadingUserName = false); }
   }
 
   Future<void> _loadDailySpend() async {
@@ -186,8 +240,7 @@ class _HomeViewState extends State<HomeView> {
           .collection('users').doc(uid).collection('transactions')
           .where('date', isGreaterThanOrEqualTo: start)
           .where('date', isLessThanOrEqualTo: end)
-          .orderBy('date', descending: true)
-          .get();
+          .orderBy('date', descending: true).get();
       final expMap = <int, double>{};
       final incMap = <int, double>{};
       final txMap  = <int, List<Map<String, dynamic>>>{};
@@ -223,8 +276,7 @@ class _HomeViewState extends State<HomeView> {
           .collection('users').doc(uid).collection('transactions')
           .where('date', isGreaterThanOrEqualTo: start)
           .where('date', isLessThanOrEqualTo: end)
-          .orderBy('date', descending: true)
-          .get();
+          .orderBy('date', descending: true).get();
       double inc = 0, exp = 0;
       final txs = <Map<String, dynamic>>[];
       for (final doc in snap.docs) {
@@ -246,15 +298,14 @@ class _HomeViewState extends State<HomeView> {
         _reportLoading = false;
         _dailyBudget   = daily;
       });
-    } catch (_) {
-      if (mounted) setState(() => _reportLoading = false);
-    }
+    } catch (_) { if (mounted) setState(() => _reportLoading = false); }
   }
 
   String _fmt(double v) => v.toStringAsFixed(0).replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
   String _formatCurrency(double v) => _fmt(v);
 
+  // ══════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -262,24 +313,25 @@ class _HomeViewState extends State<HomeView> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               _buildHeader(),
               const SizedBox(height: 24),
-              _buildBalanceCards(),
+              RepaintBoundary(child: _buildBalanceCards(isDark)),
               const SizedBox(height: 14),
-              _buildDailyBudgetCard(isDark),
+              RepaintBoundary(child: _buildDailyBudgetCard(isDark)),
               const SizedBox(height: 14),
               _buildAddButtons(isDark),
               const SizedBox(height: 16),
-              _buildMiniCalendar(isDark),
+              RepaintBoundary(child: _buildMiniCalendar(isDark)),
               const SizedBox(height: 16),
               _buildProgressBar(),
               const SizedBox(height: 20),
-              _buildPlanSection(isDark),
+              RepaintBoundary(child: _buildPlanSection(isDark)),
               const SizedBox(height: 20),
-              _buildMonthReportSection(isDark),
+              RepaintBoundary(child: _buildMonthReportSection(isDark)),
               const SizedBox(height: 20),
             ]),
           ),
@@ -392,8 +444,7 @@ class _HomeViewState extends State<HomeView> {
 
   Widget _streakStat(String label, String value, Color color) =>
       Column(children: [
-        Text(value, style: TextStyle(fontSize: 20,
-            fontWeight: FontWeight.bold, color: color)),
+        Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
         const SizedBox(height: 4),
         Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
       ]);
@@ -432,8 +483,8 @@ class _HomeViewState extends State<HomeView> {
           GestureDetector(
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const CalendarView())),
-            child: const Text('Xem chi tiết', style: TextStyle(fontSize: 11,
-                color: Color(0xFF00CED1), fontWeight: FontWeight.w500)),
+            child: const Text('Xem chi tiết', style: TextStyle(
+                fontSize: 11, color: Color(0xFF00CED1), fontWeight: FontWeight.w500)),
           ),
         ]),
         const SizedBox(height: 10),
@@ -537,46 +588,28 @@ class _HomeViewState extends State<HomeView> {
     ));
   }
 
-  Widget _buildBalanceCards() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    if (userId == null) return const Center(child: Text('Please login'));
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').doc(userId).snapshots(),
-      builder: (ctx, snap) {
-        if (snap.connectionState == ConnectionState.waiting)
-          return const Center(child: CircularProgressIndicator());
-        if (!snap.hasData || !snap.data!.exists) {
-          return Row(children: [
-            Expanded(child: _balCard(icon: Icons.account_balance_wallet_outlined,
-                label: 'Total Balance', amount: 0,
-                color: isDark ? Colors.white : Colors.black, isDark: isDark)),
-            const SizedBox(width: 12),
-            Expanded(child: _balCard(icon: Icons.trending_down,
-                label: 'Total Expenses', amount: 0,
-                color: Colors.red, isDark: isDark)),
-          ]);
-        }
-        final d       = snap.data!.data() as Map<String, dynamic>? ?? {};
-        final balance = (d['balance']      ?? 0).toDouble();
-        final income  = (d['totalIncome']  ?? 0).toDouble();
-        final expense = (d['totalExpense'] ?? 0).toDouble();
-        return Column(children: [
-          Row(children: [
-            Expanded(child: _balCard(icon: Icons.trending_up,
-                label: 'Total Income', amount: income,
-                color: Colors.green[600]!, isDark: isDark)),
-            const SizedBox(width: 12),
-            Expanded(child: _balCard(icon: Icons.trending_down,
-                label: 'Total Expenses', amount: expense,
-                color: Colors.red[600]!, isDark: isDark)),
-          ]),
-          const SizedBox(height: 12),
-          _balCard(icon: Icons.account_balance_wallet_outlined,
-              label: 'Total Balance', amount: balance,
-              color: Colors.blue[600]!, isDark: isDark, full: true),
-        ]);
-      },
-    );
+  // ── Balance Cards — dùng local state thay vì StreamBuilder ──
+  Widget _buildBalanceCards(bool isDark) {
+    if (!_balLoaded) {
+      return const SizedBox(height: 80,
+          child: Center(child: CircularProgressIndicator(
+              color: Color(0xFF00CED1), strokeWidth: 2)));
+    }
+    return Column(children: [
+      Row(children: [
+        Expanded(child: _balCard(icon: Icons.trending_up,
+            label: 'Total Income', amount: _totInc,
+            color: Colors.green[600]!, isDark: isDark)),
+        const SizedBox(width: 12),
+        Expanded(child: _balCard(icon: Icons.trending_down,
+            label: 'Total Expenses', amount: _totExp,
+            color: Colors.red[600]!, isDark: isDark)),
+      ]),
+      const SizedBox(height: 12),
+      _balCard(icon: Icons.account_balance_wallet_outlined,
+          label: 'Total Balance', amount: _balance,
+          color: Colors.blue[600]!, isDark: isDark, full: true),
+    ]);
   }
 
   Widget _balCard({required IconData icon, required String label,
@@ -634,238 +667,193 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
+  // ── Plan Section — KHÔNG dùng StreamBuilder ───────────
   Widget _buildPlanSection(bool isDark) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    final now   = DateTime.now();
-    final start = Timestamp.fromDate(DateTime(now.year, now.month, 1));
-    final end   = Timestamp.fromDate(DateTime(now.year, now.month + 1, 0, 23, 59, 59));
+    if (!_planLoaded) return const SizedBox.shrink();
 
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('users').doc(uid)
-          .collection('plans').doc('current_plan').snapshots(),
-      builder: (ctx, snap) {
-        if (!snap.hasData || !snap.data!.exists) return const SizedBox.shrink();
-        final data      = snap.data!.data() as Map<String, dynamic>;
-        final planData  = data['plan'] as Map<String, dynamic>? ?? {};
-        final table     = (planData['expense_table'] as List? ?? []);
-        final recIncome = (planData['recommended_income'] as num?)?.toDouble() ?? 0;
-        final createdAt = data['createdAt'] as Timestamp?;
-        final dateStr   = createdAt != null
-            ? '${createdAt.toDate().day}/${createdAt.toDate().month}/${createdAt.toDate().year}'
-            : '';
+    final table    = _planTable;
+    final recIncome = _planIncome;
+    final spentMap  = _planSpentMap;
 
-        return StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('users').doc(uid).collection('transactions')
-              .where('date', isGreaterThanOrEqualTo: start)
-              .where('date', isLessThanOrEqualTo: end)
-              .snapshots(),
-          builder: (ctx2, txSnap) {
-            final spentMap = <String, double>{};
-            if (txSnap.hasData) {
-              for (final doc in txSnap.data!.docs) {
-                final d    = doc.data() as Map<String, dynamic>;
-                final isExp = d['type'] == 'expense' || d['isIncome'] == false;
-                if (!isExp) continue;
-                final cat = (d['category'] ?? d['categoryName'] ?? '').toString();
-                final amt = (d['amount'] as num?)?.toDouble().abs() ?? 0;
-                spentMap[cat] = (spentMap[cat] ?? 0) + amt;
-              }
-            }
-
-            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text('Kế hoạch chi tiêu', style: TextStyle(fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87)),
-                GestureDetector(
-                  onTap: () => Navigator.pushReplacement(context,
-                      MaterialPageRoute(builder: (_) => const AnalysisView())),
-                  child: const Text('Xem tất cả', style: TextStyle(
-                      fontSize: 13, color: Color(0xFF00CED1),
-                      fontWeight: FontWeight.w500)),
-                ),
-              ]),
-              const SizedBox(height: 10),
-              Container(
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Text('Kế hoạch chi tiêu', style: TextStyle(fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : Colors.black87)),
+        GestureDetector(
+          onTap: () => Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (_) => const AnalysisView())),
+          child: const Text('Xem tất cả', style: TextStyle(
+              fontSize: 13, color: Color(0xFF00CED1), fontWeight: FontWeight.w500)),
+        ),
+      ]),
+      const SizedBox(height: 10),
+      Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
+          boxShadow: [BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.15 : 0.04),
+              blurRadius: 8, offset: const Offset(0, 2))],
+        ),
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+            child: Row(children: [
+              Container(padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                      color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
-                  boxShadow: [BoxShadow(
-                      color: Colors.black.withOpacity(isDark ? 0.15 : 0.04),
-                      blurRadius: 8, offset: const Offset(0, 2))],
-                ),
-                child: Column(children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                    child: Row(children: [
-                      Container(padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                            color: const Color(0xFF00CED1).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8)),
-                        child: const Icon(Icons.assignment_rounded,
-                            color: Color(0xFF00CED1), size: 16)),
-                      const SizedBox(width: 10),
-                      Expanded(child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        const Text('Mức thu nhập đề xuất',
-                            style: TextStyle(fontSize: 12, color: Colors.grey)),
-                        Text('${_fmt(recIncome)}đ / tháng',
-                            style: const TextStyle(fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF00CED1))),
-                      ])),
-                      if (dateStr.isNotEmpty)
-                        Text(dateStr, style: TextStyle(
-                            fontSize: 10, color: Colors.grey[500])),
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () => _showEditIncomeSheet(
-                            uid, planData, table, recIncome, isDark),
-                        child: Container(width: 30, height: 30,
+                    color: const Color(0xFF00CED1).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8)),
+                child: const Icon(Icons.assignment_rounded,
+                    color: Color(0xFF00CED1), size: 16)),
+              const SizedBox(width: 10),
+              Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Mức thu nhập đề xuất',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+                Text('${_fmt(recIncome)}đ / tháng',
+                    style: const TextStyle(fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF00CED1))),
+              ])),
+              if (_planDateStr.isNotEmpty)
+                Text(_planDateStr, style: TextStyle(
+                    fontSize: 10, color: Colors.grey[500])),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => _showEditIncomeSheet(
+                    uid, _planData, table, recIncome, isDark),
+                child: Container(width: 30, height: 30,
+                  decoration: BoxDecoration(
+                      color: const Color(0xFF00CED1).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.edit_rounded,
+                      size: 15, color: Color(0xFF00CED1))),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 10),
+          Divider(height: 1, thickness: 0.5,
+              color: isDark ? Colors.grey[700] : Colors.grey[100]),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Row(children: [
+              Icon(Icons.touch_app_rounded, size: 13, color: Colors.grey[400]),
+              const SizedBox(width: 4),
+              Text('Nhấn vào danh mục để thêm chi tiêu nhanh',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[400])),
+            ]),
+          ),
+          ...table.asMap().entries.map((e) {
+            final row     = e.value as Map;
+            final cat     = row['category'] as String? ?? '';
+            final limit   = (row['amount'] as num?)?.toDouble() ?? 0;
+            final percent = (row['percent'] as num?)?.toInt() ?? 0;
+            final spent   = spentMap[cat] ?? 0;
+            final isOver  = spent > limit && limit > 0;
+            final progress = limit > 0 ? (spent / limit).clamp(0.0, 1.0) : 0.0;
+            const colors  = [
+              Color(0xFF00CED1), Color(0xFF4CAF50), Color(0xFFFF9800),
+              Color(0xFF8B5CF6), Color(0xFFE91E63), Color(0xFF9C27B0),
+              Color(0xFFFF5722), Color(0xFF009688), Color(0xFFFFC107),
+              Color(0xFF607D8B),
+            ];
+            final color    = colors[e.key % colors.length];
+            final barColor = isOver ? Colors.red : color;
+            return Column(children: [
+              InkWell(
+                onTap: () => QuickAddExpenseSheet.show(
+                    context: context, category: cat,
+                    budgetLimit: limit, isDark: isDark),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Row(children: [
+                      Container(width: 8, height: 8,
                           decoration: BoxDecoration(
-                              color: const Color(0xFF00CED1).withOpacity(0.12),
+                              color: barColor, shape: BoxShape.circle)),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(cat, style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w500))),
+                      RichText(text: TextSpan(children: [
+                        TextSpan(text: '${_fmt(spent)}đ',
+                            style: TextStyle(fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: isOver ? Colors.red : barColor)),
+                        TextSpan(text: ' / ${_fmt(limit)}đ',
+                            style: TextStyle(fontSize: 11,
+                                fontWeight: FontWeight.w400,
+                                color: isDark ? Colors.grey[400] : Colors.grey[500])),
+                      ])),
+                      const SizedBox(width: 6),
+                      Container(width: 34, height: 20,
+                        decoration: BoxDecoration(
+                            color: barColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6)),
+                        child: Center(child: Text('$percent%',
+                            style: TextStyle(fontSize: 9,
+                                fontWeight: FontWeight.w700, color: barColor)))),
+                      const SizedBox(width: 6),
+                      GestureDetector(
+                        onTap: () => _editPlanAmount(uid, _planData,
+                            table, e.key, cat, limit, recIncome),
+                        child: Container(width: 28, height: 28,
+                          decoration: BoxDecoration(
+                              color: isDark ? Colors.grey[700] : Colors.grey[100],
                               borderRadius: BorderRadius.circular(8)),
-                          child: const Icon(Icons.edit_rounded,
-                              size: 15, color: Color(0xFF00CED1))),
+                          child: Icon(Icons.edit_rounded, size: 14,
+                              color: isDark ? Colors.grey[300] : Colors.grey[600])),
                       ),
                     ]),
-                  ),
-                  const SizedBox(height: 10),
-                  Divider(height: 1, thickness: 0.5,
-                      color: isDark ? Colors.grey[700] : Colors.grey[100]),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                    child: Row(children: [
-                      Icon(Icons.touch_app_rounded, size: 13,
-                          color: Colors.grey[400]),
-                      const SizedBox(width: 4),
-                      Text('Nhấn vào danh mục để thêm chi tiêu nhanh',
-                          style: TextStyle(fontSize: 11, color: Colors.grey[400])),
-                    ]),
-                  ),
-                  ...table.asMap().entries.map((e) {
-                    final row     = e.value as Map;
-                    final cat     = row['category'] as String? ?? '';
-                    final limit   = (row['amount'] as num?)?.toDouble() ?? 0;
-                    final percent = (row['percent'] as num?)?.toInt() ?? 0;
-                    final spent   = spentMap[cat] ?? 0;
-                    final isOver  = spent > limit && limit > 0;
-                    final progress = limit > 0 ? (spent / limit).clamp(0.0, 1.0) : 0.0;
-                    const colors  = [
-                      Color(0xFF00CED1), Color(0xFF4CAF50), Color(0xFFFF9800),
-                      Color(0xFF8B5CF6), Color(0xFFE91E63), Color(0xFF9C27B0),
-                      Color(0xFFFF5722), Color(0xFF009688), Color(0xFFFFC107),
-                      Color(0xFF607D8B),
-                    ];
-                    final color    = colors[e.key % colors.length];
-                    final barColor = isOver ? Colors.red : color;
-                    return Column(children: [
-                      InkWell(
-                        onTap: () => QuickAddExpenseSheet.show(
-                            context: context, category: cat,
-                            budgetLimit: limit, isDark: isDark),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(children: [
-                                Container(width: 8, height: 8,
-                                    decoration: BoxDecoration(
-                                        color: barColor, shape: BoxShape.circle)),
-                                const SizedBox(width: 10),
-                                Expanded(child: Text(cat, style: const TextStyle(
-                                    fontSize: 13, fontWeight: FontWeight.w500))),
-                                RichText(text: TextSpan(children: [
-                                  TextSpan(text: '${_fmt(spent)}đ',
-                                      style: TextStyle(fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: isOver ? Colors.red : barColor)),
-                                  TextSpan(text: ' / ${_fmt(limit)}đ',
-                                      style: TextStyle(fontSize: 11,
-                                          fontWeight: FontWeight.w400,
-                                          color: isDark ? Colors.grey[400] : Colors.grey[500])),
-                                ])),
-                                const SizedBox(width: 6),
-                                Container(width: 34, height: 20,
-                                  decoration: BoxDecoration(
-                                      color: barColor.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(6)),
-                                  child: Center(child: Text('$percent%',
-                                      style: TextStyle(fontSize: 9,
-                                          fontWeight: FontWeight.w700,
-                                          color: barColor)))),
-                                const SizedBox(width: 6),
-                                GestureDetector(
-                                  onTap: () => _editPlanAmount(uid, planData,
-                                      table, e.key, cat, limit, recIncome),
-                                  child: Container(width: 28, height: 28,
-                                    decoration: BoxDecoration(
-                                        color: isDark ? Colors.grey[700] : Colors.grey[100],
-                                        borderRadius: BorderRadius.circular(8)),
-                                    child: Icon(Icons.edit_rounded, size: 14,
-                                        color: isDark ? Colors.grey[300] : Colors.grey[600])),
-                                ),
-                              ]),
-                              const SizedBox(height: 6),
-                              Padding(
-                                padding: const EdgeInsets.only(left: 18),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(4),
-                                  child: LinearProgressIndicator(
-                                    value: progress, minHeight: 4,
-                                    backgroundColor: isDark ? Colors.grey[700] : Colors.grey[100],
-                                    valueColor: AlwaysStoppedAnimation(barColor),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                    const SizedBox(height: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 18),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: progress, minHeight: 4,
+                          backgroundColor: isDark ? Colors.grey[700] : Colors.grey[100],
+                          valueColor: AlwaysStoppedAnimation(barColor),
                         ),
                       ),
-                      if (e.key < table.length - 1)
-                        Divider(height: 1, thickness: 0.5,
-                            color: isDark ? Colors.grey[700] : Colors.grey[100]),
-                    ]);
-                  }).toList(),
-                  Divider(height: 1, thickness: 0.5,
-                      color: isDark ? Colors.grey[700] : Colors.grey[100]),
-                  InkWell(
-                    onTap: () => _showAddPlanCategorySheet(
-                        uid, planData, table, recIncome, isDark),
-                    borderRadius: const BorderRadius.vertical(
-                        bottom: Radius.circular(16)),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      child: Row(mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                        Container(width: 24, height: 24,
-                          decoration: BoxDecoration(
-                              color: const Color(0xFF00CED1).withOpacity(0.12),
-                              shape: BoxShape.circle),
-                          child: const Icon(Icons.add_rounded,
-                              size: 16, color: Color(0xFF00CED1))),
-                        const SizedBox(width: 8),
-                        const Text('Thêm danh mục',
-                            style: TextStyle(fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF00CED1))),
-                      ]),
                     ),
-                  ),
-                ]),
+                  ]),
+                ),
               ),
+              if (e.key < table.length - 1)
+                Divider(height: 1, thickness: 0.5,
+                    color: isDark ? Colors.grey[700] : Colors.grey[100]),
             ]);
-          },
-        );
-      },
-    );
+          }).toList(),
+          Divider(height: 1, thickness: 0.5,
+              color: isDark ? Colors.grey[700] : Colors.grey[100]),
+          InkWell(
+            onTap: () => _showAddPlanCategorySheet(
+                uid, _planData, table, recIncome, isDark),
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Container(width: 24, height: 24,
+                  decoration: BoxDecoration(
+                      color: const Color(0xFF00CED1).withOpacity(0.12),
+                      shape: BoxShape.circle),
+                  child: const Icon(Icons.add_rounded,
+                      size: 16, color: Color(0xFF00CED1))),
+                const SizedBox(width: 8),
+                const Text('Thêm danh mục', style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600,
+                    color: Color(0xFF00CED1))),
+              ]),
+            ),
+          ),
+        ]),
+      ),
+    ]);
   }
 
   void _showEditIncomeSheet(String uid, Map<String, dynamic> planData,
@@ -876,141 +864,133 @@ class _HomeViewState extends State<HomeView> {
     showModalBottomSheet(
       context: context, isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => Container(
-          padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 28,
-              top: 20, left: 20, right: 20),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 40, height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2))),
-            Row(children: [
-              Container(padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(
-                    color: const Color(0xFF00CED1).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.trending_up_rounded,
-                    color: Color(0xFF00CED1), size: 20)),
-              const SizedBox(width: 12),
-              const Expanded(child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Chỉnh mức thu nhập',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                Text('Cập nhật thu nhập thực tế của bạn',
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
-              ])),
-              GestureDetector(onTap: () => Navigator.pop(ctx),
-                child: Container(padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                      color: Colors.grey[200], shape: BoxShape.circle),
-                  child: Icon(Icons.close_rounded, size: 18, color: Colors.grey[700]))),
-            ]),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                    colors: [Color(0xFF00CED1), Color(0xFF0097A7)],
-                    begin: Alignment.topLeft, end: Alignment.bottomRight),
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [BoxShadow(
-                    color: const Color(0xFF00CED1).withOpacity(0.3),
-                    blurRadius: 10, offset: const Offset(0, 4))],
-              ),
-              child: Column(children: [
-                const Text('Thu nhập / tháng',
-                    style: TextStyle(color: Colors.white70, fontSize: 13)),
-                const SizedBox(height: 8),
-                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  const Text('₫ ', style: TextStyle(fontSize: 22,
-                      fontWeight: FontWeight.bold, color: Colors.white)),
-                  Expanded(child: TextField(
-                    controller: amtCtrl,
-                    keyboardType: TextInputType.number,
-                    autofocus: true, textAlign: TextAlign.center,
-                    onChanged: (v) => setS(() =>
-                        tempAmt = double.tryParse(v.replaceAll(',', '')) ?? 0),
-                    style: const TextStyle(fontSize: 28,
-                        fontWeight: FontWeight.bold, color: Colors.white),
-                    decoration: const InputDecoration(hintText: '0',
-                        hintStyle: TextStyle(color: Colors.white38),
-                        border: InputBorder.none, isDense: true,
-                        contentPadding: EdgeInsets.zero),
-                  )),
-                ]),
-              ]),
-            ),
-            const SizedBox(height: 16),
-            Row(children: [5000000, 8000000, 12000000, 18000000, 25000000].map((v) {
-              final label = '${v ~/ 1000000}tr';
-              final isSel = (tempAmt - v).abs() < 1000;
-              return Expanded(child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: GestureDetector(
-                  onTap: () => setS(() {
-                    tempAmt = v.toDouble(); amtCtrl.text = v.toString();
-                  }),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSel ? const Color(0xFF00CED1)
-                          : const Color(0xFF00CED1).withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: const Color(0xFF00CED1).withOpacity(0.3)),
-                    ),
-                    child: Center(child: Text(label, style: TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w600,
-                        color: isSel ? Colors.white : const Color(0xFF00CED1)))),
-                  ),
-                ),
-              ));
-            }).toList()),
-            const SizedBox(height: 20),
-            SizedBox(width: double.infinity, height: 50,
-              child: ElevatedButton(
-                onPressed: () async {
-                  final amt = double.tryParse(amtCtrl.text.replaceAll(',', '')) ?? 0;
-                  if (amt <= 0) return;
-                  final newTable = List<Map<String, dynamic>>.from(
-                      table.map((r) => Map<String, dynamic>.from(r as Map)));
-                  for (final row in newTable) {
-                    final rowAmt = (row['amount'] as num?)?.toDouble() ?? 0;
-                    row['percent'] = (rowAmt / amt * 100).round();
-                  }
-                  await FirebaseFirestore.instance
-                      .collection('users').doc(uid)
-                      .collection('plans').doc('current_plan')
-                      .update({'plan.recommended_income': amt.toInt(),
-                        'plan.expense_table': newTable});
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('Đã cập nhật thu nhập: ${_fmt(amt)}đ/tháng'),
-                    backgroundColor: const Color(0xFF00CED1),
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 2),
-                    margin: const EdgeInsets.all(12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ));
-                },
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00CED1), elevation: 0,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14))),
-                child: const Text('Lưu thu nhập', style: TextStyle(
-                    color: Colors.white, fontSize: 16,
-                    fontWeight: FontWeight.w600)),
-              ),
-            ),
-          ]),
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => Container(
+        padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 28,
+            top: 20, left: 20, right: 20),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
-      ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 40, height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2))),
+          Row(children: [
+            Container(padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(
+                  color: const Color(0xFF00CED1).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12)),
+              child: const Icon(Icons.trending_up_rounded,
+                  color: Color(0xFF00CED1), size: 20)),
+            const SizedBox(width: 12),
+            const Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Chỉnh mức thu nhập',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+              Text('Cập nhật thu nhập thực tế của bạn',
+                  style: TextStyle(fontSize: 12, color: Colors.grey)),
+            ])),
+            GestureDetector(onTap: () => Navigator.pop(ctx),
+              child: Container(padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(color: Colors.grey[200], shape: BoxShape.circle),
+                child: Icon(Icons.close_rounded, size: 18, color: Colors.grey[700]))),
+          ]),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                  colors: [Color(0xFF00CED1), Color(0xFF0097A7)],
+                  begin: Alignment.topLeft, end: Alignment.bottomRight),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [BoxShadow(
+                  color: const Color(0xFF00CED1).withOpacity(0.3),
+                  blurRadius: 10, offset: const Offset(0, 4))],
+            ),
+            child: Column(children: [
+              const Text('Thu nhập / tháng',
+                  style: TextStyle(color: Colors.white70, fontSize: 13)),
+              const SizedBox(height: 8),
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                const Text('₫ ', style: TextStyle(fontSize: 22,
+                    fontWeight: FontWeight.bold, color: Colors.white)),
+                Expanded(child: TextField(
+                  controller: amtCtrl, keyboardType: TextInputType.number,
+                  autofocus: true, textAlign: TextAlign.center,
+                  onChanged: (v) => setS(() =>
+                      tempAmt = double.tryParse(v.replaceAll(',', '')) ?? 0),
+                  style: const TextStyle(fontSize: 28,
+                      fontWeight: FontWeight.bold, color: Colors.white),
+                  decoration: const InputDecoration(hintText: '0',
+                      hintStyle: TextStyle(color: Colors.white38),
+                      border: InputBorder.none, isDense: true,
+                      contentPadding: EdgeInsets.zero),
+                )),
+              ]),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          Row(children: [5000000, 8000000, 12000000, 18000000, 25000000].map((v) {
+            final label = '${v ~/ 1000000}tr';
+            final isSel = (tempAmt - v).abs() < 1000;
+            return Expanded(child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: GestureDetector(
+                onTap: () => setS(() { tempAmt = v.toDouble(); amtCtrl.text = v.toString(); }),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSel ? const Color(0xFF00CED1)
+                        : const Color(0xFF00CED1).withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF00CED1).withOpacity(0.3)),
+                  ),
+                  child: Center(child: Text(label, style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600,
+                      color: isSel ? Colors.white : const Color(0xFF00CED1)))),
+                ),
+              ),
+            ));
+          }).toList()),
+          const SizedBox(height: 20),
+          SizedBox(width: double.infinity, height: 50,
+            child: ElevatedButton(
+              onPressed: () async {
+                final amt = double.tryParse(amtCtrl.text.replaceAll(',', '')) ?? 0;
+                if (amt <= 0) return;
+                final newTable = List<Map<String, dynamic>>.from(
+                    table.map((r) => Map<String, dynamic>.from(r as Map)));
+                for (final row in newTable) {
+                  final rowAmt = (row['amount'] as num?)?.toDouble() ?? 0;
+                  row['percent'] = (rowAmt / amt * 100).round();
+                }
+                await FirebaseFirestore.instance
+                    .collection('users').doc(uid)
+                    .collection('plans').doc('current_plan')
+                    .update({'plan.recommended_income': amt.toInt(),
+                      'plan.expense_table': newTable});
+                if (ctx.mounted) Navigator.pop(ctx);
+                _loadPlanData();
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('Đã cập nhật thu nhập: ${_fmt(amt)}đ/tháng'),
+                  backgroundColor: const Color(0xFF00CED1),
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 2),
+                  margin: const EdgeInsets.all(12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ));
+              },
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00CED1), elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+              child: const Text('Lưu thu nhập', style: TextStyle(
+                  color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ]),
+      )),
     );
   }
 
@@ -1043,8 +1023,7 @@ class _HomeViewState extends State<HomeView> {
                 decoration: BoxDecoration(
                     color: const Color(0xFF00CED1).withOpacity(0.12),
                     borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.add_rounded,
-                    color: Color(0xFF00CED1), size: 20)),
+                child: const Icon(Icons.add_rounded, color: Color(0xFF00CED1), size: 20)),
               const SizedBox(width: 12),
               const Expanded(child: Text('Thêm danh mục mới',
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold))),
@@ -1054,10 +1033,8 @@ class _HomeViewState extends State<HomeView> {
                   child: Icon(Icons.close_rounded, size: 18, color: Colors.grey[700]))),
             ]),
             const SizedBox(height: 20),
-            TextField(
-              controller: nameCtrl,
-              style: TextStyle(fontSize: 15,
-                  color: isDark ? Colors.white : Colors.black87),
+            TextField(controller: nameCtrl,
+              style: TextStyle(fontSize: 15, color: isDark ? Colors.white : Colors.black87),
               decoration: InputDecoration(
                 hintText: 'Tên danh mục (VD: Gym, Thú cưng...)',
                 hintStyle: TextStyle(color: Colors.grey[400]),
@@ -1087,16 +1064,15 @@ class _HomeViewState extends State<HomeView> {
                           color: const Color(0xFF00CED1).withOpacity(0.12),
                           borderRadius: BorderRadius.circular(8)),
                       child: Text('≈ $pct% thu nhập', style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF00CED1),
-                          fontWeight: FontWeight.w600))),
+                          fontSize: 11, color: Color(0xFF00CED1), fontWeight: FontWeight.w600))),
                 ]),
                 const SizedBox(height: 8),
                 Row(children: [
                   const Text('₫', style: TextStyle(fontSize: 26,
                       fontWeight: FontWeight.bold, color: Color(0xFF00CED1))),
                   const SizedBox(width: 8),
-                  Expanded(child: TextField(
-                    controller: amtCtrl, keyboardType: TextInputType.number,
+                  Expanded(child: TextField(controller: amtCtrl,
+                    keyboardType: TextInputType.number,
                     onChanged: (v) => setS(() =>
                         tempAmt = double.tryParse(v.replaceAll(',', '')) ?? 0),
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold,
@@ -1115,9 +1091,7 @@ class _HomeViewState extends State<HomeView> {
                 return Expanded(child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 3),
                   child: GestureDetector(
-                    onTap: () => setS(() {
-                      tempAmt = val.toDouble(); amtCtrl.text = val.toString();
-                    }),
+                    onTap: () => setS(() { tempAmt = val.toDouble(); amtCtrl.text = val.toString(); }),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
@@ -1125,8 +1099,7 @@ class _HomeViewState extends State<HomeView> {
                             ? const Color(0xFF00CED1)
                             : const Color(0xFF00CED1).withOpacity(0.08),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                            color: const Color(0xFF00CED1).withOpacity(0.3)),
+                        border: Border.all(color: const Color(0xFF00CED1).withOpacity(0.3)),
                       ),
                       child: Center(child: Text('$p%', style: TextStyle(
                           fontSize: 12, fontWeight: FontWeight.w600,
@@ -1148,39 +1121,34 @@ class _HomeViewState extends State<HomeView> {
                       content: const Text('Vui lòng nhập tên và số tiền!'),
                       backgroundColor: Colors.red[400],
                       behavior: SnackBarBehavior.floating,
-                      duration: const Duration(seconds: 2),
-                      margin: const EdgeInsets.all(12),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
+                      duration: const Duration(seconds: 2), margin: const EdgeInsets.all(12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ));
                     return;
                   }
                   final newTable = List<Map<String, dynamic>>.from(
                       table.map((r) => Map<String, dynamic>.from(r as Map)));
                   newTable.add({'category': name, 'amount': amt.toInt(),
-                    'percent': recIncome > 0 ? (amt / recIncome * 100).round() : 0,
-                    'note': ''});
+                    'percent': recIncome > 0 ? (amt / recIncome * 100).round() : 0, 'note': ''});
                   await FirebaseFirestore.instance
                       .collection('users').doc(uid)
                       .collection('plans').doc('current_plan')
                       .update({'plan.expense_table': newTable});
                   if (ctx.mounted) Navigator.pop(ctx);
+                  _loadPlanData();
                   if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                     content: Text('Đã thêm "$name" vào kế hoạch!'),
                     backgroundColor: const Color(0xFF00CED1),
                     behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 2),
-                    margin: const EdgeInsets.all(12),
+                    duration: const Duration(seconds: 2), margin: const EdgeInsets.all(12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ));
                 },
                 style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF00CED1), elevation: 0,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14))),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
                 child: const Text('Thêm vào kế hoạch', style: TextStyle(
-                    color: Colors.white, fontSize: 16,
-                    fontWeight: FontWeight.w600)),
+                    color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
               ),
             ),
           ]),
@@ -1196,7 +1164,6 @@ class _HomeViewState extends State<HomeView> {
     final double maxSlider =
         recIncome > 0 ? (recIncome * 0.6).clamp(1000000, 50000000) : 10000000;
     double tempAmount = currentAmount.clamp(0, maxSlider);
-
     final result = await showModalBottomSheet<double>(
       context: context, isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -1220,20 +1187,16 @@ class _HomeViewState extends State<HomeView> {
                 decoration: BoxDecoration(
                     color: const Color(0xFF00CED1).withOpacity(0.12),
                     borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.tune_rounded,
-                    color: Color(0xFF00CED1), size: 20)),
+                child: const Icon(Icons.tune_rounded, color: Color(0xFF00CED1), size: 20)),
               const SizedBox(width: 12),
-              Expanded(child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const Text('Chỉnh ngân sách',
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                Text(category, style: TextStyle(
-                    fontSize: 12, color: Colors.grey[500])),
+                Text(category, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
               ])),
             ]),
             const SizedBox(height: 24),
-            Container(
-              width: double.infinity,
+            Container(width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
@@ -1268,14 +1231,12 @@ class _HomeViewState extends State<HomeView> {
               child: Slider(value: tempAmount, min: 0, max: maxSlider,
                   divisions: 200, onChanged: (v) => setS(() => tempAmount = v)),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 Text('0đ', style: TextStyle(fontSize: 11, color: Colors.grey[400])),
                 Text('${_fmt(maxSlider)}đ',
                     style: TextStyle(fontSize: 11, color: Colors.grey[400])),
-              ]),
-            ),
+              ])),
             if (recIncome > 0) ...[
               const SizedBox(height: 12),
               Row(mainAxisAlignment: MainAxisAlignment.center,
@@ -1291,8 +1252,7 @@ class _HomeViewState extends State<HomeView> {
                       color: isSel ? const Color(0xFF00CED1)
                           : const Color(0xFF00CED1).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: const Color(0xFF00CED1).withOpacity(0.3)),
+                      border: Border.all(color: const Color(0xFF00CED1).withOpacity(0.3)),
                     ),
                     child: Text('$p%', style: TextStyle(fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -1307,8 +1267,7 @@ class _HomeViewState extends State<HomeView> {
                 onPressed: () => Navigator.pop(ctx),
                 style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12))),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                 child: const Text('Hủy'),
               )),
               const SizedBox(width: 12),
@@ -1317,35 +1276,31 @@ class _HomeViewState extends State<HomeView> {
                 style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF00CED1),
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0),
                 child: const Text('Áp dụng', style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold,
-                    fontSize: 15)),
+                    color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
               )),
             ]),
           ]),
         );
       }),
     );
-
     if (result == null) return;
     final newTable = List<Map<String, dynamic>>.from(
         table.map((r) => Map<String, dynamic>.from(r as Map)));
     newTable[index]['amount']  = result.toInt();
-    newTable[index]['percent'] =
-        recIncome > 0 ? (result / recIncome * 100).round() : 0;
+    newTable[index]['percent'] = recIncome > 0 ? (result / recIncome * 100).round() : 0;
     try {
       await FirebaseFirestore.instance
           .collection('users').doc(uid)
           .collection('plans').doc('current_plan')
           .update({'plan.expense_table': newTable});
+      _loadPlanData();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Đã cập nhật "$category"'),
         backgroundColor: const Color(0xFF00CED1),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(12),
       ));
@@ -1356,8 +1311,8 @@ class _HomeViewState extends State<HomeView> {
     final now = DateTime.now();
     const months = ['','Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5',
       'Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
-    final label   = '${months[now.month]} ${now.year}';
-    final balance = _monthIncome - _monthExpense;
+    final label      = '${months[now.month]} ${now.year}';
+    final balance    = _monthIncome - _monthExpense;
     final savingRate = _monthIncome > 0
         ? (balance / _monthIncome * 100).clamp(0.0, 100.0) : 0.0;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1368,8 +1323,8 @@ class _HomeViewState extends State<HomeView> {
         GestureDetector(
           onTap: () => Navigator.push(context,
               MaterialPageRoute(builder: (_) => const BudgetListView())),
-          child: const Text('Xem chi tiết', style: TextStyle(fontSize: 13,
-              color: Color(0xFF00CED1), fontWeight: FontWeight.w500)),
+          child: const Text('Xem chi tiết', style: TextStyle(
+              fontSize: 13, color: Color(0xFF00CED1), fontWeight: FontWeight.w500)),
         ),
       ]),
       const SizedBox(height: 12),
@@ -1435,20 +1390,17 @@ class _HomeViewState extends State<HomeView> {
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                  color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
+              border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
             ),
             child: Column(children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: Row(children: [
                   Icon(Icons.receipt_long_rounded, size: 16, color: Colors.grey[500]),
                   const SizedBox(width: 6),
                   Text('Giao dịch gần đây', style: TextStyle(fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: isDark ? Colors.white70 : Colors.grey[700])),
-                ]),
-              ),
+                ])),
               Divider(height: 1, thickness: 0.5,
                   color: isDark ? Colors.grey[700] : Colors.grey[100]),
               ..._recentTxs.asMap().entries.map((e) {
@@ -1460,29 +1412,21 @@ class _HomeViewState extends State<HomeView> {
                 final date  = (t['date'] as Timestamp?)?.toDate() ?? DateTime.now();
                 final color = isInc ? Colors.green[600]! : Colors.red[500]!;
                 return Column(children: [
-                  Padding(padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                  Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     child: Row(children: [
                       Container(width: 36, height: 36,
-                        decoration: BoxDecoration(
-                            color: color.withOpacity(0.1), shape: BoxShape.circle),
-                        child: Icon(isInc
-                            ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                        decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+                        child: Icon(isInc ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
                             color: color, size: 16)),
                       const SizedBox(width: 10),
-                      Expanded(child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(title, style: TextStyle(fontSize: 13,
-                            fontWeight: FontWeight.w500,
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500,
                             color: isDark ? Colors.white : Colors.black87),
                             maxLines: 1, overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 2),
                         Row(children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 1),
-                            decoration: BoxDecoration(
-                                color: color.withOpacity(0.1),
+                          Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(color: color.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(5)),
                             child: Text(cat, style: TextStyle(fontSize: 9,
                                 color: color, fontWeight: FontWeight.w500))),
@@ -1492,8 +1436,7 @@ class _HomeViewState extends State<HomeView> {
                         ]),
                       ])),
                       Text('${isInc ? '+' : '-'}${_fmt(amt)}đ',
-                          style: TextStyle(fontSize: 13,
-                              fontWeight: FontWeight.bold, color: color)),
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
                     ])),
                   if (e.key < _recentTxs.length - 1)
                     Divider(height: 1, thickness: 0.5,
@@ -1582,8 +1525,7 @@ class _HomeViewState extends State<HomeView> {
           Text(emoji, style: const TextStyle(fontSize: 28)),
           const SizedBox(height: 6),
           if (_monthIncome > 0) ...[
-            Text('Còn lại tháng', style: TextStyle(
-                fontSize: 10, color: Colors.grey[500])),
+            Text('Còn lại tháng', style: TextStyle(fontSize: 10, color: Colors.grey[500])),
             const SizedBox(height: 2),
             Text('${isPositive ? '' : '-'}${_fmt(remaining.abs())}đ',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold,
@@ -1601,12 +1543,10 @@ class _HomeViewState extends State<HomeView> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 15),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-                colors: [Color(0xFF2DC653), Color(0xFF00A86B)],
+            gradient: const LinearGradient(colors: [Color(0xFF2DC653), Color(0xFF00A86B)],
                 begin: Alignment.topLeft, end: Alignment.bottomRight),
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(
-                color: const Color(0xFF2DC653).withOpacity(0.45),
+            boxShadow: [BoxShadow(color: const Color(0xFF2DC653).withOpacity(0.45),
                 blurRadius: 12, offset: const Offset(0, 5))],
           ),
           child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -1616,8 +1556,7 @@ class _HomeViewState extends State<HomeView> {
               child: const Icon(Icons.add_rounded, color: Colors.white, size: 16)),
             const SizedBox(width: 8),
             const Text('Thu nhập', style: TextStyle(fontSize: 15,
-                fontWeight: FontWeight.bold, color: Colors.white,
-                letterSpacing: 0.3)),
+                fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.3)),
           ]),
         ),
       )),
@@ -1627,12 +1566,10 @@ class _HomeViewState extends State<HomeView> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 15),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-                colors: [Color(0xFFFF5252), Color(0xFFE53935)],
+            gradient: const LinearGradient(colors: [Color(0xFFFF5252), Color(0xFFE53935)],
                 begin: Alignment.topLeft, end: Alignment.bottomRight),
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(
-                color: const Color(0xFFFF5252).withOpacity(0.45),
+            boxShadow: [BoxShadow(color: const Color(0xFFFF5252).withOpacity(0.45),
                 blurRadius: 12, offset: const Offset(0, 5))],
           ),
           child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -1642,8 +1579,7 @@ class _HomeViewState extends State<HomeView> {
               child: const Icon(Icons.remove_rounded, color: Colors.white, size: 16)),
             const SizedBox(width: 8),
             const Text('Chi tiêu', style: TextStyle(fontSize: 15,
-                fontWeight: FontWeight.bold, color: Colors.white,
-                letterSpacing: 0.3)),
+                fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.3)),
           ]),
         ),
       )),
@@ -1654,25 +1590,21 @@ class _HomeViewState extends State<HomeView> {
     final amtCtrl  = TextEditingController();
     final noteCtrl = TextEditingController();
     String selCat  = isIncome ? 'Lương' : 'Ăn uống';
-
-    // Categories mặc định
     final List<Map<String, String>> expCats = [
-      {'icon': '🍜', 'name': 'Ăn uống'}, {'icon': '🚗', 'name': 'Di chuyển'},
-      {'icon': '🏠', 'name': 'Nhà ở'}, {'icon': '💊', 'name': 'Sức khoẻ'},
-      {'icon': '🛍️', 'name': 'Mua sắm cá nhân'}, {'icon': '🎬', 'name': 'Giải trí & xã hội'},
-      {'icon': '💡', 'name': 'Hóa đơn tiện ích'}, {'icon': '📚', 'name': 'Giáo dục'},
-      {'icon': '💰', 'name': 'Tiết kiệm'}, {'icon': '📈', 'name': 'Đầu tư & học tập'},
-      {'icon': '🛡️', 'name': 'Quỹ dự phòng'}, {'icon': '👨‍👩‍👧', 'name': 'Chi phí gia đình'},
-      {'icon': '👶', 'name': 'Chi phí con cái'}, {'icon': '📦', 'name': 'Khác'},
+      {'icon':'🍜','name':'Ăn uống'},{'icon':'🚗','name':'Di chuyển'},
+      {'icon':'🏠','name':'Nhà ở'},{'icon':'💊','name':'Sức khoẻ'},
+      {'icon':'🛍️','name':'Mua sắm cá nhân'},{'icon':'🎬','name':'Giải trí & xã hội'},
+      {'icon':'💡','name':'Hóa đơn tiện ích'},{'icon':'📚','name':'Giáo dục'},
+      {'icon':'💰','name':'Tiết kiệm'},{'icon':'📈','name':'Đầu tư & học tập'},
+      {'icon':'🛡️','name':'Quỹ dự phòng'},{'icon':'👨‍👩‍👧','name':'Chi phí gia đình'},
+      {'icon':'👶','name':'Chi phí con cái'},{'icon':'📦','name':'Khác'},
     ];
     final List<Map<String, String>> incCats = [
-      {'icon': '💼', 'name': 'Lương'}, {'icon': '🎁', 'name': 'Thưởng'},
-      {'icon': '📈', 'name': 'Đầu tư'}, {'icon': '🏪', 'name': 'Kinh doanh'},
-      {'icon': '🏡', 'name': 'Cho thuê'}, {'icon': '💻', 'name': 'Freelance'},
-      {'icon': '💵', 'name': 'Khác'},
+      {'icon':'💼','name':'Lương'},{'icon':'🎁','name':'Thưởng'},
+      {'icon':'📈','name':'Đầu tư'},{'icon':'🏪','name':'Kinh doanh'},
+      {'icon':'🏡','name':'Cho thuê'},{'icon':'💻','name':'Freelance'},
+      {'icon':'💵','name':'Khác'},
     ];
-
-    // Load thêm categories từ plan (khoản tự thêm như tập gym, netflix...)
     if (!isIncome) {
       try {
         final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -1687,7 +1619,7 @@ class _HomeViewState extends State<HomeView> {
             for (final row in table) {
               final cat = (row['category'] as String? ?? '').trim();
               if (cat.isNotEmpty && !defaultNames.contains(cat.toLowerCase())) {
-                expCats.add({'icon': '📌', 'name': cat});
+                expCats.add({'icon':'📌','name':cat});
                 defaultNames.add(cat.toLowerCase());
               }
             }
@@ -1695,7 +1627,6 @@ class _HomeViewState extends State<HomeView> {
         }
       } catch (_) {}
     }
-
     final cats      = isIncome ? incCats : expCats;
     final mainColor = isIncome ? Colors.green[600]! : Colors.red[500]!;
     showModalBottomSheet(
@@ -1731,8 +1662,7 @@ class _HomeViewState extends State<HomeView> {
                   child: Icon(Icons.close_rounded, size: 18, color: Colors.grey[700]))),
             ]),
             const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
+            Container(padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(color: mainColor.withOpacity(0.06),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: mainColor.withOpacity(0.2))),
@@ -1780,8 +1710,8 @@ class _HomeViewState extends State<HomeView> {
                     color: isSel ? mainColor.withOpacity(0.12)
                         : (isDark ? Colors.grey[800] : Colors.grey[100]),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: isSel ? mainColor : Colors.transparent,
-                        width: 1.5),
+                    border: Border.all(
+                        color: isSel ? mainColor : Colors.transparent, width: 1.5),
                   ),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Text(c['icon']!, style: const TextStyle(fontSize: 14)),
@@ -1802,12 +1732,10 @@ class _HomeViewState extends State<HomeView> {
                   await _saveTx(isIncome: isIncome, amount: amount,
                       note: noteCtrl.text.trim(), category: selCat);
                   if (ctx.mounted) Navigator.pop(ctx);
-                  _loadMonthReport();
+                  await Future.wait([_loadMonthReport(), _loadBalanceOnce()]);
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: mainColor,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14))),
+                style: ElevatedButton.styleFrom(backgroundColor: mainColor, elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
                 child: Text(isIncome ? 'Thêm Thu nhập' : 'Thêm Chi tiêu',
                     style: const TextStyle(color: Colors.white, fontSize: 16,
                         fontWeight: FontWeight.w600)),
@@ -1844,22 +1772,16 @@ class _HomeViewState extends State<HomeView> {
           Text('Đã thêm ${isIncome ? 'thu nhập' : 'chi tiêu'} ${_fmt(amount)}đ'),
         ]),
         backgroundColor: isIncome ? Colors.green[600] : Colors.red[500],
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(12),
       ));
     } catch (e) { debugPrint('Error: $e'); }
   }
 
-  // ══════════════════════════════════════════════════════
-  // BOTTOM NAV + GREETING BANNER
-  // ══════════════════════════════════════════════════════
   Widget _buildBottomNavBar() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(mainAxisSize: MainAxisSize.min, children: [
-
-      // ── Greeting Banner ────────────────────────────────
       AnimatedSlide(
         offset: _showGreeting ? Offset.zero : const Offset(0, 1),
         duration: const Duration(milliseconds: 400),
@@ -1872,26 +1794,21 @@ class _HomeViewState extends State<HomeView> {
                   onTap: () => setState(() => _showGreeting = false),
                   child: Container(
                     margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF00CED1), Color(0xFF8B5CF6)],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
+                          colors: [Color(0xFF00CED1), Color(0xFF8B5CF6)],
+                          begin: Alignment.centerLeft, end: Alignment.centerRight),
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [BoxShadow(
                           color: const Color(0xFF00CED1).withOpacity(0.4),
                           blurRadius: 14, offset: const Offset(0, 4))],
                     ),
                     child: Row(children: [
-                      Text(_greetingEmoji,
-                          style: const TextStyle(fontSize: 22)),
+                      Text(_greetingEmoji, style: const TextStyle(fontSize: 22)),
                       const SizedBox(width: 10),
                       Expanded(child: Text(_greetingMsg,
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 13,
+                          style: const TextStyle(color: Colors.white, fontSize: 13,
                               fontWeight: FontWeight.w500, height: 1.4))),
                       const SizedBox(width: 6),
                       Icon(Icons.close_rounded,
@@ -1902,8 +1819,6 @@ class _HomeViewState extends State<HomeView> {
               : const SizedBox.shrink(),
         ),
       ),
-
-      // ── Bottom Nav Bar ─────────────────────────────────
       Container(
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
@@ -1914,8 +1829,8 @@ class _HomeViewState extends State<HomeView> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-              _navItem(Icons.home_rounded, true,
-                  const Color(0xFF00CED1), label: 'Home', onTap: () {}),
+              _navItem(Icons.home_rounded, true, const Color(0xFF00CED1),
+                  label: 'Home', onTap: () {}),
               _navItem(Icons.assignment_rounded, false,
                   isDark ? Colors.grey[500]! : Colors.grey[400]!, label: 'Plan',
                   onTap: () => Navigator.pushReplacement(context,
@@ -1944,8 +1859,7 @@ class _HomeViewState extends State<HomeView> {
           gradient: const LinearGradient(
               colors: [Color(0xFF00CED1), Color(0xFF8B5CF6)]),
           shape: BoxShape.circle,
-          boxShadow: [BoxShadow(
-              color: const Color(0xFF00CED1).withOpacity(0.45),
+          boxShadow: [BoxShadow(color: const Color(0xFF00CED1).withOpacity(0.45),
               blurRadius: 12, offset: const Offset(0, 4))],
         ),
         child: const Icon(Icons.mic_rounded, color: Colors.white, size: 26)),
@@ -1969,11 +1883,8 @@ class _HomeViewState extends State<HomeView> {
         if (label.isNotEmpty)
           Text(label, style: TextStyle(fontSize: 10,
               fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-              color: isActive ? color
-                  : isDark ? Colors.grey[500]! : Colors.grey[400]!)),
+              color: isActive ? color : isDark ? Colors.grey[500]! : Colors.grey[400]!)),
       ]),
     );
   }
-} 
-
-
+}
