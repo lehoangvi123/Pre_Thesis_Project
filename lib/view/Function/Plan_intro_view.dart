@@ -41,40 +41,21 @@ class _PlanIntroViewState extends State<PlanIntroView>
   }
 
   @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
+  void dispose() { _ctrl.dispose(); super.dispose(); }
 
   Future<void> _markSeen() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('plan_intro_seen', true);
   }
 
-  void _goForm() async {
-    await _markSeen();
-    widget.onStartForm();
-  }
-
-  void _goChat() async {
-    await _markSeen();
-    widget.onFreeChat();
-  }
-
-  void _goAnalysis() async {
-    await _markSeen();
-    widget.onAnalysis();
-  }
-
-  void _goBillScanner() async {
-    await _markSeen();
-    widget.onBillScanner();
-  }
+  void _goForm()        async { await _markSeen(); widget.onStartForm(); }
+  void _goChat()        async { await _markSeen(); widget.onFreeChat(); }
+  void _goAnalysis()    async { await _markSeen(); widget.onAnalysis(); }
+  void _goBillScanner() async { await _markSeen(); widget.onBillScanner(); }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -86,15 +67,12 @@ class _PlanIntroViewState extends State<PlanIntroView>
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Column(children: [
                 const Spacer(flex: 2),
-
-                // Icon
                 Container(
                   width: 88, height: 88,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                         colors: [_teal, _purple],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight),
+                        begin: Alignment.topLeft, end: Alignment.bottomRight),
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [BoxShadow(
                         color: _teal.withOpacity(0.3),
@@ -103,80 +81,43 @@ class _PlanIntroViewState extends State<PlanIntroView>
                   child: const Icon(Icons.assignment_rounded,
                       color: Colors.white, size: 44),
                 ),
-
                 const SizedBox(height: 28),
-
                 Text('Trợ lý tài chính',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 26,
-                        fontWeight: FontWeight.bold, height: 1.25,
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold,
+                        height: 1.25,
                         color: isDark ? Colors.white : Colors.black87)),
-
                 const SizedBox(height: 14),
-
                 Text('Chọn công cụ phù hợp để quản lý\ntài chính cá nhân hiệu quả hơn',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 15, height: 1.5,
                         color: isDark ? Colors.grey[400] : Colors.grey[600])),
-
                 const SizedBox(height: 36),
 
-                // Card 1 — Form
-                _OptionCard(
-                  icon: Icons.format_list_bulleted_rounded,
-                  iconColor: _teal,
-                  title: 'Lập Plan cho bạn',
-                  desc: 'Trả lời 4 bước đơn giản — hệ thống tự lập bảng chi tiêu phù hợp cho bạn',
-                  badge: 'Được dùng nhiều nhất',
-                  badgeColor: _teal,
-                  isDark: isDark,
-                  onTap: _goForm,
-                ),
-
+                _OptionCard(icon: Icons.format_list_bulleted_rounded,
+                    iconColor: _teal, title: 'Lập Plan cho bạn',
+                    desc: 'Trả lời 4 bước đơn giản — hệ thống tự lập bảng chi tiêu phù hợp cho bạn',
+                    isDark: isDark, onTap: _goForm),
                 const SizedBox(height: 12),
 
-                // Card 2 — Chat
-                _OptionCard(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  iconColor: _purple,
-                  title: 'Tạo plan tự do',
-                  desc: 'Nhắn tin tự nhiên như hỏi bạn bè — không cần điền form',
-                  badge: null,
-                  badgeColor: _purple,
-                  isDark: isDark,
-                  onTap: _goChat,
-                ),
-
+                _OptionCard(icon: Icons.chat_bubble_outline_rounded,
+                    iconColor: _purple, title: 'Tạo plan tự do',
+                    desc: 'Nhắn tin tự nhiên như hỏi bạn bè — không cần điền form',
+                    isDark: isDark, onTap: _goChat),
                 const SizedBox(height: 12),
 
-                // Card 3 — Phân tích chi tiêu
-                _OptionCard(
-                  icon: Icons.bar_chart_rounded,
-                  iconColor: Color(0xFFFF9800),
-                  title: 'Phân tích chi tiêu',
-                  desc: 'Xem biểu đồ thống kê thu chi và cảnh báo chi tiêu theo tháng',
-                  badge: 'Mới',
-                  badgeColor: Color(0xFFFF9800),
-                  isDark: isDark,
-                  onTap: _goAnalysis,
-                ),
-
+                _OptionCard(icon: Icons.bar_chart_rounded,
+                    iconColor: const Color(0xFFFF9800), title: 'Phân tích chi tiêu',
+                    desc: 'Xem biểu đồ thống kê thu chi và cảnh báo chi tiêu theo tháng',
+                    isDark: isDark, onTap: _goAnalysis),
                 const SizedBox(height: 12),
 
-                // Card 4 — Chụp ảnh bill
-                _OptionCard(
-                  icon: Icons.receipt_long_rounded,
-                  iconColor: Color(0xFF4CAF50),
-                  title: 'Chụp ảnh bill',
-                  desc: 'Chụp hóa đơn và tự động nhận diện giao dịch chi tiêu',
-                  badge: null,
-                  badgeColor: Color(0xFF4CAF50),
-                  isDark: isDark,
-                  onTap: _goBillScanner,
-                ),
+                _OptionCard(icon: Icons.receipt_long_rounded,
+                    iconColor: const Color(0xFF4CAF50), title: 'Chụp ảnh bill',
+                    desc: 'Chụp hóa đơn và tự động nhận diện giao dịch chi tiêu',
+                    isDark: isDark, onTap: _goBillScanner),
 
                 const Spacer(flex: 3),
-
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Text('Bạn có thể đổi cách bất cứ lúc nào',
@@ -197,15 +138,12 @@ class _OptionCard extends StatelessWidget {
   final Color iconColor;
   final String title;
   final String desc;
-  final String? badge;
-  final Color badgeColor;
   final bool isDark;
   final VoidCallback onTap;
 
   const _OptionCard({
     required this.icon, required this.iconColor,
     required this.title, required this.desc,
-    required this.badge, required this.badgeColor,
     required this.isDark, required this.onTap,
   });
 
@@ -237,22 +175,9 @@ class _OptionCard extends StatelessWidget {
           Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [
-                Text(title, style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w600)),
-                if (badge != null) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                        color: badgeColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(99)),
-                    child: Text(badge!, style: TextStyle(
-                        fontSize: 9, fontWeight: FontWeight.w600,
-                        color: badgeColor)),
-                  ),
-                ],
-              ]),
+              Text(title, style: TextStyle(fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : Colors.black87)),
               const SizedBox(height: 4),
               Text(desc, style: TextStyle(fontSize: 12, height: 1.4,
                   color: isDark ? Colors.grey[400] : Colors.grey[600])),

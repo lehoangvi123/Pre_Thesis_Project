@@ -81,7 +81,7 @@ class _CategoriesViewState extends State<CategoriesView>
           .where('date', isGreaterThanOrEqualTo: start)
           .where('date', isLessThanOrEqualTo: end)
           .orderBy('date', descending: true)
-          .get();
+          .get(const GetOptions(source: Source.server));
 
       double inc = 0, exp = 0;
       final catMap = <String, double>{};
@@ -445,7 +445,9 @@ class _CategoriesViewState extends State<CategoriesView>
                 size: 14, color: Colors.grey[500]),
             const SizedBox(width: 4),
             Text(_sortBy == 'date' ? 'Ngày' : 'Số tiền',
-                style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                style: TextStyle(fontSize: 11,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey[400] : Colors.grey[600])),
           ]),
         ),
       ),
@@ -496,30 +498,33 @@ class _CategoriesViewState extends State<CategoriesView>
             blurRadius: 8, offset: const Offset(0, 3))],
       ),
       child: Row(children: [
-        Expanded(child: _summaryCol(
-            '↑ Thu nhập', _fmt(_totalIncome) + 'đ',
-            Colors.greenAccent[200]!)),
+        Expanded(child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: _summaryCol('↑ Thu nhập', _fmt(_totalIncome) + 'đ',
+              Colors.greenAccent[200]!))),
         Container(width: 1, height: 36,
             color: Colors.white.withOpacity(0.3)),
-        Expanded(child: _summaryCol(
-            '↓ Chi tiêu', _fmt(_totalExpense) + 'đ',
-            Colors.red[200]!)),
+        Expanded(child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: _summaryCol('↓ Chi tiêu', _fmt(_totalExpense) + 'đ',
+              Colors.red[200]!))),
         Container(width: 1, height: 36,
             color: Colors.white.withOpacity(0.3)),
-        Expanded(child: _summaryCol(
-            '📋 Giao dịch', '$count',
-            Colors.white)),
+        Expanded(child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: _summaryCol('📋 Giao dịch', '$count', Colors.white))),
       ]),
     );
   }
 
   Widget _summaryCol(String label, String value, Color color) =>
       Column(children: [
-        Text(label, style: TextStyle(
-            fontSize: 10, color: Colors.white.withOpacity(0.7))),
+        Text(label, style: const TextStyle(
+            fontSize: 10, color: Colors.white70)),
         const SizedBox(height: 4),
         Text(value, style: TextStyle(
-            fontSize: 13, fontWeight: FontWeight.bold, color: color)),
+            fontSize: 13, fontWeight: FontWeight.bold, color: color),
+            textAlign: TextAlign.center),
       ]);
 
   // ── Transaction list ──────────────────────────────────
@@ -682,7 +687,7 @@ class _CategoriesViewState extends State<CategoriesView>
                 crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(title, style: TextStyle(
                   fontSize: 14, fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white : Colors.black87),
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A)),
                   maxLines: 1, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 3),
               Row(children: [
@@ -1205,16 +1210,23 @@ class _CategoriesViewState extends State<CategoriesView>
             const Text('Phân bổ 100% thu nhập — mỗi đồng đều có nhiệm vụ',
                 style: TextStyle(color: Colors.white70, fontSize: 12)),
             const SizedBox(height: 16),
-            Row(children: [
-              _zeroStatCol('Thu nhập', '${_fmt(income)}đ', Colors.white),
-              Container(width: 1, height: 40, color: Colors.white24),
-              _zeroStatCol('Đã chi', '${_fmt(totalAllocated)}đ',
-                  Colors.greenAccent[200]!),
-              Container(width: 1, height: 40, color: Colors.white24),
-              _zeroStatCol(unallocated >= 0 ? 'Còn lại' : 'Vượt quá',
-                  '${_fmt(unallocated.abs())}đ',
-                  unallocated >= 0 ? Colors.amber[200]! : Colors.red[200]!),
-            ]),
+            IntrinsicHeight(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: _zeroStatCol('Thu nhập', '${_fmt(income)}đ', Colors.white)),
+                  Container(width: 1, color: Colors.white24),
+                  Expanded(child: _zeroStatCol('Đã chi', '${_fmt(totalAllocated)}đ',
+                      Colors.greenAccent[200]!)),
+                  Container(width: 1, color: Colors.white24),
+                  Expanded(child: _zeroStatCol(
+                      unallocated >= 0 ? 'Còn lại' : 'Vượt quá',
+                      '${_fmt(unallocated.abs())}đ',
+                      unallocated >= 0 ? Colors.amber[200]! : Colors.red[200]!)),
+                ],
+              ),
+            ),
             const SizedBox(height: 14),
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               const Text('Tỷ lệ đã phân bổ',
@@ -1347,12 +1359,14 @@ class _CategoriesViewState extends State<CategoriesView>
   }
 
   Widget _zeroStatCol(String label, String value, Color color) =>
-      Column(children: [
-        Text(label, style: TextStyle(
-            color: Colors.white.withOpacity(0.7), fontSize: 10)),
+      Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
+        Text(label, textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 10)),
         const SizedBox(height: 4),
-        Text(value, style: TextStyle(
-            color: color, fontSize: 12, fontWeight: FontWeight.bold)),
+        FittedBox(fit: BoxFit.scaleDown,
+          child: Text(value, textAlign: TextAlign.center,
+              style: TextStyle(color: color, fontSize: 12,
+                  fontWeight: FontWeight.bold))),
       ]);
 
   Widget _buildZeroInsight(bool isDark, double income,
