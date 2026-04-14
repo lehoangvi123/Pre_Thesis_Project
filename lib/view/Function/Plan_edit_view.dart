@@ -510,28 +510,61 @@ class _PlanEditViewState extends State<PlanEditView> {
   }
 
   Widget _buildHintBanner(bool isDark) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0FAFA),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _teal.withOpacity(0.2)),
-      ),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('💡', style: TextStyle(fontSize: 18)),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            'Đây là tổng chi tiêu do app đề xuất, trong đó đã có khoản Tiết kiệm. '
-            'Bạn có thể thêm những khoản chi mà bạn mong muốn — '
-            'đó là cách phù hợp nhất để kế hoạch sát với thực tế của bạn! 😊',
-            style: TextStyle(fontSize: 12, height: 1.5,
-                color: isDark ? Colors.grey[300] : const Color(0xFF2C7873)),
-          ),
+    return Column(children: [
+      // Banner 1: giải thích tổng quan
+      Container(
+        margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0FAFA),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _teal.withOpacity(0.2)),
         ),
-      ]),
-    );
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('💡', style: TextStyle(fontSize: 18)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Đây là tổng chi tiêu do app đề xuất, trong đó đã có khoản Tiết kiệm. '
+              'Bạn có thể thêm những khoản chi mà bạn mong muốn — '
+              'đó là cách phù hợp nhất để kế hoạch sát với thực tế của bạn! 😊',
+              style: TextStyle(fontSize: 12, height: 1.5,
+                  color: isDark ? Colors.grey[300] : const Color(0xFF2C7873)),
+            ),
+          ),
+        ]),
+      ),
+      // Banner 2: giải thích số lẻ
+      Container(
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2C2C1A) : const Color(0xFFFFFBF0),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _orange.withOpacity(0.3)),
+        ),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('🔢', style: TextStyle(fontSize: 16)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: TextStyle(fontSize: 12, height: 1.5,
+                    color: isDark ? Colors.grey[300] : Colors.grey[700]),
+                children: const [
+                  TextSpan(text: 'Tại sao số tiền lẻ? ',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  TextSpan(
+                    text: 'Hệ thống tự động chia tỷ lệ để tổng các khoản = đúng 100% thu nhập. '
+                        'Bạn có thể chỉnh tay sang số tròn hơn bên dưới.',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ]),
+      ),
+    ]);
   }
 
   Widget _buildList(bool isDark) {
