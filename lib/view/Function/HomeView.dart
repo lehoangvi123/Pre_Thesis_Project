@@ -3,6 +3,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../login/LoginView.dart';
 import '../notification/NotificationView.dart';
@@ -19,7 +20,6 @@ import './AddTransactionView.dart';
 import '../TextVoice/AI_deep_analysis_view.dart';
 import './AI_Chatbot/chatbot_view.dart';
 import '../../view/Bill_Scanner_Service/Bill_scanner_view.dart';
-import 'package:flutter/services.dart';
 import './HomeQuickAddExpense.dart';
 
 // ── Thousand separator formatter ──────────────────────
@@ -68,12 +68,14 @@ class _HomeViewState extends State<HomeView> {
   String _greetingMsg   = '';
   String _greetingEmoji = '';
 
+  // ── Balance — realtime stream ─────────────────────────
   double _balance   = 0;
   double _totInc    = 0;
   double _totExp    = 0;
   bool   _balLoaded = false;
+  Stream<DocumentSnapshot>? _balanceStream;
 
-  // ── Plan stream (realtime) ────────────────────────────
+  // ── Plan — realtime stream ────────────────────────────
   Stream<DocumentSnapshot>? _planStream;
 
   // ── Default plan % ────────────────────────────────────
@@ -93,10 +95,30 @@ class _HomeViewState extends State<HomeView> {
   void initState() {
     super.initState();
     userId = FirebaseAuth.instance.currentUser?.uid;
-    _setupPlanStream();
+    _setupBalanceStream(); // realtime balance
+    _setupPlanStream();    // realtime plan
     _initAll();
   }
 
+  // ── Balance stream — tự đồng bộ giữa các thiết bị ────
+  void _setupBalanceStream() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    _balanceStream = FirebaseFirestore.instance
+        .collection('users').doc(uid).snapshots();
+    _balanceStream!.listen((doc) {
+      if (!doc.exists || !mounted) return;
+      final d = doc.data() as Map<String, dynamic>? ?? {};
+      setState(() {
+        _balance   = (d['balance']      ?? 0).toDouble();
+        _totInc    = (d['totalIncome']  ?? 0).toDouble();
+        _totExp    = (d['totalExpense'] ?? 0).toDouble();
+        _balLoaded = true;
+      });
+    });
+  }
+
+  // ── Plan stream ───────────────────────────────────────
   void _setupPlanStream() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -110,27 +132,12 @@ class _HomeViewState extends State<HomeView> {
 
   Future<void> _initAll() async {
     await Future.wait([
-      _loadUserName(), _loadStreakOnce(),
-      _loadBalanceOnce(), _loadDailySpend(),
+      _loadUserName(),
+      _loadStreakOnce(),
+      _loadDailySpend(),
     ]);
     await _loadMonthReport();
     if (mounted) _triggerGreeting();
-  }
-
-  Future<void> _loadBalanceOnce() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-    try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-      if (!doc.exists) return;
-      final d = doc.data() as Map<String, dynamic>? ?? {};
-      if (mounted) setState(() {
-        _balance   = (d['balance']      ?? 0).toDouble();
-        _totInc    = (d['totalIncome']  ?? 0).toDouble();
-        _totExp    = (d['totalExpense'] ?? 0).toDouble();
-        _balLoaded = true;
-      });
-    } catch (_) {}
   }
 
   // ── Tự động tạo/cập nhật plan ─────────────────────────
@@ -172,7 +179,6 @@ class _HomeViewState extends State<HomeView> {
             'plan.expense_table': oldTable});
         }
       }
-      // Stream sẽ tự cập nhật UI — không cần setState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Row(children: [
@@ -229,7 +235,6 @@ class _HomeViewState extends State<HomeView> {
     );
 
     if (confirmed != true) return;
-
     try {
       await FirebaseFirestore.instance
           .collection('users').doc(uid)
@@ -394,7 +399,6 @@ class _HomeViewState extends State<HomeView> {
 
   String _fmt(double v) => v.toStringAsFixed(0).replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
-  String _formatCurrency(double v) => _fmt(v);
 
   @override
   Widget build(BuildContext context) {
@@ -744,15 +748,11 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  // ── Plan Section — dùng StreamBuilder, tự cập nhật realtime ──
   Widget _buildPlanSection(bool isDark) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-
     return StreamBuilder<DocumentSnapshot>(
       stream: _planStream,
       builder: (context, snapshot) {
-
-        // Chưa có data hoặc doc không tồn tại
         if (!snapshot.hasData || !snapshot.data!.exists) {
           return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Kế hoạch chi tiêu', style: TextStyle(fontSize: 18,
@@ -795,7 +795,6 @@ class _HomeViewState extends State<HomeView> {
           ]);
         }
 
-        // Parse data realtime từ Firestore
         final data      = snapshot.data!.data() as Map<String, dynamic>? ?? {};
         final plan      = data['plan'] as Map<String, dynamic>? ?? {};
         final table     = plan['expense_table'] as List? ?? [];
@@ -804,7 +803,6 @@ class _HomeViewState extends State<HomeView> {
         final dateStr   = created != null
             ? '${created.toDate().day}/${created.toDate().month}/${created.toDate().year}' : '';
 
-        // Tính spent từ _dailyTxs
         final spentMap = <String, double>{};
         for (final dayTxs in _dailyTxs.values) {
           for (final d in dayTxs) {
@@ -821,7 +819,6 @@ class _HomeViewState extends State<HomeView> {
             Text('Kế hoạch chi tiêu', style: TextStyle(fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: isDark ? Colors.white : Colors.black87)),
-            // Nút reset
             GestureDetector(
               onTap: _resetPlan,
               child: Container(
@@ -1043,8 +1040,12 @@ class _HomeViewState extends State<HomeView> {
                 Expanded(child: TextField(
                   controller: amtCtrl, keyboardType: TextInputType.number,
                   autofocus: true, textAlign: TextAlign.center,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    _ThousandsSeparator(),
+                  ],
                   onChanged: (v) => setS(() =>
-                      tempAmt = double.tryParse(v.replaceAll(',', '')) ?? 0),
+                      tempAmt = double.tryParse(v.replaceAll('.', '')) ?? 0),
                   style: const TextStyle(fontSize: 28,
                       fontWeight: FontWeight.bold, color: Colors.white),
                   decoration: const InputDecoration(hintText: '0',
@@ -1061,7 +1062,7 @@ class _HomeViewState extends State<HomeView> {
             return Expanded(child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 3),
               child: GestureDetector(
-                onTap: () => setS(() { tempAmt = v.toDouble(); amtCtrl.text = v.toString(); }),
+                onTap: () => setS(() { tempAmt = v.toDouble(); amtCtrl.text = _fmt(v.toDouble()).replaceAll(',', '.'); }),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
@@ -1081,10 +1082,9 @@ class _HomeViewState extends State<HomeView> {
           SizedBox(width: double.infinity, height: 50,
             child: ElevatedButton(
               onPressed: () async {
-                final amt = double.tryParse(amtCtrl.text.replaceAll(',', '')) ?? 0;
+                final amt = double.tryParse(amtCtrl.text.replaceAll('.', '').replaceAll(',', '')) ?? 0;
                 if (amt <= 0) return;
                 if (ctx.mounted) Navigator.pop(ctx);
-                // Stream tự cập nhật UI sau khi _autoUpdatePlan ghi Firestore
                 await _autoUpdatePlan(amt);
               },
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00CED1),
@@ -1175,8 +1175,12 @@ class _HomeViewState extends State<HomeView> {
                   const SizedBox(width: 8),
                   Expanded(child: TextField(controller: amtCtrl,
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      _ThousandsSeparator(),
+                    ],
                     onChanged: (v) => setS(() =>
-                        tempAmt = double.tryParse(v.replaceAll(',', '')) ?? 0),
+                        tempAmt = double.tryParse(v.replaceAll('.', '')) ?? 0),
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold,
                         color: isDark ? Colors.white : Colors.black87),
                     decoration: const InputDecoration(hintText: '0',
@@ -1192,7 +1196,7 @@ class _HomeViewState extends State<HomeView> {
                 return Expanded(child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 3),
                   child: GestureDetector(
-                    onTap: () => setS(() { tempAmt = val.toDouble(); amtCtrl.text = val.toString(); }),
+                    onTap: () => setS(() { tempAmt = val.toDouble(); amtCtrl.text = _fmt(val.toDouble()).replaceAll(',', '.'); }),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
@@ -1215,7 +1219,7 @@ class _HomeViewState extends State<HomeView> {
               child: ElevatedButton(
                 onPressed: () async {
                   final name = nameCtrl.text.trim();
-                  final amt  = double.tryParse(amtCtrl.text.replaceAll(',', '')) ?? 0;
+                  final amt  = double.tryParse(amtCtrl.text.replaceAll('.', '').replaceAll(',', '')) ?? 0;
                   if (name.isEmpty || amt <= 0) {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: const Text('Vui lòng nhập tên và số tiền!'),
@@ -1234,7 +1238,6 @@ class _HomeViewState extends State<HomeView> {
                       .collection('plans').doc('current_plan')
                       .update({'plan.expense_table': newTable});
                   if (ctx.mounted) Navigator.pop(ctx);
-                  // Stream tự cập nhật UI
                   if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                     content: Text('Đã thêm "$name" vào kế hoạch!'),
                     backgroundColor: const Color(0xFF00CED1), behavior: SnackBarBehavior.floating,
@@ -1386,7 +1389,6 @@ class _HomeViewState extends State<HomeView> {
           .collection('users').doc(uid)
           .collection('plans').doc('current_plan')
           .update({'plan.expense_table': newTable});
-      // Stream tự cập nhật UI
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Đã cập nhật "$category"'),
         backgroundColor: const Color(0xFF00CED1), behavior: SnackBarBehavior.floating,
@@ -1806,14 +1808,16 @@ class _HomeViewState extends State<HomeView> {
             SizedBox(width: double.infinity, height: 52,
               child: ElevatedButton(
                 onPressed: () async {
-                  final amount = double.tryParse(amtCtrl.text.replaceAll('.', '').replaceAll(',', ''));
+                  final amount = double.tryParse(
+                      amtCtrl.text.replaceAll('.', '').replaceAll(',', ''));
                   if (amount == null || amount <= 0) return;
                   await _saveTx(isIncome: isIncome, amount: amount,
                       note: noteCtrl.text.trim(), category: selCat);
                   if (ctx.mounted) Navigator.pop(ctx);
                   await _loadDailySpend();
-                  await Future.wait([_loadMonthReport(), _loadBalanceOnce()]);
-                  // Thu nhập → tự động cập nhật plan (stream tự reload UI)
+                  await _loadMonthReport();
+                  // Balance stream tự cập nhật
+                  // Thu nhập → tự cập nhật plan
                   if (isIncome) await _autoUpdatePlan(_totInc);
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: mainColor, elevation: 0,
@@ -1846,6 +1850,7 @@ class _HomeViewState extends State<HomeView> {
         if (isIncome)  'totalIncome':  FieldValue.increment(amount),
         if (!isIncome) 'totalExpense': FieldValue.increment(amount),
       });
+      // Balance stream tự detect thay đổi và cập nhật UI
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Row(children: [
           Icon(isIncome ? Icons.trending_up_rounded : Icons.trending_down_rounded,
