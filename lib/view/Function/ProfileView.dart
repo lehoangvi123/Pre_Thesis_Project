@@ -776,6 +776,14 @@ class _ProfileViewState extends State<ProfileView> {
     }
   }
 
+  // ══════════════════════════════════════════════════════════
+// BOTTOM NAV BAR — ProfileView.dart
+// Thay thế toàn bộ method _buildBottomNavBar cũ bằng đoạn này
+// ══════════════════════════════════════════════════════════
+ // ══════════════════════════════════════════════════════════
+// BOTTOM NAV BAR — ProfileView.dart — Đổi thứ tự nav
+// Thay thế toàn bộ method _buildBottomNavBar bằng đoạn này
+// ══════════════════════════════════════════════════════════
   Widget _buildBottomNavBar() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
@@ -796,17 +804,17 @@ class _ProfileViewState extends State<ProfileView> {
                   label: 'Home',
                   onTap: () => Navigator.pushReplacement(context,
                       MaterialPageRoute(builder: (_) => const HomeView()))),
-             _buildNavItem(Icons.assignment_rounded, false,
-    isDark ? Colors.grey[500]! : Colors.grey[400]!,
-    label: 'Plan',
-                  onTap: () => Navigator.pushReplacement(context,
-                      MaterialPageRoute(builder: (_) => const AnalysisView()))),
-              _buildVoiceNavItem(),
-              _buildNavItem(Icons.layers_rounded, false,
+              _buildNavItem(Icons.history_rounded, false,
                   isDark ? Colors.grey[500]! : Colors.grey[400]!,
-                  label: 'Category',
+                  label: 'History',
                   onTap: () => Navigator.pushReplacement(context,
                       MaterialPageRoute(builder: (_) => const CategoriesView()))),
+              _buildVoiceNavItem(),
+              _buildNavItem(Icons.assignment_rounded, false,
+                  isDark ? Colors.grey[500]! : Colors.grey[400]!,
+                  label: 'Plan',
+                  onTap: () => Navigator.pushReplacement(context,
+                      MaterialPageRoute(builder: (_) => const AnalysisView()))),
               _buildNavItem(Icons.person_outline_rounded, true,
                   const Color(0xFF00CED1),
                   label: 'Profile', onTap: () {}),

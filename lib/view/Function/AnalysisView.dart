@@ -220,7 +220,7 @@ OUTPUT JSON THUẦN:
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(child: PlanEntryView(onPlanCreated: _onPlanCreated, isGenerating: _isGenerating, onGenerate: _generate)),
-        bottomNavigationBar: _SharedBottomNavBar(activeIndex: 1, isDark: isDark),
+        bottomNavigationBar: _SharedBottomNavBar(activeIndex: 3, isDark: isDark),
       );
     }
     return _PlanResultScreen(plan: _savedPlan!, formData: _savedFormData!, onReset: _resetPlan);
@@ -379,7 +379,7 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
           ]),
         )),
       ])),
-      bottomNavigationBar: _SharedBottomNavBar(activeIndex: 1, isDark: isDark),
+      bottomNavigationBar: _SharedBottomNavBar(activeIndex: 3, isDark: isDark),
     );
   }
 
@@ -942,6 +942,19 @@ class _ActionItem {
 // ══════════════════════════════════════════════════════════
 // SHARED BOTTOM NAV BAR
 // ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// SHARED BOTTOM NAV BAR — AnalysisView.dart
+// Thay thế toàn bộ class _SharedBottomNavBar cũ bằng đoạn này
+// ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// HƯỚNG DẪN SỬA AnalysisView.dart — Đổi thứ tự nav
+// ══════════════════════════════════════════════════════════
+// BƯỚC 1: Tìm tất cả dòng có "activeIndex: 1" → đổi thành "activeIndex: 3"
+//         (có 2 chỗ trong file: ở _AnalysisViewState.build và _PlanResultScreen.build)
+//
+// BƯỚC 2: Thay toàn bộ class _SharedBottomNavBar bằng code dưới đây
+// ══════════════════════════════════════════════════════════
+
 class _SharedBottomNavBar extends StatelessWidget {
   final int activeIndex; final bool isDark;
   const _SharedBottomNavBar({required this.activeIndex, required this.isDark});
@@ -950,15 +963,25 @@ class _SharedBottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(color: isDark ? const Color(0xFF2C2C2C) : Colors.white, boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -4))]),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10, offset: const Offset(0, -4))],
+      ),
       child: SafeArea(child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-          _item(context, Icons.home_rounded, 'Home', 0, () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeView()))),
-          _item(context, Icons.assignment_rounded, 'Plan', 1, () {}),
+          _item(context, Icons.home_rounded, 'Home', 0,
+              () => Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (_) => const HomeView()))),
+          _item(context, Icons.history_rounded, 'History', 1,
+              () => Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (_) => const CategoriesView()))),
           _voiceItem(context),
-          _item(context, Icons.layers_rounded, 'Category', 3, () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CategoriesView()))),
-          _item(context, Icons.person_outline_rounded, 'Profile', 4, () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ProfileView()))),
+          _item(context, Icons.assignment_rounded, 'Plan', 3, () {}),
+          _item(context, Icons.person_outline_rounded, 'Profile', 4,
+              () => Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (_) => const ProfileView()))),
         ]),
       )),
     );
@@ -968,16 +991,37 @@ class _SharedBottomNavBar extends StatelessWidget {
     final active = index == activeIndex;
     final color  = active ? _teal : (isDark ? Colors.grey[500]! : Colors.grey[400]!);
     return GestureDetector(onTap: onTap, child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: active ? _teal.withOpacity(0.12) : Colors.transparent, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: color, size: 24)),
-      Text(label, style: TextStyle(fontSize: 10, fontWeight: active ? FontWeight.w600 : FontWeight.normal, color: color)),
+      Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: active ? _teal.withOpacity(0.12) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, color: color, size: 24),
+      ),
+      Text(label, style: TextStyle(fontSize: 10,
+          fontWeight: active ? FontWeight.w600 : FontWeight.normal, color: color)),
     ]));
   }
 
   Widget _voiceItem(BuildContext ctx) {
-    return GestureDetector(onTap: () => Navigator.pushNamed(ctx, '/test-voice'), child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Container(width: 52, height: 52, decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF00CED1), Color(0xFF8B5CF6)]), shape: BoxShape.circle, boxShadow: [BoxShadow(color: _teal.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))]), child: const Icon(Icons.mic_rounded, color: Colors.white, size: 26)),
-      const SizedBox(height: 4),
-      const Text('Voice', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _teal)),
-    ]));
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(ctx, '/test-voice'),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          width: 52, height: 52,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [Color(0xFF00CED1), Color(0xFF8B5CF6)]),
+            shape: BoxShape.circle,
+            boxShadow: [BoxShadow(color: _teal.withOpacity(0.4),
+                blurRadius: 10, offset: const Offset(0, 4))],
+          ),
+          child: const Icon(Icons.mic_rounded, color: Colors.white, size: 26),
+        ),
+        const SizedBox(height: 4),
+        const Text('Voice', style: TextStyle(fontSize: 10,
+            fontWeight: FontWeight.w600, color: _teal)),
+      ]),
+    );
   }
 }

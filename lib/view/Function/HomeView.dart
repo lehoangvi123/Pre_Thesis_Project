@@ -448,7 +448,7 @@ class _HomeViewState extends State<HomeView> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Hi, Welcome Back', style: TextStyle(fontSize: 20,
+        Text('Xin chào 👋', style: TextStyle(fontSize: 20,
             fontWeight: FontWeight.bold,
             color: isDark ? Colors.white : Colors.grey[800])),
         const SizedBox(height: 4),
@@ -456,10 +456,6 @@ class _HomeViewState extends State<HomeView> {
             color: isDark ? Colors.grey[400] : Colors.grey[600])),
       ]),
       Row(children: [
-        _hIcon(Icons.swap_horiz_rounded, isDark,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const TransactionView()))),
-        const SizedBox(width: 8),
         _hIcon(Icons.notifications_outlined, isDark,
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const NotificationView()))),
@@ -1931,13 +1927,13 @@ class _HomeViewState extends State<HomeView> {
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
               _navItem(Icons.home_rounded, true, const Color(0xFF00CED1),
                   label: 'Home', onTap: () {}),
-              _navItem(Icons.assignment_rounded, false,
-                  isDark ? Colors.grey[500]! : Colors.grey[400]!, label: 'Plan',
+              _navItem(Icons.history_rounded, false,
+                  isDark ? Colors.grey[500]! : Colors.grey[400]!, label: 'History',
                   onTap: () => Navigator.pushReplacement(context,
                       MaterialPageRoute(builder: (_) => const AnalysisView()))),
               _voiceNavItem(),
-              _navItem(Icons.layers_rounded, false,
-                  isDark ? Colors.grey[500]! : Colors.grey[400]!, label: 'Category',
+              _navItem(Icons.assignment_rounded, false,
+                  isDark ? Colors.grey[500]! : Colors.grey[400]!, label: 'Plan',
                   onTap: () => Navigator.pushReplacement(context,
                       MaterialPageRoute(builder: (_) => const CategoriesView()))),
               _navItem(Icons.person_outline_rounded, false,
