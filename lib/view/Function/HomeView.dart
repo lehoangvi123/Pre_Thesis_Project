@@ -406,8 +406,16 @@ class _HomeViewState extends State<HomeView> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const ClampingScrollPhysics(),
+        child: RefreshIndicator(
+          color: const Color(0xFF00CED1),
+          onRefresh: () async {
+            await Future.wait([
+              _loadDailySpend(),
+              _loadMonthReport(),
+            ]);
+          },
+          child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -429,6 +437,7 @@ class _HomeViewState extends State<HomeView> {
               const SizedBox(height: 20),
             ]),
           ),
+        ),
         ),
       ),
       bottomNavigationBar: _buildBottomNavBar(),
@@ -901,7 +910,12 @@ class _HomeViewState extends State<HomeView> {
                 return Column(children: [
                   InkWell(
                     onTap: () => QuickAddExpenseSheet.show(
-                        context: context, category: cat, budgetLimit: limit, isDark: isDark),
+                        context: context, category: cat,
+                        budgetLimit: limit, isDark: isDark,
+                        onSaved: () async {
+                          await _loadDailySpend();
+                          await _loadMonthReport();
+                        }),
                     borderRadius: BorderRadius.circular(8),
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
