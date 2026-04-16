@@ -240,7 +240,7 @@ class _CategoriesViewState extends State<CategoriesView>
           const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-          
+            child: _buildTabSwitcher(isDark),
           ),
           const SizedBox(height: 10),
           Padding(
@@ -635,7 +635,18 @@ class _CategoriesViewState extends State<CategoriesView>
     );
   }
 
- 
+  Widget _buildTabSwitcher(bool isDark) {
+    return Container(
+      height: 42,
+      decoration: BoxDecoration(color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100], borderRadius: BorderRadius.circular(12)),
+      child: Row(children: [
+        _tabBtn(0, '🧾  Giao dịch', isDark),
+        _tabBtn(1, '📊  50/30/20', isDark),
+        _tabBtn(2, '🎯  Zero', isDark),
+      ]),
+    );
+  }
+
   Widget _tabBtn(int idx, String label, bool isDark) {
     final active = _tabIndex == idx;
     return Expanded(

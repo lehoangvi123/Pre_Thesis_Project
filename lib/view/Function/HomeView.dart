@@ -225,7 +225,7 @@ class _HomeViewState extends State<HomeView> {
               child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF00CED1), size: 16)),
             const SizedBox(width: 10),
             const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Chỉnh tỷ lệ dựa trên thu nhập thực', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Text('Tỷ lệ AI → Thu nhập thực', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               Text('Giữ % AI, tính lại theo thu nhập hiện tại', style: TextStyle(fontSize: 11, color: Colors.grey)),
             ])),
           ]),

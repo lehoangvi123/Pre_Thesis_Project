@@ -7,7 +7,6 @@ import './HomeView.dart';
 import './CategorizeContent.dart';
 import './ProfileView.dart';
 import './SpecialFutureView.dart';
-
 class BudgetPlanView extends StatefulWidget {
   final int initialTab;
   const BudgetPlanView({Key? key, this.initialTab = 0}) : super(key: key);
