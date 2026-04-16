@@ -65,6 +65,7 @@ class _HomeViewState extends State<HomeView> {
   bool _reportLoading = true;
 
   bool   _showGreeting  = false;
+  final GlobalKey _planOptionsKey = GlobalKey();
   String _greetingMsg   = '';
   String _greetingEmoji = '';
 
@@ -196,6 +197,202 @@ class _HomeViewState extends State<HomeView> {
   }
 
   // ── Reset plan ────────────────────────────────────────
+  // ── Plan options dropdown ───────────────────────────
+  void _showPlanOptions(bool isDark) {
+    final RenderBox button = _planOptionsKey.currentContext!.findRenderObject() as RenderBox;
+    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final Offset offset = button.localToGlobal(Offset.zero, ancestor: overlay);
+
+    showMenu<int>(
+      context: context,
+      color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      elevation: 8,
+      position: RelativeRect.fromLTRB(
+        offset.dx,
+        offset.dy + button.size.height + 4,
+        overlay.size.width - offset.dx - button.size.width,
+        0,
+      ),
+      items: [
+        PopupMenuItem<int>(
+          value: 1,
+          child: Row(children: [
+            Container(width: 32, height: 32,
+              decoration: BoxDecoration(color: const Color(0xFF00CED1).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+              child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF00CED1), size: 16)),
+            const SizedBox(width: 10),
+            const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Tỷ lệ AI → Thu nhập thực', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Text('Giữ % AI, tính lại theo thu nhập hiện tại', style: TextStyle(fontSize: 11, color: Colors.grey)),
+            ])),
+          ]),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem<int>(
+          value: 2,
+          child: Row(children: [
+            Container(width: 32, height: 32,
+              decoration: BoxDecoration(color: const Color(0xFF8B5CF6).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+              child: const Icon(Icons.grid_view_rounded, color: Color(0xFF8B5CF6), size: 16)),
+            const SizedBox(width: 10),
+            const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Kế hoạch mặc định', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Text('9 danh mục chuẩn theo thu nhập thực', style: TextStyle(fontSize: 11, color: Colors.grey)),
+            ])),
+          ]),
+        ),
+      ],
+    ).then((val) {
+      if (val == 1) _applyAIRatioToRealIncome();
+      if (val == 2) _applyDefaultPlanToRealIncome();
+    });
+  }
+
+  // Option 1: Lấy % từ AI plan hiện tại → scale theo totalIncome thực
+  Future<void> _applyAIRatioToRealIncome() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    if (_totInc <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Chưa có thu nhập thực. Thêm thu nhập trước!'),
+        backgroundColor: Colors.orange, behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.all(12),
+      ));
+      return;
+    }
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users').doc(uid).collection('plans').doc('current_plan').get();
+      if (!doc.exists) { _showNoAIPlanSnack(); return; }
+      final data  = doc.data() as Map<String, dynamic>;
+      final plan  = data['plan'] as Map<String, dynamic>? ?? {};
+      final table = List<Map<String, dynamic>>.from(
+          (plan['expense_table'] as List? ?? []).map((r) => Map<String, dynamic>.from(r as Map)));
+      if (table.isEmpty) { _showNoAIPlanSnack(); return; }
+
+      // Tính tổng % hiện tại
+      final totalPct = table.fold<int>(0, (s, r) => s + ((r['percent'] as num?)?.toInt() ?? 0));
+      final income   = _totInc.toInt();
+
+      final newTable = <Map<String, dynamic>>[];
+      for (final row in table) {
+        final pct = (row['percent'] as num?)?.toInt() ?? 0;
+        final ratio = totalPct > 0 ? pct / totalPct : 1.0 / table.length;
+        final raw = (income * ratio).round();
+        final amt = (raw / 500000).round() * 500000;
+        newTable.add({...row, 'amount': amt, 'percent': pct});
+      }
+      // Fix total
+      final newTotal = newTable.fold<int>(0, (s, r) => s + (r['amount'] as int));
+      if (newTable.isNotEmpty) newTable.last['amount'] = (newTable.last['amount'] as int) + (income - newTotal);
+
+      await FirebaseFirestore.instance
+          .collection('users').doc(uid).collection('plans').doc('current_plan')
+          .update({'plan.recommended_income': income, 'plan.expense_table': newTable});
+
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Row(children: [
+          const Text('✅', style: TextStyle(fontSize: 16)),
+          const SizedBox(width: 8),
+          Text('Đã áp dụng tỷ lệ AI theo ${_fmt(_totInc)}đ/tháng'),
+        ]),
+        backgroundColor: const Color(0xFF00CED1),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(12),
+        duration: const Duration(seconds: 3),
+      ));
+    } catch (e) { debugPrint('Error: $e'); }
+  }
+
+  // Option 2: Reset về plan mặc định theo totalIncome thực
+  Future<void> _applyDefaultPlanToRealIncome() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    if (_totInc <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Chưa có thu nhập thực. Thêm thu nhập trước!'),
+        backgroundColor: Colors.orange, behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.all(12),
+      ));
+      return;
+    }
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(children: [
+          Container(padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: const Color(0xFF8B5CF6).withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+            child: const Icon(Icons.grid_view_rounded, color: Color(0xFF8B5CF6))),
+          const SizedBox(width: 12),
+          const Expanded(child: Text('Dùng kế hoạch mặc định?', style: TextStyle(fontSize: 17))),
+        ]),
+        content: Text(
+          'Tạo lại kế hoạch 9 danh mục chuẩn theo thu nhập thực ${_fmt(_totInc)}đ/tháng. Kế hoạch AI hiện tại sẽ bị thay thế.',
+          style: TextStyle(fontSize: 13, height: 1.5, color: isDark ? Colors.grey[300] : Colors.grey[700]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false),
+              child: Text('Hủy', style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]))),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            child: const Text('Áp dụng', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final income = _totInc.toInt();
+      final table  = _defaultPlanRows.map((row) {
+        final pct = row['percent'] as int;
+        final raw = (income * pct / 100).round();
+        final amt = (raw / 500000).round() * 500000;
+        return {'category': row['category'], 'amount': amt, 'percent': pct, 'note': ''};
+      }).toList();
+      final total = table.fold<int>(0, (s, r) => s + (r['amount'] as int));
+      if (table.isNotEmpty) table.last['amount'] = (table.last['amount'] as int) + (income - total);
+
+      await FirebaseFirestore.instance
+          .collection('users').doc(uid).collection('plans').doc('current_plan')
+          .set({'plan': {'recommended_income': income, 'expense_table': table,
+            'income_reason': 'Kế hoạch mặc định theo thu nhập thực.',
+            'summary': 'Kế hoạch chuẩn theo ${_fmt(_totInc)}đ/tháng.',
+            'tips': ['Chuyển tiết kiệm ngay khi nhận lương.', 'Ghi chép chi tiêu hàng ngày.'],
+            'goal_plan': 'Kiểm soát tài chính hiệu quả.',
+          }, 'createdAt': FieldValue.serverTimestamp()});
+
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Row(children: [
+          const Text('✅', style: TextStyle(fontSize: 16)),
+          const SizedBox(width: 8),
+          Text('Đã tạo kế hoạch mặc định theo ${_fmt(_totInc)}đ/tháng'),
+        ]),
+        backgroundColor: const Color(0xFF8B5CF6),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(12),
+        duration: const Duration(seconds: 3),
+      ));
+    } catch (e) { debugPrint('Error: $e'); }
+  }
+
+  void _showNoAIPlanSnack() {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Chưa có kế hoạch AI. Dùng BuddyAI để tạo trước!'),
+      backgroundColor: Colors.grey, behavior: SnackBarBehavior.floating,
+      margin: EdgeInsets.all(12),
+    ));
+  }
+
   Future<void> _resetPlan() async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -824,18 +1021,40 @@ class _HomeViewState extends State<HomeView> {
             Text('Kế hoạch chi tiêu', style: TextStyle(fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: isDark ? Colors.white : Colors.black87)),
-            GestureDetector(
-              onTap: _resetPlan,
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              // Dropdown 2 options
+              GestureDetector(
+                key: _planOptionsKey,
+                onTap: () => _showPlanOptions(isDark),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00CED1).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF00CED1).withOpacity(0.3)),
+                  ),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.tune_rounded, color: Color(0xFF00CED1), size: 15),
+                    SizedBox(width: 4),
+                    Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF00CED1), size: 16),
+                  ]),
                 ),
-                child: const Icon(Icons.refresh_rounded, color: Colors.orange, size: 16),
               ),
-            ),
+              const SizedBox(width: 8),
+              // Reset button
+              GestureDetector(
+                onTap: _resetPlan,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: const Icon(Icons.refresh_rounded, color: Colors.orange, size: 16),
+                ),
+              ),
+            ]),
           ]),
           const SizedBox(height: 10),
           Container(
@@ -969,6 +1188,102 @@ class _HomeViewState extends State<HomeView> {
                         color: isDark ? Colors.grey[700] : Colors.grey[100]),
                 ]);
               }).toList(),
+
+              // ── Chi tiêu ngoài kế hoạch — tự động hiển thị ──
+              ...() {
+                final planCats = table
+                    .map((r) => (r['category'] as String? ?? '').toLowerCase().trim())
+                    .toSet();
+                final unplanned = spentMap.entries
+                    .where((e) =>
+                        !planCats.contains(e.key.toLowerCase().trim()) &&
+                        e.value > 0)
+                    .toList();
+                if (unplanned.isEmpty) return <Widget>[];
+
+                const extraColors = [
+                  Color(0xFFFF6B6B), Color(0xFFFF9F43), Color(0xFF48DBFB),
+                  Color(0xFF1DD1A1), Color(0xFFFECA57), Color(0xFFFF9FF3),
+                ];
+                return [
+                  Divider(height: 1, thickness: 0.5,
+                      color: isDark ? Colors.grey[700] : Colors.grey[100]),
+                  // Header "Ngoài kế hoạch"
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                    child: Row(children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.info_outline_rounded,
+                              size: 11, color: Colors.orange),
+                          const SizedBox(width: 4),
+                          const Text('Chưa có trong kế hoạch',
+                              style: TextStyle(fontSize: 10,
+                                  fontWeight: FontWeight.w600, color: Colors.orange)),
+                        ]),
+                      ),
+                    ]),
+                  ),
+                  // Từng mục ngoài kế hoạch
+                  ...unplanned.asMap().entries.map((entry) {
+                    final idx    = entry.key;
+                    final e      = entry.value;
+                    final cat    = e.key;
+                    final spent  = e.value;
+                    final color  = extraColors[idx % extraColors.length];
+                    final isLast = idx == unplanned.length - 1;
+                    return Column(children: [
+                      InkWell(
+                        onTap: () => QuickAddExpenseSheet.show(
+                            context: context, category: cat,
+                            budgetLimit: 0, isDark: isDark,
+                            onSaved: () async {
+                              await _loadDailySpend();
+                              await _loadMonthReport();
+                            }),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                          child: Row(children: [
+                            Container(width: 8, height: 8,
+                                decoration: BoxDecoration(
+                                    color: Colors.orange, shape: BoxShape.circle)),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(cat, style: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w500))),
+                            Text('${_fmt(spent)}đ',
+                                style: TextStyle(fontSize: 12,
+                                    fontWeight: FontWeight.w700, color: color)),
+                            const SizedBox(width: 6),
+                            // Nút thêm vào kế hoạch
+                            GestureDetector(
+                              onTap: () => _showAddPlanCategorySheet(
+                                  uid, plan, table, recIncome, isDark),
+                              child: Container(
+                                width: 28, height: 28,
+                                decoration: BoxDecoration(
+                                    color: Colors.orange.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8)),
+                                child: const Icon(Icons.add_rounded,
+                                    size: 15, color: Colors.orange),
+                              ),
+                            ),
+                          ]),
+                        ),
+                      ),
+                      if (!isLast)
+                        Divider(height: 1, thickness: 0.5,
+                            color: isDark ? Colors.grey[700] : Colors.grey[100]),
+                    ]);
+                  }).toList(),
+                ];
+              }(),
+
               Divider(height: 1, thickness: 0.5,
                   color: isDark ? Colors.grey[700] : Colors.grey[100]),
               InkWell(
@@ -989,6 +1304,7 @@ class _HomeViewState extends State<HomeView> {
               ),
             ]),
           ),
+
         ]);
       },
     );
