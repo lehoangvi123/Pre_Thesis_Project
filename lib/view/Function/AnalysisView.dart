@@ -14,6 +14,8 @@ import './Spend_rule_view.dart';
 import './Plan_entry_view.dart';
 import './Plan_form_data.dart';
 import './Plan_edit_view.dart';
+import './SpecialFutureView.dart';
+import './BudgetingPlanView.dart';
 
 class AnalysisView extends StatefulWidget {
   const AnalysisView({Key? key}) : super(key: key);
@@ -248,7 +250,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
   Map<String, int> _editedAmounts = {};
   bool _isSaved = false;
 
-  // ── Inline income edit state ──────────────────────────
   bool _editingIncome = false;
   final TextEditingController _incomeEditCtrl = TextEditingController();
 
@@ -448,11 +449,9 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
     );
   }
 
-  // ── Income Card với inline edit ───────────────────────
   Widget _incomeCard(bool isDark) {
     final rec      = _rec1;
     final isEdited = _editedAmounts.containsKey('__income__');
-
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -464,110 +463,65 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
         ),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Header
         Row(children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: _teal.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-            child: Icon(_editingIncome ? Icons.edit_rounded : Icons.account_balance_wallet_rounded, color: _teal, size: 20),
-          ),
+          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: _teal.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+            child: Icon(_editingIncome ? Icons.edit_rounded : Icons.account_balance_wallet_rounded, color: _teal, size: 20)),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(isEdited ? 'Thu nhập của bạn' : 'Mức thu nhập phù hợp',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            Text(isEdited ? 'Thu nhập của bạn' : 'Mức thu nhập phù hợp', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             if (!_editingIncome)
               Text(isEdited ? 'Đã chỉnh sửa thủ công' : 'Nhấn vào số tiền để chỉnh sửa',
                   style: TextStyle(fontSize: 11, color: _teal.withOpacity(0.7))),
           ])),
           if (!_editingIncome && isEdited)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(color: _teal.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-              child: const Text('Đã chỉnh', style: TextStyle(fontSize: 10, color: _teal, fontWeight: FontWeight.w600)),
-            ),
+              child: const Text('Đã chỉnh', style: TextStyle(fontSize: 10, color: _teal, fontWeight: FontWeight.w600))),
         ]),
         const SizedBox(height: 14),
-
-        // Số tiền hoặc inline edit
         if (_editingIncome) ...[
-          // Input field
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: _teal.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _teal.withOpacity(0.3)),
-            ),
+            decoration: BoxDecoration(color: _teal.withOpacity(0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: _teal.withOpacity(0.3))),
             child: Row(children: [
               const Text('₫', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: _teal)),
               const SizedBox(width: 8),
               Expanded(child: TextField(
-                controller: _incomeEditCtrl,
-                autofocus: true,
-                keyboardType: TextInputType.number,
+                controller: _incomeEditCtrl, autofocus: true, keyboardType: TextInputType.number,
                 style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: _teal),
-                decoration: const InputDecoration(
-                  hintText: '0',
-                  border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero,
-                  suffixText: 'đ / tháng',
-                  suffixStyle: TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.normal),
-                ),
+                decoration: const InputDecoration(hintText: '0', border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero,
+                  suffixText: 'đ / tháng', suffixStyle: TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.normal)),
               )),
             ]),
           ),
           const SizedBox(height: 12),
-          // Quick select
           Row(children: [8000000, 10000000, 15000000, 20000000, 25000000].map((v) {
             final label = '${v ~/ 1000000}tr';
             final isSel = (_incomeEditCtrl.text == v.toString());
-            return Expanded(child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: GestureDetector(
-                onTap: () => setState(() => _incomeEditCtrl.text = v.toString()),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSel ? _teal : _teal.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: _teal.withOpacity(0.3)),
-                  ),
-                  child: Center(child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isSel ? Colors.white : _teal))),
-                ),
-              ),
-            ));
+            return Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: GestureDetector(onTap: () => setState(() => _incomeEditCtrl.text = v.toString()),
+                child: Container(padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(color: isSel ? _teal : _teal.withOpacity(0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: _teal.withOpacity(0.3))),
+                  child: Center(child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isSel ? Colors.white : _teal)))))));
           }).toList()),
           const SizedBox(height: 12),
-          // Hủy / Xác nhận
           Row(children: [
             Expanded(child: GestureDetector(
               onTap: () => setState(() { _editingIncome = false; _incomeEditCtrl.text = rec.toInt().toString(); }),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 11),
+              child: Container(padding: const EdgeInsets.symmetric(vertical: 11),
                 decoration: BoxDecoration(color: isDark ? Colors.grey[700] : Colors.grey[100], borderRadius: BorderRadius.circular(10)),
-                child: Center(child: Text('Hủy', style: TextStyle(fontSize: 13, color: isDark ? Colors.grey[300] : Colors.grey[600], fontWeight: FontWeight.w600))),
-              ),
-            )),
+                child: Center(child: Text('Hủy', style: TextStyle(fontSize: 13, color: isDark ? Colors.grey[300] : Colors.grey[600], fontWeight: FontWeight.w600)))))),
             const SizedBox(width: 10),
             Expanded(flex: 2, child: GestureDetector(
               onTap: () {
                 final val = int.tryParse(_incomeEditCtrl.text.replaceAll(',', '')) ?? 0;
-                if (val > 0) {
-                  setState(() {
-                    _editedAmounts['__income__'] = val;
-                    _editingIncome = false;
-                    _isSaved = false;
-                  });
-                }
+                if (val > 0) setState(() { _editedAmounts['__income__'] = val; _editingIncome = false; _isSaved = false; });
               },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 11),
+              child: Container(padding: const EdgeInsets.symmetric(vertical: 11),
                 decoration: BoxDecoration(gradient: const LinearGradient(colors: [_teal, Color(0xFF0097A7)]), borderRadius: BorderRadius.circular(10)),
-                child: const Center(child: Text('Xác nhận', style: TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w700))),
-              ),
-            )),
+                child: const Center(child: Text('Xác nhận', style: TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w700)))))),
           ]),
         ] else ...[
-          // Hiện số tiền — nhấn để edit
           GestureDetector(
             onTap: () => setState(() {
               _editingIncome = true;
@@ -576,23 +530,12 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
             }),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: _teal.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _teal.withOpacity(0.2)),
-              ),
+              decoration: BoxDecoration(color: _teal.withOpacity(0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: _teal.withOpacity(0.2))),
               child: Row(children: [
-                Expanded(child: Text('${_fmt(rec)} đ / tháng',
-                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: _teal))),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                Expanded(child: Text('${_fmt(rec)} đ / tháng', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: _teal))),
+                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                   decoration: BoxDecoration(color: _teal.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.edit_rounded, size: 12, color: _teal),
-                    SizedBox(width: 4),
-                    Text('Sửa', style: TextStyle(fontSize: 11, color: _teal, fontWeight: FontWeight.w600)),
-                  ]),
-                ),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.edit_rounded, size: 12, color: _teal), SizedBox(width: 4), Text('Sửa', style: TextStyle(fontSize: 11, color: _teal, fontWeight: FontWeight.w600))])),
               ]),
             ),
           ),
@@ -665,12 +608,10 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
           Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: _purple.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.table_chart_rounded, color: _purple, size: 20)),
           const SizedBox(width: 10),
           const Expanded(child: Text('Kế hoạch chi tiêu chi tiết', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
-          GestureDetector(
-            onTap: () => _openEditPage(rows),
-            child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: _purple.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: _purple.withOpacity(0.25))), child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.edit_rounded, size: 11, color: _purple), SizedBox(width: 3), Text('Chỉnh sửa', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _purple))])),
-          ),
+          GestureDetector(onTap: () => _openEditPage(rows),
+            child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: _purple.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: _purple.withOpacity(0.25))),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.edit_rounded, size: 11, color: _purple), SizedBox(width: 3), Text('Chỉnh sửa', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _purple))]))),
         ])),
-        // Banner số lẻ
         Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 0), child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(color: isDark ? const Color(0xFF2C2C1A) : const Color(0xFFFFFBF0), borderRadius: BorderRadius.circular(10), border: Border.all(color: _orange.withOpacity(0.3))),
@@ -687,8 +628,7 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
           Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 0), child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(color: _orange.withOpacity(0.08), borderRadius: BorderRadius.circular(10), border: Border.all(color: _orange.withOpacity(0.2))),
-            child: Row(children: [const Icon(Icons.info_outline_rounded, size: 14, color: _orange), const SizedBox(width: 6), Text('${_editedAmounts.length} mục đã được chỉnh sửa', style: const TextStyle(fontSize: 11, color: _orange, fontWeight: FontWeight.w500))]),
-          )),
+            child: Row(children: [const Icon(Icons.info_outline_rounded, size: 14, color: _orange), const SizedBox(width: 6), Text('${_editedAmounts.length} mục đã được chỉnh sửa', style: const TextStyle(fontSize: 11, color: _orange, fontWeight: FontWeight.w500))]))),
         const SizedBox(height: 12),
         Container(color: isDark ? const Color(0xFF3A3A3A) : const Color(0xFFF5F5F5), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: const Row(children: [
           Expanded(flex: 5, child: Text('DANH MỤC', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey, letterSpacing: 0.5))),
@@ -728,7 +668,6 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
           ]);
         }).toList(),
         () {
-          // Tính tổng chi tiêu thực tế từ các rows
           final totalExpense = rows.fold<int>(0, (s, r) {
             final cat = r['category'] as String? ?? '';
             final amt = (_editedAmounts[cat] ?? (r['amount'] as num?)?.toInt() ?? 0);
@@ -754,31 +693,22 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
                 Text('${_fmt(totalIncome.toInt())} đ', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
               ]),
               const SizedBox(height: 6),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: totalIncome > 0 ? (totalExpense / totalIncome).clamp(0.0, 1.0) : 0,
-                  minHeight: 5,
+              ClipRRect(borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(value: totalIncome > 0 ? (totalExpense / totalIncome).clamp(0.0, 1.0) : 0, minHeight: 5,
                   backgroundColor: Colors.grey[200],
-                  valueColor: AlwaysStoppedAnimation(
-                    totalExpense > totalIncome ? Colors.red : accentColor),
-                ),
-              ),
+                  valueColor: AlwaysStoppedAnimation(totalExpense > totalIncome ? Colors.red : accentColor))),
               const SizedBox(height: 6),
               Row(children: [
-                Icon(remaining >= 0 ? Icons.savings_rounded : Icons.warning_rounded,
-                    size: 14, color: remaining >= 0 ? Colors.green[600] : Colors.red),
+                Icon(remaining >= 0 ? Icons.savings_rounded : Icons.warning_rounded, size: 14, color: remaining >= 0 ? Colors.green[600] : Colors.red),
                 const SizedBox(width: 6),
                 Expanded(child: Text(remaining >= 0 ? 'Chưa phân bổ / Tiết kiệm thêm' : 'Vượt thu nhập',
                     style: TextStyle(fontSize: 11, color: remaining >= 0 ? Colors.green[600] : Colors.red))),
                 Text('${remaining >= 0 ? '+' : ''}${_fmt(remaining)} đ',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold,
-                        color: remaining >= 0 ? Colors.green[600] : Colors.red)),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: remaining >= 0 ? Colors.green[600] : Colors.red)),
               ]),
             ]),
           );
         }(),
-        // Banner giải thích phần chưa phân bổ
         () {
           final totalExpense = rows.fold<int>(0, (s, r) {
             final cat = r['category'] as String? ?? '';
@@ -790,30 +720,20 @@ class _PlanResultScreenState extends State<_PlanResultScreen> {
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0FFF4),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green.withOpacity(0.3)),
-              ),
+              decoration: BoxDecoration(color: const Color(0xFFF0FFF4), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green.withOpacity(0.3))),
               child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const Text('💡', style: TextStyle(fontSize: 16)),
                 const SizedBox(width: 10),
-                Expanded(child: RichText(
-                  text: TextSpan(
-                    style: TextStyle(fontSize: 12, height: 1.5, color: Colors.grey[700]),
-                    children: [
-                      TextSpan(text: 'Tại sao còn dư ${_fmt(remaining)}đ? ', style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.green)),
-                      const TextSpan(text: 'Kế hoạch này chỉ liệt kê các khoản chi chính. Phần còn lại bạn có thể dùng để '),
-                      const TextSpan(text: 'tăng tiết kiệm, đầu tư thêm, ', style: TextStyle(fontWeight: FontWeight.w600)),
-                      const TextSpan(text: 'hoặc thêm khoản chi khác bằng nút "Chỉnh sửa".'),
-                    ],
-                  ),
-                )),
+                Expanded(child: RichText(text: TextSpan(style: TextStyle(fontSize: 12, height: 1.5, color: Colors.grey[700]), children: [
+                  TextSpan(text: 'Tại sao còn dư ${_fmt(remaining)}đ? ', style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.green)),
+                  const TextSpan(text: 'Kế hoạch này chỉ liệt kê các khoản chi chính. Phần còn lại bạn có thể dùng để '),
+                  const TextSpan(text: 'tăng tiết kiệm, đầu tư thêm, ', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const TextSpan(text: 'hoặc thêm khoản chi khác bằng nút "Chỉnh sửa".'),
+                ]))),
               ]),
             ),
           );
         }(),
-
         Padding(padding: const EdgeInsets.fromLTRB(14, 0, 14, 14), child: SizedBox(width: double.infinity, height: 48, child: ElevatedButton.icon(
           onPressed: _isSaved ? null : () => _saveEditedPlan(context),
           icon: Icon(_isSaved ? Icons.check_circle_rounded : Icons.save_alt_rounded, color: Colors.white, size: 18),
@@ -942,19 +862,6 @@ class _ActionItem {
 // ══════════════════════════════════════════════════════════
 // SHARED BOTTOM NAV BAR
 // ══════════════════════════════════════════════════════════
-// ══════════════════════════════════════════════════════════
-// SHARED BOTTOM NAV BAR — AnalysisView.dart
-// Thay thế toàn bộ class _SharedBottomNavBar cũ bằng đoạn này
-// ══════════════════════════════════════════════════════════
-// ══════════════════════════════════════════════════════════
-// HƯỚNG DẪN SỬA AnalysisView.dart — Đổi thứ tự nav
-// ══════════════════════════════════════════════════════════
-// BƯỚC 1: Tìm tất cả dòng có "activeIndex: 1" → đổi thành "activeIndex: 3"
-//         (có 2 chỗ trong file: ở _AnalysisViewState.build và _PlanResultScreen.build)
-//
-// BƯỚC 2: Thay toàn bộ class _SharedBottomNavBar bằng code dưới đây
-// ══════════════════════════════════════════════════════════
-
 class _SharedBottomNavBar extends StatelessWidget {
   final int activeIndex; final bool isDark;
   const _SharedBottomNavBar({required this.activeIndex, required this.isDark});
@@ -978,7 +885,7 @@ class _SharedBottomNavBar extends StatelessWidget {
               () => Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (_) => const CategoriesView()))),
           _voiceItem(context),
-          _item(context, Icons.assignment_rounded, 'Plan', 3, () {}),
+          _item(context, Icons.pie_chart_rounded, 'Plan', 3, activeIndex == 3 ? () {} : () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const BudgetPlanView()))),
           _item(context, Icons.person_outline_rounded, 'Profile', 4,
               () => Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (_) => const ProfileView()))),
@@ -991,36 +898,26 @@ class _SharedBottomNavBar extends StatelessWidget {
     final active = index == activeIndex;
     final color  = active ? _teal : (isDark ? Colors.grey[500]! : Colors.grey[400]!);
     return GestureDetector(onTap: onTap, child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: active ? _teal.withOpacity(0.12) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(icon, color: color, size: 24),
-      ),
-      Text(label, style: TextStyle(fontSize: 10,
-          fontWeight: active ? FontWeight.w600 : FontWeight.normal, color: color)),
+      Container(padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: active ? _teal.withOpacity(0.12) : Colors.transparent, borderRadius: BorderRadius.circular(12)),
+        child: Icon(icon, color: color, size: 24)),
+      Text(label, style: TextStyle(fontSize: 10, fontWeight: active ? FontWeight.w600 : FontWeight.normal, color: color)),
     ]));
   }
 
   Widget _voiceItem(BuildContext ctx) {
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(ctx, '/test-voice'),
+      onTap: () => Navigator.pushReplacement(ctx,
+          MaterialPageRoute(builder: (_) => const SpecialFeaturesView())),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          width: 52, height: 52,
+        Container(width: 52, height: 52,
           decoration: BoxDecoration(
             gradient: const LinearGradient(colors: [Color(0xFF00CED1), Color(0xFF8B5CF6)]),
             shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: _teal.withOpacity(0.4),
-                blurRadius: 10, offset: const Offset(0, 4))],
-          ),
-          child: const Icon(Icons.mic_rounded, color: Colors.white, size: 26),
-        ),
+            boxShadow: [BoxShadow(color: _teal.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))]),
+          child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 26)),
         const SizedBox(height: 4),
-        const Text('Voice', style: TextStyle(fontSize: 10,
-            fontWeight: FontWeight.w600, color: _teal)),
+        const Text('Tính năng', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _teal)),
       ]),
     );
   }

@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import './HomeView.dart';
 import './AnalysisView.dart';
+import './SpecialFutureView.dart';
+import './BudgetingPlanView.dart';
 import './Transaction.dart';
 import './CategorizeContent.dart';
 import '../notification/NotificationView.dart';
@@ -574,10 +576,10 @@ class _ProfileViewState extends State<ProfileView> {
               onTap: () => Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (_) => const CategoriesView()))),
           _buildVoiceNavItem(),
-          _buildNavItem(Icons.assignment_rounded, false,
+          _buildNavItem(Icons.pie_chart_rounded, false,
               isDark ? Colors.grey[500]! : Colors.grey[400]!, label: 'Plan',
               onTap: () => Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (_) => const AnalysisView()))),
+                  MaterialPageRoute(builder: (_) => const BudgetPlanView()))),
           _buildNavItem(Icons.person_outline_rounded, true,
               const Color(0xFF00CED1), label: 'Profile', onTap: () {}),
         ]),
@@ -587,7 +589,8 @@ class _ProfileViewState extends State<ProfileView> {
 
   Widget _buildVoiceNavItem() {
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/test-voice'),
+      onTap: () => Navigator.pushReplacement(context,
+          MaterialPageRoute(builder: (_) => const SpecialFeaturesView())),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(width: 52, height: 52,
           decoration: BoxDecoration(
@@ -596,9 +599,9 @@ class _ProfileViewState extends State<ProfileView> {
             boxShadow: [BoxShadow(color: const Color(0xFF00CED1).withOpacity(0.45),
                 blurRadius: 12, offset: const Offset(0, 4))],
           ),
-          child: const Icon(Icons.mic_rounded, color: Colors.white, size: 26)),
+          child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 26)),
         const SizedBox(height: 4),
-        const Text('Voice', style: TextStyle(fontSize: 10,
+        const Text('Tính năng', style: TextStyle(fontSize: 10,
             fontWeight: FontWeight.w600, color: Color(0xFF00CED1))),
       ]),
     );

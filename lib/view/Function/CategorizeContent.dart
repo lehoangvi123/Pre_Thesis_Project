@@ -5,6 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import './HomeView.dart';
 import './AnalysisView.dart';
+import './SpecialFutureView.dart';
+import './BudgetingPlanView.dart';
 import './Transaction.dart';
 import '../notification/NotificationView.dart';
 import './ProfileView.dart';
@@ -238,7 +240,7 @@ class _CategoriesViewState extends State<CategoriesView>
           const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: _buildTabSwitcher(isDark),
+          
           ),
           const SizedBox(height: 10),
           Padding(
@@ -633,18 +635,7 @@ class _CategoriesViewState extends State<CategoriesView>
     );
   }
 
-  Widget _buildTabSwitcher(bool isDark) {
-    return Container(
-      height: 42,
-      decoration: BoxDecoration(color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100], borderRadius: BorderRadius.circular(12)),
-      child: Row(children: [
-        _tabBtn(0, '🧾  Giao dịch', isDark),
-        _tabBtn(1, '📊  50/30/20', isDark),
-        _tabBtn(2, '🎯  Zero', isDark),
-      ]),
-    );
-  }
-
+ 
   Widget _tabBtn(int idx, String label, bool isDark) {
     final active = _tabIndex == idx;
     return Expanded(
@@ -1018,9 +1009,9 @@ class _CategoriesViewState extends State<CategoriesView>
                     MaterialPageRoute(builder: (_) => const HomeView()))),
             _navItem(Icons.history_rounded, true, label: 'History', onTap: () {}),
             _voiceItem(),
-            _navItem(Icons.assignment_rounded, false, label: 'Plan',
+            _navItem(Icons.pie_chart_rounded, false, label: 'Plan',
                 onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const AnalysisView()))),
+                    MaterialPageRoute(builder: (_) => const BudgetPlanView()))),
             _navItem(Icons.person_outline_rounded, false, label: 'Profile',
                 onTap: () => Navigator.pushReplacement(context,
                     MaterialPageRoute(builder: (_) => const ProfileView()))),
@@ -1031,7 +1022,8 @@ class _CategoriesViewState extends State<CategoriesView>
   }
 
   Widget _voiceItem() => GestureDetector(
-    onTap: () => Navigator.pushNamed(context, '/test-voice'),
+    onTap: () => Navigator.pushReplacement(context,
+        MaterialPageRoute(builder: (_) => const SpecialFeaturesView())),
     child: Column(mainAxisSize: MainAxisSize.min, children: [
       Container(width: 52, height: 52,
         decoration: BoxDecoration(
@@ -1039,9 +1031,9 @@ class _CategoriesViewState extends State<CategoriesView>
           shape: BoxShape.circle,
           boxShadow: [BoxShadow(color: const Color(0xFF00CED1).withOpacity(0.45), blurRadius: 12, offset: const Offset(0, 4))],
         ),
-        child: const Icon(Icons.mic_rounded, color: Colors.white, size: 26)),
+        child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 26)),
       const SizedBox(height: 4),
-      const Text('Voice', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF00CED1))),
+      const Text('Tính năng', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF00CED1))),
     ]),
   );
 

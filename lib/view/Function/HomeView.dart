@@ -8,6 +8,8 @@ import 'package:intl/intl.dart';
 import '../login/LoginView.dart';
 import '../notification/NotificationView.dart';
 import './AnalysisView.dart';
+import './SpecialFutureView.dart';
+import './BudgetingPlanView.dart';
 import './Transaction.dart';
 import './CategorizeContent.dart';
 import './ProfileView.dart';
@@ -223,7 +225,7 @@ class _HomeViewState extends State<HomeView> {
               child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF00CED1), size: 16)),
             const SizedBox(width: 10),
             const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Tỷ lệ AI → Thu nhập thực', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Text('Chỉnh tỷ lệ dựa trên thu nhập thực', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               Text('Giữ % AI, tính lại theo thu nhập hiện tại', style: TextStyle(fontSize: 11, color: Colors.grey)),
             ])),
           ]),
@@ -2247,11 +2249,11 @@ class _HomeViewState extends State<HomeView> {
                   isDark ? Colors.grey[500]! : Colors.grey[400]!, label: 'History',
                   onTap: () => Navigator.pushReplacement(context,
                       MaterialPageRoute(builder: (_) => const CategoriesView()))),
-              _voiceNavItem(),
-              _navItem(Icons.assignment_rounded, false,
+              _featuresNavItem(),
+              _navItem(Icons.pie_chart_rounded, false,
                   isDark ? Colors.grey[500]! : Colors.grey[400]!, label: 'Plan',
                   onTap: () => Navigator.pushReplacement(context,
-                      MaterialPageRoute(builder: (_) => const AnalysisView()))),
+                      MaterialPageRoute(builder: (_) => const BudgetPlanView()))),
               _navItem(Icons.person_outline_rounded, false,
                   isDark ? Colors.grey[500]! : Colors.grey[400]!, label: 'Profile',
                   onTap: () => Navigator.pushReplacement(context,
@@ -2263,8 +2265,9 @@ class _HomeViewState extends State<HomeView> {
     ]);
   }
 
-  Widget _voiceNavItem() => GestureDetector(
-    onTap: () => Navigator.pushNamed(context, '/test-voice'),
+  Widget _featuresNavItem() => GestureDetector(
+    onTap: () => Navigator.pushReplacement(context,
+        MaterialPageRoute(builder: (_) => const SpecialFeaturesView())),
     child: Column(mainAxisSize: MainAxisSize.min, children: [
       Container(width: 52, height: 52,
         decoration: BoxDecoration(
@@ -2273,9 +2276,9 @@ class _HomeViewState extends State<HomeView> {
           boxShadow: [BoxShadow(color: const Color(0xFF00CED1).withOpacity(0.45),
               blurRadius: 12, offset: const Offset(0, 4))],
         ),
-        child: const Icon(Icons.mic_rounded, color: Colors.white, size: 26)),
+        child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 26)),
       const SizedBox(height: 4),
-      const Text('Voice', style: TextStyle(fontSize: 10,
+      const Text('Tính năng', style: TextStyle(fontSize: 10,
           fontWeight: FontWeight.w600, color: Color(0xFF00CED1))),
     ]),
   );
