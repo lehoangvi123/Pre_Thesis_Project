@@ -45,7 +45,7 @@ class OCRService {
   }
 
   // ─────────────────────────────────────────────────────────
-  // CORE PARSER — chỉ lấy total, category luôn là Ăn uống
+  // CORE PARSER
   // ─────────────────────────────────────────────────────────
   Map<String, dynamic> _parseReceipt(String rawText) {
     final lines = rawText.split('\n')
@@ -68,9 +68,14 @@ class OCRService {
 
   // ─────────────────────────────────────────────────────────
   // EXTRACT TOTAL
+  // Nhóm 1 (cao): grand total, tổng cộng, tổng tiền, thành tiền...
+  // Nhóm 2 (trung): total, tổng, thanh toán, phải trả...
+  // Fallback: số lớn nhất ở nửa dưới bill
   // ─────────────────────────────────────────────────────────
   double? _extractTotal(List<String> lines) {
-    // Tính max amount để validate — total phải >= max item price
+    final normalized = lines.map(_normalize).toList();
+
+    // Tính max amount để validate
     final allAmounts = <double>[];
     for (final l in lines) {
       final v = _extractMoneyFromLine(l);
@@ -79,31 +84,76 @@ class OCRService {
     final maxItem = allAmounts.isEmpty ? 0.0
         : allAmounts.reduce((a, b) => a > b ? a : b);
 
-    final keywords = [
-      RegExp(r'\btotal\b',       caseSensitive: false),
-      RegExp(r'\breceivable\b',  caseSensitive: false),
-      RegExp(r'\bthành tiền\b',  caseSensitive: false),
-      RegExp(r'\btổng cộng\b',   caseSensitive: false),
-      RegExp(r'\btổng tiền\b',   caseSensitive: false),
-      RegExp(r'\btổng\b',        caseSensitive: false),
+    // ── Nhóm 1: Ưu tiên cao ──────────────────────────────
+    final highPriority = [
+      RegExp(r'grand\s*total',              caseSensitive: false),
+      RegExp(r't[oô]ng\s*c[o\u00f4]ng',    caseSensitive: false), // tổng cộng
+      RegExp(r't[oô]ng\s*ti[e\u1ec1]n',    caseSensitive: false), // tổng tiền
+      RegExp(r'th[a\u00e0]nh\s*ti[e\u1ec1]n', caseSensitive: false), // thành tiền
+      RegExp(r'amount\s*due',               caseSensitive: false),
+      RegExp(r'total\s*amount',             caseSensitive: false),
+      RegExp(r'total\s*due',                caseSensitive: false),
+      RegExp(r'total\s*bill',               caseSensitive: false),
+      RegExp(r'receivable',                 caseSensitive: false),
+      RegExp(r'tong\s*cong',                caseSensitive: false), // OCR mất dấu
+      RegExp(r'tong\s*tien',                caseSensitive: false),
+      RegExp(r'thanh\s*tien',               caseSensitive: false),
+    ];
+
+    // ── Nhóm 2: Ưu tiên trung ────────────────────────────
+    final medPriority = [
+      RegExp(r'\btotal\b',                  caseSensitive: false),
+      RegExp(r'\bt[oô]ng\b',               caseSensitive: false), // tổng
+      RegExp(r'\btong\b',                   caseSensitive: false), // OCR mất dấu
+      RegExp(r'c[o\u00f4]ng\s*ti[e\u1ec1]n', caseSensitive: false), // cộng tiền
+      RegExp(r'ti[e\u1ec1]n\s*thanh\s*to[a\u00e1]n', caseSensitive: false),
+      RegExp(r'thanh\s*to[a\u00e1]n',       caseSensitive: false), // thanh toán
+      RegExp(r'ph[a\u1ea3]i\s*tr[a\u1ea3]', caseSensitive: false), // phải trả
+      RegExp(r'kh[a\u00e1]ch\s*tr[a\u1ea3]', caseSensitive: false), // khách trả
+      RegExp(r'payment',                    caseSensitive: false),
+      RegExp(r'thanh\s*toan',               caseSensitive: false), // OCR mất dấu
+      RegExp(r'phai\s*tra',                 caseSensitive: false),
     ];
 
     double? best;
-    for (final pattern in keywords) {
-      for (int i = 0; i < lines.length; i++) {
-        if (!pattern.hasMatch(lines[i])) continue;
 
-        double? candidate;
-        final same = _extractMoneyAfterColon(lines[i]);
-        if (same != null && same >= 1000) candidate = same;
-        if (candidate == null && i + 1 < lines.length) {
-          final next = _extractMoneyFromLine(lines[i + 1]);
-          if (next != null && next >= 1000) candidate = next;
-        }
+    for (final group in [highPriority, medPriority]) {
+      double? groupBest;
+      for (final pattern in group) {
+        for (int i = 0; i < normalized.length; i++) {
+          if (!pattern.hasMatch(normalized[i])) continue;
 
-        if (candidate != null && candidate >= maxItem * 0.9) {
-          if (best == null || candidate > best) best = candidate;
+          double? candidate;
+
+          // 1. Số trên cùng dòng (sau : hoặc cuối dòng)
+          candidate = _extractMoneyAfterColon(lines[i]);
+          if (candidate != null && candidate < 1000) candidate = null;
+
+          // 2. Số ở cuối dòng (không cần dấu :)
+          if (candidate == null) {
+            final endAmt = _extractMoneyFromLine(lines[i]);
+            if (endAmt != null && endAmt >= 1000) candidate = endAmt;
+          }
+
+          // 3. Số ở dòng kế tiếp
+          if (candidate == null && i + 1 < lines.length) {
+            final next = _extractMoneyFromLine(lines[i + 1]);
+            if (next != null && next >= 1000) candidate = next;
+          }
+
+          // Validate >= 90% maxItem
+          if (candidate != null && candidate >= maxItem * 0.9) {
+            if (groupBest == null || candidate > groupBest) {
+              groupBest = candidate;
+            }
+          }
         }
+      }
+
+      // Tìm thấy ở nhóm cao → dừng, không xuống nhóm thấp hơn
+      if (groupBest != null) {
+        best = groupBest;
+        break;
       }
     }
 
@@ -114,6 +164,15 @@ class OCRService {
 
     debugPrint('⚠️ Fallback to largest amount');
     return _fallbackLargestAmount(lines);
+  }
+
+  // Chuẩn hóa dòng: lowercase, bỏ ký tự rác, bỏ space thừa
+  String _normalize(String line) {
+    return line
+        .toLowerCase()
+        .replaceAll(RegExp(r'[*\-–—_=|:()]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
   }
 
   // ─────────────────────────────────────────────────────────
@@ -132,7 +191,7 @@ class OCRService {
   double? _extractMoneyFromLine(String line) {
     double? best;
 
-    // "813.750" hoặc "1,228,500"
+    // "813.750" hoặc "1,228,500" hoặc "775,000đ"
     final p1 = RegExp(r'\d{1,3}(?:[.,]\d{3})+');
     for (final m in p1.allMatches(line)) {
       final raw = m.group(0)!.replaceAll('.', '').replaceAll(',', '');

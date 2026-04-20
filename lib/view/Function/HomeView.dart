@@ -98,12 +98,11 @@ class _HomeViewState extends State<HomeView> {
   void initState() {
     super.initState();
     userId = FirebaseAuth.instance.currentUser?.uid;
-    _setupBalanceStream(); // realtime balance
-    _setupPlanStream();    // realtime plan
+    _setupBalanceStream();
+    _setupPlanStream();
     _initAll();
   }
 
-  // ── Balance stream — tự đồng bộ giữa các thiết bị ────
   void _setupBalanceStream() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -121,7 +120,6 @@ class _HomeViewState extends State<HomeView> {
     });
   }
 
-  // ── Plan stream ───────────────────────────────────────
   void _setupPlanStream() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -143,7 +141,6 @@ class _HomeViewState extends State<HomeView> {
     if (mounted) _triggerGreeting();
   }
 
-  // ── Tự động tạo/cập nhật plan ─────────────────────────
   Future<void> _autoUpdatePlan(double totalIncome) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null || totalIncome <= 0) return;
@@ -198,8 +195,6 @@ class _HomeViewState extends State<HomeView> {
     } catch (e) { debugPrint('❌ AutoUpdatePlan error: $e'); }
   }
 
-  // ── Reset plan ────────────────────────────────────────
-  // ── Plan options dropdown ───────────────────────────
   void _showPlanOptions(bool isDark) {
     final RenderBox button = _planOptionsKey.currentContext!.findRenderObject() as RenderBox;
     final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
@@ -251,7 +246,6 @@ class _HomeViewState extends State<HomeView> {
     });
   }
 
-  // Option 1: Lấy % từ AI plan hiện tại → scale theo totalIncome thực
   Future<void> _applyAIRatioToRealIncome() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -273,7 +267,6 @@ class _HomeViewState extends State<HomeView> {
           (plan['expense_table'] as List? ?? []).map((r) => Map<String, dynamic>.from(r as Map)));
       if (table.isEmpty) { _showNoAIPlanSnack(); return; }
 
-      // Tính tổng % hiện tại
       final totalPct = table.fold<int>(0, (s, r) => s + ((r['percent'] as num?)?.toInt() ?? 0));
       final income   = _totInc.toInt();
 
@@ -285,7 +278,6 @@ class _HomeViewState extends State<HomeView> {
         final amt = (raw / 500000).round() * 500000;
         newTable.add({...row, 'amount': amt, 'percent': pct});
       }
-      // Fix total
       final newTotal = newTable.fold<int>(0, (s, r) => s + (r['amount'] as int));
       if (newTable.isNotEmpty) newTable.last['amount'] = (newTable.last['amount'] as int) + (income - newTotal);
 
@@ -308,7 +300,6 @@ class _HomeViewState extends State<HomeView> {
     } catch (e) { debugPrint('Error: $e'); }
   }
 
-  // Option 2: Reset về plan mặc định theo totalIncome thực
   Future<void> _applyDefaultPlanToRealIncome() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -952,6 +943,62 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
+  // ── Budget warning widget ─────────────────────────────
+  Widget _buildBudgetWarning({
+    required String category,
+    required double spent,
+    required double limit,
+    required bool isDark,
+  }) {
+    final ratio = limit > 0 ? spent / limit : 0.0;
+    final isOver = ratio > 1.0;
+    final isNear = ratio >= 0.8 && ratio <= 1.0;
+
+    if (!isOver && !isNear) return const SizedBox.shrink();
+
+    final Color bgColor;
+    final Color textColor;
+    final Color borderColor;
+    final IconData icon;
+    final String message;
+
+    if (isOver) {
+      bgColor     = Colors.red.withOpacity(isDark ? 0.15 : 0.08);
+      borderColor = Colors.red.withOpacity(0.4);
+      textColor   = Colors.red[isDark ? 300 : 700]!;
+      icon        = Icons.error_rounded;
+      final overAmt = spent - limit;
+      message = 'Vượt ${_fmt(overAmt)}đ so với kế hoạch!';
+    } else {
+      bgColor     = Colors.orange.withOpacity(isDark ? 0.15 : 0.08);
+      borderColor = Colors.orange.withOpacity(0.4);
+      textColor   = Colors.orange[isDark ? 300 : 800]!;
+      icon        = Icons.warning_rounded;
+      final remainAmt = limit - spent;
+      message = 'Sắp đạt giới hạn — còn ${_fmt(remainAmt)}đ';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 18, right: 0, bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: borderColor, width: 1),
+        ),
+        child: Row(children: [
+          Icon(icon, size: 13, color: textColor),
+          const SizedBox(width: 6),
+          Text(
+            message,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textColor),
+          ),
+        ]),
+      ),
+    );
+  }
+
   Widget _buildPlanSection(bool isDark) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     return StreamBuilder<DocumentSnapshot>(
@@ -1024,7 +1071,6 @@ class _HomeViewState extends State<HomeView> {
                 fontWeight: FontWeight.bold,
                 color: isDark ? Colors.white : Colors.black87)),
             Row(mainAxisSize: MainAxisSize.min, children: [
-              // Dropdown 2 options
               GestureDetector(
                 key: _planOptionsKey,
                 onTap: () => _showPlanOptions(isDark),
@@ -1043,7 +1089,6 @@ class _HomeViewState extends State<HomeView> {
                 ),
               ),
               const SizedBox(width: 8),
-              // Reset button
               GestureDetector(
                 onTap: _resetPlan,
                 child: Container(
@@ -1109,21 +1154,30 @@ class _HomeViewState extends State<HomeView> {
                       style: TextStyle(fontSize: 11, color: Colors.grey[400])),
                 ]),
               ),
+
+              // ── Plan rows ────────────────────────────────
               ...table.asMap().entries.map((e) {
                 final row      = e.value as Map;
                 final cat      = row['category'] as String? ?? '';
                 final limit    = (row['amount'] as num?)?.toDouble() ?? 0;
                 final percent  = (row['percent'] as num?)?.toInt() ?? 0;
                 final spent    = spentMap[cat] ?? 0;
-                final isOver   = spent > limit && limit > 0;
-                final progress = limit > 0 ? (spent / limit).clamp(0.0, 1.0) : 0.0;
-                const colors   = [
+                final ratio    = limit > 0 ? spent / limit : 0.0;
+                final isOver   = ratio > 1.0;
+                final isNear   = ratio >= 0.8 && ratio <= 1.0;
+                final progress = ratio.clamp(0.0, 1.0);
+
+                const colors = [
                   Color(0xFF00CED1), Color(0xFF4CAF50), Color(0xFFFF9800),
                   Color(0xFF8B5CF6), Color(0xFFE91E63), Color(0xFF9C27B0),
                   Color(0xFFFF5722), Color(0xFF009688), Color(0xFFFFC107), Color(0xFF607D8B),
                 ];
                 final color    = colors[e.key % colors.length];
-                final barColor = isOver ? Colors.red : color;
+                // Bar đỏ khi over, cam khi near, bình thường khi ok
+                final barColor = isOver ? Colors.red
+                    : isNear ? Colors.orange
+                    : color;
+
                 return Column(children: [
                   InkWell(
                     onTap: () => QuickAddExpenseSheet.show(
@@ -1135,7 +1189,7 @@ class _HomeViewState extends State<HomeView> {
                         }),
                     borderRadius: BorderRadius.circular(8),
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Row(children: [
                           Container(width: 8, height: 8,
@@ -1146,7 +1200,9 @@ class _HomeViewState extends State<HomeView> {
                           RichText(text: TextSpan(children: [
                             TextSpan(text: '${_fmt(spent)}đ',
                                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                                    color: isOver ? Colors.red : barColor)),
+                                    color: isOver ? Colors.red
+                                        : isNear ? Colors.orange
+                                        : barColor)),
                             TextSpan(text: ' / ${_fmt(limit)}đ',
                                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400,
                                     color: isDark ? Colors.grey[400] : Colors.grey[500])),
@@ -1182,6 +1238,16 @@ class _HomeViewState extends State<HomeView> {
                             ),
                           ),
                         ),
+                        // ── WARNING INLINE ──────────────────
+                        if (isOver || isNear) ...[
+                          const SizedBox(height: 4),
+                          _buildBudgetWarning(
+                            category: cat,
+                            spent: spent,
+                            limit: limit,
+                            isDark: isDark,
+                          ),
+                        ],
                       ]),
                     ),
                   ),
@@ -1191,7 +1257,7 @@ class _HomeViewState extends State<HomeView> {
                 ]);
               }).toList(),
 
-              // ── Chi tiêu ngoài kế hoạch — tự động hiển thị ──
+              // ── Chi tiêu ngoài kế hoạch ──────────────────
               ...() {
                 final planCats = table
                     .map((r) => (r['category'] as String? ?? '').toLowerCase().trim())
@@ -1210,7 +1276,6 @@ class _HomeViewState extends State<HomeView> {
                 return [
                   Divider(height: 1, thickness: 0.5,
                       color: isDark ? Colors.grey[700] : Colors.grey[100]),
-                  // Header "Ngoài kế hoạch"
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
                     child: Row(children: [
@@ -1231,7 +1296,6 @@ class _HomeViewState extends State<HomeView> {
                       ),
                     ]),
                   ),
-                  // Từng mục ngoài kế hoạch
                   ...unplanned.asMap().entries.map((entry) {
                     final idx    = entry.key;
                     final e      = entry.value;
@@ -1262,7 +1326,6 @@ class _HomeViewState extends State<HomeView> {
                                 style: TextStyle(fontSize: 12,
                                     fontWeight: FontWeight.w700, color: color)),
                             const SizedBox(width: 6),
-                            // Nút thêm vào kế hoạch
                             GestureDetector(
                               onTap: () => _showAddPlanCategorySheet(
                                   uid, plan, table, recIncome, isDark),
@@ -1306,7 +1369,6 @@ class _HomeViewState extends State<HomeView> {
               ),
             ]),
           ),
-
         ]);
       },
     );
@@ -2144,8 +2206,6 @@ class _HomeViewState extends State<HomeView> {
                   if (ctx.mounted) Navigator.pop(ctx);
                   await _loadDailySpend();
                   await _loadMonthReport();
-                  // Balance stream tự cập nhật
-                  // Thu nhập → tự cập nhật plan
                   if (isIncome) await _autoUpdatePlan(_totInc);
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: mainColor, elevation: 0,
@@ -2178,7 +2238,6 @@ class _HomeViewState extends State<HomeView> {
         if (isIncome)  'totalIncome':  FieldValue.increment(amount),
         if (!isIncome) 'totalExpense': FieldValue.increment(amount),
       });
-      // Balance stream tự detect thay đổi và cập nhật UI
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Row(children: [
           Icon(isIncome ? Icons.trending_up_rounded : Icons.trending_down_rounded,
