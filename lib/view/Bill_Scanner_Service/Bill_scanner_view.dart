@@ -94,12 +94,8 @@ class _BillScannerViewSimpleState extends State<BillScannerViewSimple> {
   // ── OCR Result Dialog ─────────────────────────────────────
   void _showOCRResultDialog(Map<String, dynamic> result) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    String selectedCategory = result['category'] ?? 'Khác';
-
-    final items    = (result['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    final subtotal = result['subtotal'] as double?;
-    final svc      = result['service_charge'] as double?;
-    final total    = result['total_amount'] as double?;
+    String selectedCategory = 'Ăn uống'; // luôn mặc định Ăn uống
+    final total = result['total_amount'] as double?;
 
     showDialog(
       context: context,
@@ -126,96 +122,54 @@ class _BillScannerViewSimpleState extends State<BillScannerViewSimple> {
                         color: Colors.green, size: 24),
                   ),
                   const SizedBox(width: 10),
-                  Expanded(child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Đã quét hóa đơn',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      if (result['store_name'] != null)
-                        Text(result['store_name'],
-                            style: TextStyle(fontSize: 12, color: Colors.grey[500])),
-                    ],
-                  )),
+                  const Text('Đã quét hóa đơn',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ]),
 
-                const SizedBox(height: 14),
-                Divider(height: 1, color: isDark ? Colors.grey[700] : Colors.grey[200]),
-                const SizedBox(height: 10),
+                const SizedBox(height: 16),
 
-                // ── Bill detail list ─────────────────────────
-                ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.38,
-                  ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-
-                        // Items
-                        if (items.isNotEmpty) ...[
-                          ...items.map((item) => _buildBillRow(
-                            name:   item['name'] as String? ?? '',
-                            amount: (item['amount'] as num?)?.toDouble(),
-                            isDark: isDark,
-                          )),
-                          const SizedBox(height: 8),
-                          Divider(height: 1,
-                              color: isDark ? Colors.grey[700] : Colors.grey[200]),
-                          const SizedBox(height: 6),
-                        ],
-
-                        // Subtotal
-                        if (subtotal != null)
-                          _buildBillRow(
-                              name: 'Subtotal', amount: subtotal,
-                              isDark: isDark, isSubRow: true),
-
-                        // Service charge
-                        if (svc != null)
-                          _buildBillRow(
-                              name: 'Service charge', amount: svc,
-                              isDark: isDark, isSubRow: true),
-
-                        // Total
-                        if (total != null) ...[
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                  color: Colors.green.withOpacity(0.3)),
-                            ),
-                            child: Row(children: [
-                              const Text('💰 Total',
-                                  style: TextStyle(
-                                      fontSize: 14, fontWeight: FontWeight.bold)),
-                              const Spacer(),
-                              Text(_ocrService.formatMoney(total),
-                                  style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green[700])),
-                            ]),
-                          ),
-                        ],
-
-                        if (items.isEmpty && total == null)
-                          Center(child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Text('Không đọc được chi tiết',
-                                style: TextStyle(color: Colors.grey[500])),
-                          )),
-                      ],
+                // ── Total ────────────────────────────────────
+                if (total != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: Colors.green.withOpacity(0.3)),
                     ),
+                    child: Row(children: [
+                      const Text('💰 Total',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.bold)),
+                      const Spacer(),
+                      Text(_ocrService.formatMoney(total),
+                          style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green[700])),
+                    ]),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          color: Colors.orange, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Không đọc được số tiền',
+                          style: TextStyle(
+                              fontSize: 14, color: Colors.orange[800])),
+                    ]),
                   ),
-                ),
 
-                const SizedBox(height: 12),
-                Divider(height: 1, color: isDark ? Colors.grey[700] : Colors.grey[200]),
                 const SizedBox(height: 12),
 
                 // ── Category picker ──────────────────────────
@@ -254,22 +208,13 @@ class _BillScannerViewSimpleState extends State<BillScannerViewSimple> {
                   ),
                 ),
 
-                // Hint + confidence
+                // Hint
                 const SizedBox(height: 6),
                 Row(children: [
                   Icon(Icons.touch_app_rounded, size: 12, color: Colors.grey[400]),
                   const SizedBox(width: 4),
                   Text('Nhấn để đổi danh mục',
                       style: TextStyle(fontSize: 11, color: Colors.grey[400])),
-                  const Spacer(),
-                  if (result['confidence'] != null) ...[
-                    Icon(Icons.info_outline, size: 12, color: Colors.grey[400]),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Độ tin cậy: ${(result['confidence'] * 100).toInt()}%',
-                      style: TextStyle(fontSize: 11, color: Colors.grey[400]),
-                    ),
-                  ],
                 ]),
 
                 const SizedBox(height: 16),
@@ -283,7 +228,7 @@ class _BillScannerViewSimpleState extends State<BillScannerViewSimple> {
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
-                    onPressed: () {
+                    onPressed: total == null ? null : () {
                       Navigator.pop(context);
                       final updated = Map<String, dynamic>.from(result);
                       updated['category'] = selectedCategory;
@@ -294,6 +239,7 @@ class _BillScannerViewSimpleState extends State<BillScannerViewSimple> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF00D09E),
                       foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.grey[300],
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
@@ -304,48 +250,6 @@ class _BillScannerViewSimpleState extends State<BillScannerViewSimple> {
           ),
         ),
       ),
-    );
-  }
-
-  // ── Bill row widget ───────────────────────────────────────
-  Widget _buildBillRow({
-    required String name,
-    required double? amount,
-    required bool isDark,
-    bool isSubRow = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(children: [
-        if (!isSubRow)
-          Container(
-            width: 6, height: 6,
-            margin: const EdgeInsets.only(right: 10, top: 1),
-            decoration: BoxDecoration(
-                color: const Color(0xFF00D09E), shape: BoxShape.circle),
-          )
-        else
-          const SizedBox(width: 16),
-        Expanded(child: Text(name,
-          style: TextStyle(
-            fontSize: isSubRow ? 12 : 14,
-            fontWeight: isSubRow ? FontWeight.normal : FontWeight.w500,
-            color: isSubRow
-                ? (isDark ? Colors.grey[400] : Colors.grey[600])
-                : (isDark ? Colors.white : Colors.black87),
-          ),
-        )),
-        Text(
-          amount != null ? _ocrService.formatMoney(amount) : '—',
-          style: TextStyle(
-            fontSize: isSubRow ? 12 : 14,
-            fontWeight: isSubRow ? FontWeight.normal : FontWeight.w600,
-            color: isSubRow
-                ? (isDark ? Colors.grey[400] : Colors.grey[600])
-                : (isDark ? Colors.white : Colors.black87),
-          ),
-        ),
-      ]),
     );
   }
 
@@ -462,16 +366,16 @@ class _BillScannerViewSimpleState extends State<BillScannerViewSimple> {
             'id':           txId,
             'userId':       userId,
             'categoryId':   '',
-            'categoryName': result['category'] ?? 'Khác',
-            'category':     result['category'] ?? 'Khác',
-            'title':        result['store_name'] ?? 'Hóa đơn',
+            'categoryName': result['category'] ?? 'Ăn uống',
+            'category':     result['category'] ?? 'Ăn uống',
+            'title':        'Hóa đơn',
             'amount':       amount,
             'type':         'expense',
             'isIncome':     false,
             'date':         Timestamp.now(),
             'createdAt':    FieldValue.serverTimestamp(),
             'message':      'Quét từ hóa đơn - OCR',
-            'items':        result['items'] ?? [],
+            'items':        [],
             'rawText':      result['raw_text'] ?? '',
           },
         );
@@ -719,11 +623,11 @@ class _BillScannerViewSimpleState extends State<BillScannerViewSimple> {
         ]),
         const SizedBox(height: 8),
         if (_scanMode == ScanMode.autoOCR) ...[
-          const Text('✓ AI tự động đọc số tiền',
+          const Text('✓ AI tự động đọc số tiền tổng',
               style: TextStyle(fontSize: 13)),
-          const Text('✓ Liệt kê chi tiết từng món',
+          const Text('✓ Danh mục mặc định: Ăn uống',
               style: TextStyle(fontSize: 13)),
-          const Text('✓ Nhận diện cửa hàng & danh mục',
+          const Text('✓ Có thể đổi danh mục trước khi lưu',
               style: TextStyle(fontSize: 13)),
           const Text('✓ Lưu nhanh chỉ 1 click',
               style: TextStyle(fontSize: 13)),

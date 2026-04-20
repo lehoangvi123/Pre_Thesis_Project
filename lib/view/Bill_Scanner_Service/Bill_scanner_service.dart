@@ -1,4 +1,4 @@
-// lib/service/bill_scanner_service_simple.dart
+// lib/view/Bill_Scanner_Service/Bill_scanner_service.dart
 // GIẢI PHÁP ĐƠN GIẢN - KHÔNG CẦN ML KIT
 // Chỉ cần image_picker để chụp ảnh, sau đó user nhập tay
 
@@ -10,27 +10,27 @@ class BillScannerServiceSimple {
   final ImagePicker _picker = ImagePicker();
 
   /// Chụp ảnh từ camera
- Future<File?> captureImage({
-  CameraDevice preferredCamera = CameraDevice.rear, // ✅ THÊM parameter
-}) async {
-  try {
-    final XFile? photo = await _picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 85,
-      maxWidth: 1920,
-      maxHeight: 1920,
-      preferredCameraDevice: preferredCamera, // ✅ THÊM dòng này
-    );
+  Future<File?> captureImage({
+    CameraDevice preferredCamera = CameraDevice.rear,
+  }) async {
+    try {
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        preferredCameraDevice: preferredCamera,
+      );
 
-    if (photo != null) {
-      return File(photo.path);
+      if (photo != null) {
+        return File(photo.path);
+      }
+      return null;
+    } catch (e) {
+      print('Error capturing image: $e');
+      return null;
     }
-    return null;
-  } catch (e) {
-    print('Error capturing image: $e');
-    return null;
   }
-}
 
   /// Chọn ảnh từ thư viện
   Future<File?> pickImageFromGallery() async {
@@ -53,7 +53,7 @@ class BillScannerServiceSimple {
   /// Tạo bill rỗng để user tự nhập
   ScannedBill createEmptyBill(File imageFile) {
     return ScannedBill(
-      items: [], // User sẽ tự thêm items
+      items: [],
       scannedAt: DateTime.now(),
       imageUrl: imageFile.path,
     );
