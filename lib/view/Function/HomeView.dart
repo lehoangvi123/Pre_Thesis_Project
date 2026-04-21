@@ -23,6 +23,9 @@ import '../TextVoice/AI_deep_analysis_view.dart';
 import './AI_Chatbot/chatbot_view.dart';
 import '../../view/Bill_Scanner_Service/Bill_scanner_view.dart';
 import './HomeQuickAddExpense.dart';
+import './SavingGoalsListView.dart';
+import './SavingGoals.dart';
+import './SavingGoalsService.dart';
 
 // ── Thousand separator formatter ──────────────────────
 class _ThousandsSeparator extends TextInputFormatter {
@@ -623,6 +626,8 @@ class _HomeViewState extends State<HomeView> {
               const SizedBox(height: 20),
               _buildPlanSection(isDark),
               const SizedBox(height: 20),
+              _buildSavingGoalsSection(isDark),
+              const SizedBox(height: 20),
               RepaintBoundary(child: _buildMonthReportSection(isDark)),
               const SizedBox(height: 20),
             ]),
@@ -951,10 +956,11 @@ class _HomeViewState extends State<HomeView> {
     required bool isDark,
   }) {
     final ratio = limit > 0 ? spent / limit : 0.0;
-    final isOver = ratio > 1.0;
-    final isNear = ratio >= 0.8 && ratio <= 1.0;
+    final isOver  = ratio > 1.0;
+    final isExact = ratio == 1.0;
+    final isNear  = ratio >= 0.8 && ratio < 1.0;
 
-    if (!isOver && !isNear) return const SizedBox.shrink();
+    if (!isOver && !isExact && !isNear) return const SizedBox.shrink();
 
     final Color bgColor;
     final Color textColor;
@@ -969,6 +975,12 @@ class _HomeViewState extends State<HomeView> {
       icon        = Icons.error_rounded;
       final overAmt = spent - limit;
       message = 'Vượt ${_fmt(overAmt)}đ so với kế hoạch!';
+    } else if (isExact) {
+      bgColor     = Colors.red.withOpacity(isDark ? 0.15 : 0.08);
+      borderColor = Colors.red.withOpacity(0.4);
+      textColor   = Colors.red[isDark ? 300 : 700]!;
+      icon        = Icons.error_rounded;
+      message = 'Đã chạm giới hạn — cẩn thận khi chi thêm!';
     } else {
       bgColor     = Colors.orange.withOpacity(isDark ? 0.15 : 0.08);
       borderColor = Colors.orange.withOpacity(0.4);
@@ -2360,4 +2372,122 @@ class _HomeViewState extends State<HomeView> {
       ]),
     );
   }
+  // ── Saving Goals Section ─────────────────────────────
+  Widget _buildSavingGoalsSection(bool isDark) {
+    return StreamBuilder<List<SavingGoal>>(
+      stream: SavingGoalService().getSavingGoalsStream(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        final active = snapshot.data!.where((g) => !g.isCompleted).toList();
+        if (active.isEmpty) return const SizedBox.shrink();
+
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text('Mục tiêu tiết kiệm',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87)),
+            GestureDetector(
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const SavingGoalsView())),
+              child: const Text('Xem tất cả',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF00CED1),
+                      fontWeight: FontWeight.w500)),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          ...active.take(3).map((goal) => _buildSavingGoalItem(goal, isDark)),
+        ]);
+      },
+    );
+  }
+
+  Widget _buildSavingGoalItem(SavingGoal goal, bool isDark) {
+    final goalColor = Color(goal.color ?? 0xFF00CED1);
+    final daysLeft  = goal.targetDate != null
+        ? goal.targetDate!.difference(DateTime.now()).inDays
+        : null;
+    final progress  = (goal.progress / 100).clamp(0.0, 1.0);
+
+    return GestureDetector(
+      onTap: () => Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const SavingGoalsView())),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
+          boxShadow: [BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.15 : 0.04),
+              blurRadius: 8, offset: const Offset(0, 2))],
+        ),
+        child: Row(children: [
+          Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(
+              color: goalColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(child: Text(goal.icon ?? '🎯',
+                style: const TextStyle(fontSize: 22))),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(child: Text(goal.title,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.black87),
+                  maxLines: 1, overflow: TextOverflow.ellipsis)),
+              if (daysLeft != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: (daysLeft <= 7 ? Colors.red : Colors.orange)
+                        .withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    daysLeft <= 0 ? 'Hết hạn' : '$daysLeft ngày',
+                    style: TextStyle(fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: daysLeft <= 7 ? Colors.red : Colors.orange),
+                  ),
+                ),
+            ]),
+            const SizedBox(height: 5),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progress, minHeight: 5,
+                backgroundColor:
+                    isDark ? Colors.grey[700] : Colors.grey[200],
+                valueColor: AlwaysStoppedAnimation(goalColor),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${_fmt(goal.currentAmount)}đ / ${_fmt(goal.targetAmount)}đ',
+                  style: TextStyle(fontSize: 11,
+                      color: isDark ? Colors.grey[400] : Colors.grey[500]),
+                ),
+                Text('${goal.progress.toStringAsFixed(0)}%',
+                    style: TextStyle(fontSize: 11,
+                        fontWeight: FontWeight.bold, color: goalColor)),
+              ],
+            ),
+          ])),
+        ]),
+      ),
+    );
+  }
+
 }

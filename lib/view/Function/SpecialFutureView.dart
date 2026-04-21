@@ -9,6 +9,7 @@ import './AnalysisView.dart';
 import './AI_Chatbot/chatbot_view.dart';
 import 'package:project1/view/Bill_Scanner_Service/Bill_scanner_view.dart';
 import './SavingGoalsListView.dart';
+import '../TextVoice/test_voice.dart';
 
 class SpecialFeaturesView extends StatelessWidget {
   const SpecialFeaturesView({Key? key}) : super(key: key);
@@ -44,15 +45,17 @@ class SpecialFeaturesView extends StatelessWidget {
                       blurRadius: 20, offset: const Offset(0, 8),
                     )],
                   ),
-                  child: const Icon(Icons.assignment_outlined, color: Colors.white, size: 40),
+                  child: const Icon(Icons.assignment_outlined,
+                      color: Colors.white, size: 40),
                 ),
 
                 const SizedBox(height: 20),
 
                 // ── Tiêu đề ──────────────────────────
                 Text('Trợ lý tài chính',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black87)),
+                    style: TextStyle(
+                        fontSize: 24, fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black87)),
                 const SizedBox(height: 8),
                 Text(
                   'Chọn công cụ phù hợp để quản lý\ntài chính cá nhân hiệu quả hơn',
@@ -64,33 +67,56 @@ class SpecialFeaturesView extends StatelessWidget {
                 const SizedBox(height: 36),
 
                 // ── Danh sách tính năng ───────────────
+
+                // 1. BuddyAI
                 _buildItem(
                   context: context, isDark: isDark,
                   icon: Icons.chat_bubble_outline_rounded,
-                  iconColor: const Color(0xFF8B7CF6), iconBg: const Color(0xFFEDE9FE),
+                  iconColor: const Color(0xFF8B7CF6),
+                  iconBg: const Color(0xFFEDE9FE),
                   title: 'BuddyAI',
                   desc: 'Nhận tư vấn như hỏi bạn bè – không cần điền form',
                   onTap: () => Navigator.push(context,
                       MaterialPageRoute(builder: (_) => const ChatbotView())),
                 ),
-                
+
+                // 2. Mục tiêu tiết kiệm
                 _buildItem(
                   context: context, isDark: isDark,
                   icon: Icons.savings_outlined,
-                  iconColor: const Color(0xFFFF9800), iconBg: const Color(0xFFFFF3E0),
+                  iconColor: const Color(0xFFFF9800),
+                  iconBg: const Color(0xFFFFF3E0),
                   title: 'Mục tiêu tiết kiệm',
                   desc: 'Đặt mục tiêu ngắn hạn & dài hạn – theo dõi tiến độ tiết kiệm từng tháng',
                   onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const SavingGoalsView())),
+                      MaterialPageRoute(
+                          builder: (_) => const SavingGoalsView())),
                 ),
+
+                // 4. Ghi âm chi tiêu
+                _buildItem(
+                  context: context, isDark: isDark,
+                  icon: Icons.mic_rounded,
+                  iconColor: const Color(0xFFE91E63),
+                  iconBg: const Color(0xFFFCE4EC),
+                  title: 'Ghi âm chi tiêu',
+                  desc: 'Nói "mua cà phê 35k" – AI tự nhận diện và ghi lại giao dịch',
+                  onTap: () => Navigator.push(context,
+                      MaterialPageRoute(
+                          builder: (_) => const TestVoiceView())),
+                ),
+
+                // 5. Chụp ảnh bill
                 _buildItem(
                   context: context, isDark: isDark,
                   icon: Icons.document_scanner_outlined,
-                  iconColor: const Color(0xFF00B894), iconBg: const Color(0xFFE0F7F4),
+                  iconColor: const Color(0xFF00B894),
+                  iconBg: const Color(0xFFE0F7F4),
                   title: 'Chụp ảnh bill',
                   desc: 'Chụp hóa đơn và tự động nhận diện giao dịch chi tiêu',
                   onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const BillScannerViewSimple())),
+                      MaterialPageRoute(
+                          builder: (_) => const BillScannerViewSimple())),
                   isLast: true,
                 ),
 
@@ -108,9 +134,14 @@ class SpecialFeaturesView extends StatelessWidget {
   }
 
   Widget _buildItem({
-    required BuildContext context, required bool isDark,
-    required IconData icon, required Color iconColor, required Color iconBg,
-    required String title, required String desc, required VoidCallback onTap,
+    required BuildContext context,
+    required bool isDark,
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String title,
+    required String desc,
+    required VoidCallback onTap,
     bool isLast = false,
   }) {
     return Column(children: [
@@ -129,20 +160,25 @@ class SpecialFeaturesView extends StatelessWidget {
               child: Icon(icon, color: iconColor, size: 24),
             ),
             const SizedBox(width: 16),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600,
+            Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: TextStyle(
+                  fontSize: 15, fontWeight: FontWeight.w600,
                   color: isDark ? Colors.white : Colors.black87)),
               const SizedBox(height: 3),
-              Text(desc, style: TextStyle(fontSize: 12, height: 1.4,
+              Text(desc, style: TextStyle(
+                  fontSize: 12, height: 1.4,
                   color: isDark ? Colors.grey[400] : Colors.grey[500])),
             ])),
             const SizedBox(width: 8),
-            Icon(Icons.chevron_right_rounded, color: Colors.grey[400], size: 20),
+            Icon(Icons.chevron_right_rounded,
+                color: Colors.grey[400], size: 20),
           ]),
         ),
       ),
       if (!isLast)
-        Divider(height: 1, color: isDark ? Colors.grey[800] : Colors.grey[100]),
+        Divider(height: 1,
+            color: isDark ? Colors.grey[800] : Colors.grey[100]),
     ]);
   }
 
@@ -150,7 +186,8 @@ class SpecialFeaturesView extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1),
+        boxShadow: [BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
             blurRadius: 10, offset: const Offset(0, -5))],
       ),
       child: SafeArea(child: Padding(
@@ -169,10 +206,12 @@ class SpecialFeaturesView extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: const LinearGradient(colors: [_teal, _purple]),
                 shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: _teal.withOpacity(0.5),
+                boxShadow: [BoxShadow(
+                    color: _teal.withOpacity(0.5),
                     blurRadius: 12, offset: const Offset(0, 4))],
               ),
-              child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 26),
+              child: const Icon(Icons.auto_awesome_rounded,
+                  color: Colors.white, size: 26),
             ),
             const SizedBox(height: 4),
             const Text('Tính năng', style: TextStyle(
@@ -191,7 +230,8 @@ class SpecialFeaturesView extends StatelessWidget {
 
   Widget _navItem(BuildContext ctx, IconData icon, String label,
       bool active, bool isDark, VoidCallback onTap) {
-    final color = active ? _teal : (isDark ? Colors.grey[500]! : Colors.grey[400]!);
+    final color =
+        active ? _teal : (isDark ? Colors.grey[500]! : Colors.grey[400]!);
     return GestureDetector(
       onTap: onTap,
       child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -203,8 +243,10 @@ class SpecialFeaturesView extends StatelessWidget {
           ),
           child: Icon(icon, color: color, size: 24),
         ),
-        Text(label, style: TextStyle(fontSize: 10,
-            fontWeight: active ? FontWeight.w600 : FontWeight.normal, color: color)),
+        Text(label, style: TextStyle(
+            fontSize: 10,
+            fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+            color: color)),
       ]),
     );
   }
