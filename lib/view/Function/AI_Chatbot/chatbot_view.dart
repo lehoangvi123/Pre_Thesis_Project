@@ -1,4 +1,5 @@
 // lib/view/Function/AI_Chatbot/chatbot_view.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
@@ -54,6 +55,90 @@ class _ChatbotViewState extends State<ChatbotView> with TickerProviderStateMixin
   }
 
   // ══════════════════════════════════════════════════════
+  // CHECK INTERNET
+  // ══════════════════════════════════════════════════════
+  Future<bool> _hasInternet() async {
+    try {
+      final result = await InternetAddress.lookup('google.com')
+          .timeout(const Duration(seconds: 3));
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ══════════════════════════════════════════════════════
+  // FALLBACK RESPONSE — offline
+  // ══════════════════════════════════════════════════════
+  String _buildFallbackResponse(String userMsg) {
+    final income = _detectIncomeFromText(userMsg);
+    final lower = userMsg.toLowerCase();
+
+    String fmt(int v) => v
+        .toString()
+        .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+
+    if (income > 0) {
+      final needs   = (income * 0.50).toInt();
+      final wants   = (income * 0.30).toInt();
+      final savings = (income * 0.20).toInt();
+      final incomeM = (income / 1000000).toStringAsFixed(0);
+
+      return '''📴 Đang offline — BuddyAI dùng gợi ý tự động.
+
+Với thu nhập **${incomeM} triệu đồng/tháng**, gợi ý theo quy tắc 50/30/20:
+
+- **Thiết yếu (50%):** ${fmt(needs)}đ
+  Ăn uống, nhà ở, đi lại, hóa đơn
+
+- **Linh hoạt (30%):** ${fmt(wants)}đ
+  Giải trí, mua sắm, ăn ngoài
+
+- **Tiết kiệm (20%):** ${fmt(savings)}đ
+  Quỹ khẩn cấp, đầu tư, mục tiêu
+
+💡 Kết nối internet để BuddyAI phân tích chi tiết hơn cho bạn!''';
+    }
+
+    if (lower.contains('tiết kiệm')) {
+      return '''📴 Đang offline — BuddyAI dùng gợi ý tự động.
+
+**Một số cách tiết kiệm hiệu quả:**
+
+- Chuyển tiền tiết kiệm ngay khi nhận lương
+- Ghi chép chi tiêu hàng ngày trong Budget Buddy
+- Đặt mục tiêu tiết kiệm cụ thể (mua xe, du lịch,...)
+- Hạn chế ăn ngoài, tự nấu ăn tại nhà
+- Dùng quy tắc 50/30/20 để phân bổ thu nhập
+
+💡 Kết nối internet để BuddyAI tư vấn cá nhân hóa hơn!''';
+    }
+
+    if (lower.contains('kế hoạch') || lower.contains('chi tiêu') || lower.contains('ngân sách')) {
+      return '''📴 Đang offline — BuddyAI dùng gợi ý tự động.
+
+**Nguyên tắc quản lý chi tiêu cơ bản:**
+
+- **50%** cho chi phí thiết yếu (ăn, ở, đi lại)
+- **30%** cho chi tiêu linh hoạt (giải trí, mua sắm)
+- **20%** cho tiết kiệm và đầu tư
+
+💡 Nhập thu nhập cụ thể (VD: "lương 10 triệu") để BuddyAI tính toán chi tiết hơn!''';
+    }
+
+    return '''📴 Không có kết nối internet.
+
+BuddyAI cần internet để phân tích và tư vấn tài chính cá nhân hóa cho bạn.
+
+**Trong khi chờ kết nối, bạn có thể:**
+- Ghi chép chi tiêu trong tab Lịch sử
+- Xem kế hoạch hiện tại trong tab Plan
+- Đặt mục tiêu tiết kiệm trong Tính năng
+
+💡 Kết nối lại và hỏi BuddyAI bất cứ điều gì về tài chính!''';
+  }
+
+  // ══════════════════════════════════════════════════════
   // DETECT income từ text người dùng
   // ══════════════════════════════════════════════════════
   int _detectIncomeFromText(String text) {
@@ -89,7 +174,7 @@ class _ChatbotViewState extends State<ChatbotView> with TickerProviderStateMixin
   }
 
   // ══════════════════════════════════════════════════════
-  // BUILD MESSAGE GỬI CHO AI — ép format ngắn gọn
+  // BUILD MESSAGE GỬI CHO AI
   // ══════════════════════════════════════════════════════
   String _buildPromptForAI(String userMsg) {
     if (!_isBudgetQuestion(userMsg)) return userMsg;
@@ -109,7 +194,7 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
   }
 
   // ══════════════════════════════════════════════════════
-  // DETECT plan items từ AI response — đơn giản, chính xác
+  // DETECT plan items từ AI response
   // ══════════════════════════════════════════════════════
   List<Map<String, dynamic>> _detectPlanItems(String text) {
     final iconMap = <String, String>{
@@ -134,15 +219,12 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
       return '📌';
     }
 
-    // Parse số tiền từ string — trả về đơn vị đồng
     int? parseAmount(String raw) {
-      // "X,X triệu" hoặc "X.X triệu" hoặc "X triệu"
       final mTrieu = RegExp(r'(\d+(?:[,.]\d+)?)\s*(?:triệu|tr)(?:\s*đồng)?', caseSensitive: false).firstMatch(raw);
       if (mTrieu != null) {
         final v = double.tryParse(mTrieu.group(1)!.replaceAll(',', '.'));
         if (v != null && v >= 0.1 && v <= 500) return (v * 1000000).round();
       }
-      // "X,XXX,XXX đ" hoặc số lớn
       final mDong = RegExp(r'(\d[\d,.]+)\s*(?:đồng|đ|VND)?$', caseSensitive: false).firstMatch(raw.trim());
       if (mDong != null) {
         final cleaned = mDong.group(1)!.replaceAll(',', '').replaceAll('.', '');
@@ -155,7 +237,6 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
     final items = <Map<String, dynamic>>[];
     final seenNames = <String>{};
 
-    // Tìm tất cả dòng có dạng "Tên: số tiền"
     final linePattern = RegExp(
       r'^[*\-•\s\d.)\s]*([^\n:*]{2,40}?)\s*(?:\(\d+%\))?\s*:\s*([^\n]{1,40})$',
       multiLine: true,
@@ -192,7 +273,6 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
       });
     }
 
-    // Tính %
     if (items.isNotEmpty) {
       final total = items.fold<int>(0, (s, i) => s + (i['amount'] as int));
       if (total > 0) {
@@ -210,22 +290,15 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
   // ══════════════════════════════════════════════════════
   void _showSavePlanSheet(List<Map<String, dynamic>> rawItems, int detectedIncome) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // Deep copy items để không mutate original
     final items = rawItems.map((e) => Map<String, dynamic>.from(e)).toList();
-
-    // Tính tổng gốc từ AI
     final aiTotal = items.fold<int>(0, (s, i) => s + (i['amount'] as int));
 
-    // Nếu detect được income và AI total khác → scale lại để khớp
     if (detectedIncome > 0 && aiTotal > 0 && (detectedIncome - aiTotal).abs() > 10000) {
       final ratio = detectedIncome / aiTotal;
       for (final item in items) {
-        // Round to nearest 500k for clean numbers
         final raw = ((item['amount'] as int) * ratio).round();
         item['amount'] = (raw / 500000).round() * 500000;
       }
-      // Adjust last item to ensure exact total
       final newTotal = items.fold<int>(0, (s, i) => s + (i['amount'] as int));
       if (items.isNotEmpty && newTotal != detectedIncome) {
         items.last['amount'] = (items.last['amount'] as int) + (detectedIncome - newTotal);
@@ -273,14 +346,11 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(children: [
-            // Handle
             Center(child: Container(
               width: 40, height: 4,
               margin: const EdgeInsets.only(top: 14, bottom: 10),
               decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
             )),
-
-            // Header
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               child: Row(children: [
@@ -298,8 +368,6 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
                 ),
               ]),
             ),
-
-            // Thu nhập
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Container(
@@ -331,8 +399,6 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
                 ]),
               ),
             ),
-
-            // Thanh tổng
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Container(
@@ -359,10 +425,7 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
                 ]),
               ),
             ),
-
             Divider(height: 1, color: Colors.grey[200]),
-
-            // Danh sách
             Expanded(child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               children: [
@@ -422,8 +485,6 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
                     ),
                   );
                 }).toList(),
-
-                // Extra items
                 ...extraItems.asMap().entries.map((e) {
                   final i = e.key; final item = e.value;
                   return Container(
@@ -475,8 +536,6 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
                     ),
                   );
                 }).toList(),
-
-                // Nút thêm
                 GestureDetector(
                   onTap: () => setS(() => extraItems.add({'name': '', 'amount': ''})),
                   child: Container(
@@ -496,8 +555,6 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
                 const SizedBox(height: 8),
               ],
             )),
-
-            // Nút lưu
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               child: Column(children: [
@@ -560,7 +617,7 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
   }
 
   // ══════════════════════════════════════════════════════
-  // SAVE lên Firestore — tổng luôn = income
+  // SAVE lên Firestore
   // ══════════════════════════════════════════════════════
   Future<void> _savePlanToFirestore(
     BuildContext ctx,
@@ -586,7 +643,6 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
         });
       }
 
-      // Phần còn dư → thêm/cộng vào Tiết kiệm
       if (remaining > 1000) {
         final idx = table.indexWhere((r) => (r['category'] as String).toLowerCase().contains('tiết kiệm'));
         if (idx != -1) {
@@ -640,7 +696,7 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
   }
 
   // ══════════════════════════════════════════════════════
-  // SEND MESSAGE
+  // SEND MESSAGE — với offline fallback
   // ══════════════════════════════════════════════════════
   Future<void> _sendMessage(String text) async {
     if (text.trim().isEmpty || _isTyping || _isStreaming) return;
@@ -652,18 +708,44 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
 
     setState(() {
       _hasStartedChat = true;
-      _messages.add(ChatMessage(id: _uuid.v4(), message: userMsg, isUser: true, timestamp: DateTime.now()));
+      _messages.add(ChatMessage(
+        id: _uuid.v4(),
+        message: userMsg,
+        isUser: true,
+        timestamp: DateTime.now(),
+      ));
       _isTyping = true;
     });
     _scrollToBottom();
 
     try {
-      // Wrap message với format instructions nếu là câu hỏi về budget
-      final promptForAI = _buildPromptForAI(userMsg);
+      // ── CHECK INTERNET TRƯỚC KHI GỌI API ──────────────
+      final online = await _hasInternet();
 
+      if (!online) {
+        // ── OFFLINE: dùng fallback ngay lập tức ──────────
+        final fallbackMsg = _buildFallbackResponse(userMsg);
+        if (!mounted) return;
+        setState(() {
+          _isTyping = false;
+          _messages.add(ChatMessage(
+            id: _uuid.v4(),
+            message: fallbackMsg,
+            isUser: false,
+            timestamp: DateTime.now(),
+          ));
+        });
+        _scrollToBottom();
+        return;
+      }
+
+      // ── ONLINE: gọi backend bình thường ───────────────
+      final promptForAI = _buildPromptForAI(userMsg);
       final aiResponse = await _aiService.sendMessage(
         promptForAI,
-        chatHistory: _messages.length > 1 ? _messages.sublist(0, _messages.length - 1) : [],
+        chatHistory: _messages.length > 1
+            ? _messages.sublist(0, _messages.length - 1)
+            : [],
       );
 
       if (!mounted) return;
@@ -673,7 +755,12 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
         _isStreaming = true;
         _streamingText = '';
         _streamingMessageId = streamId;
-        _messages.add(ChatMessage(id: streamId, message: '', isUser: false, timestamp: DateTime.now()));
+        _messages.add(ChatMessage(
+          id: streamId,
+          message: '',
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
       });
 
       const chunkSize = 5;
@@ -685,7 +772,12 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
           _streamingText = chunk;
           final idx = _messages.indexWhere((m) => m.id == streamId);
           if (idx != -1) {
-            _messages[idx] = ChatMessage(id: streamId, message: chunk, isUser: false, timestamp: _messages[idx].timestamp);
+            _messages[idx] = ChatMessage(
+              id: streamId,
+              message: chunk,
+              isUser: false,
+              timestamp: _messages[idx].timestamp,
+            );
           }
         });
         if (i % 80 == 0) _scrollToBottom();
@@ -695,7 +787,12 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
         setState(() {
           final idx = _messages.indexWhere((m) => m.id == streamId);
           if (idx != -1) {
-            _messages[idx] = ChatMessage(id: streamId, message: aiResponse, isUser: false, timestamp: _messages[idx].timestamp);
+            _messages[idx] = ChatMessage(
+              id: streamId,
+              message: aiResponse,
+              isUser: false,
+              timestamp: _messages[idx].timestamp,
+            );
           }
         });
       }
@@ -709,7 +806,6 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
         _isStreaming = false;
         _streamingMessageId = null;
         if (planItems.isNotEmpty) {
-          // Gắn income để sheet dùng
           for (final item in planItems) {
             item['_income'] = detectedIncome;
           }
@@ -717,12 +813,18 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
         }
       });
       _scrollToBottom();
+
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isTyping = false;
         _isStreaming = false;
-        _messages.add(ChatMessage(id: _uuid.v4(), message: 'Xin lỗi, có lỗi xảy ra. Vui lòng thử lại!', isUser: false, timestamp: DateTime.now()));
+        _messages.add(ChatMessage(
+          id: _uuid.v4(),
+          message: 'Xin lỗi, có lỗi xảy ra. Vui lòng thử lại!',
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
       });
     }
     if (mounted) _scrollToBottom();
@@ -731,8 +833,11 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
   void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(_scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
       }
     });
   }
@@ -747,7 +852,11 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
         TextButton(
           onPressed: () {
             Navigator.pop(context);
-            setState(() { _messages.clear(); _detectedPlans.clear(); _hasStartedChat = false; });
+            setState(() {
+              _messages.clear();
+              _detectedPlans.clear();
+              _hasStartedChat = false;
+            });
           },
           child: const Text('Xóa', style: TextStyle(color: Colors.red)),
         ),
@@ -784,9 +893,12 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
           if (_lastDetectedPlan.isNotEmpty)
             GestureDetector(
               onTap: () {
-                final income = (_lastDetectedPlan.isNotEmpty ? _lastDetectedPlan.first['_income'] as int? : null) ?? _detectIncomeFromMessages();
+                final income = (_lastDetectedPlan.isNotEmpty
+                    ? _lastDetectedPlan.first['_income'] as int?
+                    : null) ?? _detectIncomeFromMessages();
                 _showSavePlanSheet(
-                  List<Map<String, dynamic>>.from(_lastDetectedPlan.map((e) => Map<String, dynamic>.from(e))),
+                  List<Map<String, dynamic>>.from(
+                      _lastDetectedPlan.map((e) => Map<String, dynamic>.from(e))),
                   income,
                 );
               },
@@ -893,7 +1005,8 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
           child: GestureDetector(
             onLongPress: () {
               Clipboard.setData(ClipboardData(text: msg.message));
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã sao chép'), duration: Duration(seconds: 1)));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Đã sao chép'), duration: Duration(seconds: 1)));
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -912,7 +1025,8 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
     );
   }
 
-  Widget _buildAIMessage(ChatMessage msg, bool isDark, Color textColor, Color subColor, {bool isStreaming = false}) {
+  Widget _buildAIMessage(ChatMessage msg, bool isDark, Color textColor, Color subColor,
+      {bool isStreaming = false}) {
     final planItems = _detectedPlans[msg.id];
     final hasPlan   = planItems != null && planItems.isNotEmpty;
 
@@ -936,19 +1050,21 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
             GestureDetector(
               onLongPress: () {
                 Clipboard.setData(ClipboardData(text: msg.message));
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã sao chép'), duration: Duration(seconds: 1)));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Đã sao chép'), duration: Duration(seconds: 1)));
               },
               child: _buildFormattedText(msg.message, textColor, isStreaming),
             ),
-
-          // Nút lưu kế hoạch
           if (hasPlan && !isStreaming) ...[
             const SizedBox(height: 12),
             GestureDetector(
               onTap: () {
-                final income = (planItems.isNotEmpty ? planItems.first['_income'] as int? : null) ?? _detectIncomeFromMessages();
+                final income = (planItems.isNotEmpty
+                    ? planItems.first['_income'] as int?
+                    : null) ?? _detectIncomeFromMessages();
                 _showSavePlanSheet(
-                  List<Map<String, dynamic>>.from(planItems.map((e) => Map<String, dynamic>.from(e))),
+                  List<Map<String, dynamic>>.from(
+                      planItems.map((e) => Map<String, dynamic>.from(e))),
                   income,
                 );
               },
@@ -957,7 +1073,9 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(colors: [Color(0xFF00CED1), Color(0xFF8B5CF6)]),
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: const Color(0xFF00CED1).withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 3))],
+                  boxShadow: [BoxShadow(
+                    color: const Color(0xFF00CED1).withOpacity(0.3),
+                    blurRadius: 8, offset: const Offset(0, 3))],
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   const Icon(Icons.save_alt_rounded, color: Colors.white, size: 16),
@@ -992,7 +1110,8 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
     );
   }
 
-  Widget _buildTypingDots(bool isDark) => const SizedBox(height: 20, child: TypingIndicator());
+  Widget _buildTypingDots(bool isDark) =>
+      const SizedBox(height: 20, child: TypingIndicator());
 
   Widget _buildFormattedText(String text, Color textColor, bool isStreaming) {
     final lines   = text.split('\n');
@@ -1000,33 +1119,46 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
 
     for (final line in lines) {
       if (line.startsWith('## ')) {
-        widgets.add(Padding(padding: const EdgeInsets.only(top: 8, bottom: 4),
-          child: Text(line.substring(3), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: textColor))));
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 4),
+          child: Text(line.substring(3),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: textColor))));
       } else if (line.startsWith('### ')) {
-        widgets.add(Padding(padding: const EdgeInsets.only(top: 6, bottom: 2),
-          child: Text(line.substring(4), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textColor))));
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(top: 6, bottom: 2),
+          child: Text(line.substring(4),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textColor))));
       } else if (line.startsWith('- ') || line.startsWith('• ')) {
-        widgets.add(Padding(padding: const EdgeInsets.only(bottom: 3),
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(bottom: 3),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Padding(padding: const EdgeInsets.only(top: 7, right: 8),
-              child: Container(width: 5, height: 5, decoration: const BoxDecoration(color: Color(0xFF00CED1), shape: BoxShape.circle))),
+            Padding(
+              padding: const EdgeInsets.only(top: 7, right: 8),
+              child: Container(width: 5, height: 5,
+                  decoration: const BoxDecoration(color: Color(0xFF00CED1), shape: BoxShape.circle))),
             Expanded(child: _buildInlineText(line.substring(2), textColor)),
           ])));
       } else if (RegExp(r'^\d+\. ').hasMatch(line)) {
         final match = RegExp(r'^(\d+)\. (.+)').firstMatch(line);
         if (match != null) {
-          widgets.add(Padding(padding: const EdgeInsets.only(bottom: 3),
+          widgets.add(Padding(
+            padding: const EdgeInsets.only(bottom: 3),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(width: 22, height: 22, margin: const EdgeInsets.only(right: 8, top: 1),
+              Container(
+                width: 22, height: 22,
+                margin: const EdgeInsets.only(right: 8, top: 1),
                 decoration: const BoxDecoration(color: Color(0xFF00CED1), shape: BoxShape.circle),
-                child: Center(child: Text(match.group(1)!, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)))),
+                child: Center(child: Text(match.group(1)!,
+                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)))),
               Expanded(child: _buildInlineText(match.group(2)!, textColor)),
             ])));
         }
       } else if (line.trim().isEmpty) {
         widgets.add(const SizedBox(height: 6));
       } else {
-        widgets.add(Padding(padding: const EdgeInsets.only(bottom: 2), child: _buildInlineText(line, textColor)));
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(bottom: 2),
+          child: _buildInlineText(line, textColor)));
       }
     }
 
@@ -1039,11 +1171,21 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
     final pattern = RegExp(r'\*\*(.+?)\*\*');
     int last = 0;
     for (final match in pattern.allMatches(text)) {
-      if (match.start > last) spans.add(TextSpan(text: text.substring(last, match.start), style: TextStyle(color: textColor, fontSize: 15, height: 1.6)));
-      spans.add(TextSpan(text: match.group(1), style: TextStyle(color: textColor, fontSize: 15, height: 1.6, fontWeight: FontWeight.w700)));
+      if (match.start > last) {
+        spans.add(TextSpan(
+          text: text.substring(last, match.start),
+          style: TextStyle(color: textColor, fontSize: 15, height: 1.6)));
+      }
+      spans.add(TextSpan(
+        text: match.group(1),
+        style: TextStyle(color: textColor, fontSize: 15, height: 1.6, fontWeight: FontWeight.w700)));
       last = match.end;
     }
-    if (last < text.length) spans.add(TextSpan(text: text.substring(last), style: TextStyle(color: textColor, fontSize: 15, height: 1.6)));
+    if (last < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(last),
+        style: TextStyle(color: textColor, fontSize: 15, height: 1.6)));
+    }
     if (spans.isEmpty) return Text(text, style: TextStyle(color: textColor, fontSize: 15, height: 1.6));
     return RichText(text: TextSpan(children: spans), textAlign: TextAlign.left);
   }
@@ -1086,7 +1228,9 @@ Trả lời NGẮN GỌN, tối đa 6 mục, đúng format sau:
                 duration: const Duration(milliseconds: 200),
                 width: 34, height: 34,
                 decoration: BoxDecoration(
-                  color: (hasText && !isBusy) ? const Color(0xFF00CED1) : (isDark ? const Color(0xFF3F3F3F) : const Color(0xFFE5E5E5)),
+                  color: (hasText && !isBusy)
+                      ? const Color(0xFF00CED1)
+                      : (isDark ? const Color(0xFF3F3F3F) : const Color(0xFFE5E5E5)),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -1118,13 +1262,16 @@ class _BlinkingCursor extends StatefulWidget {
   State<_BlinkingCursor> createState() => _BlinkingCursorState();
 }
 
-class _BlinkingCursorState extends State<_BlinkingCursor> with SingleTickerProviderStateMixin {
+class _BlinkingCursorState extends State<_BlinkingCursor>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 500))..repeat(reverse: true);
+    _controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 500))
+      ..repeat(reverse: true);
   }
 
   @override
@@ -1136,12 +1283,17 @@ class _BlinkingCursorState extends State<_BlinkingCursor> with SingleTickerProvi
         child: Container(
           width: 2, height: 18,
           margin: const EdgeInsets.only(top: 2),
-          decoration: BoxDecoration(color: const Color(0xFF00CED1), borderRadius: BorderRadius.circular(1)),
+          decoration: BoxDecoration(
+              color: const Color(0xFF00CED1),
+              borderRadius: BorderRadius.circular(1)),
         ),
       ),
     );
   }
 
   @override
-  void dispose() { _controller.dispose(); super.dispose(); }
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 }

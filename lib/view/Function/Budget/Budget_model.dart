@@ -208,5 +208,5 @@ DateTime calculateEndDate(DateTime startDate, BudgetPeriod period) {
       return DateTime(startDate.year, startDate.month + 1, startDate.day);
     case BudgetPeriod.yearly:
       return DateTime(startDate.year + 1, startDate.month, startDate.day);
-  }
+  } 
 }

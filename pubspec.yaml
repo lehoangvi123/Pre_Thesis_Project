@@ -55,5 +55,8 @@ flutter:
   assets:
     - assets/images/
     - assets/images/Intro_screen-login/
-    - assets/fonts/  
+    - assets/fonts/   
+    - assets/images/icons8-google-48.png
     
+
+

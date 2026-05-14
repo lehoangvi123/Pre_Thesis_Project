@@ -9,7 +9,7 @@ class AchievementPopup extends StatefulWidget {
   final Achievement achievement;
   final VoidCallback onDismiss;
 
-  const AchievementPopup({
+  const AchievementPopup({ 
     Key? key,
     required this.achievement,
     required this.onDismiss,
