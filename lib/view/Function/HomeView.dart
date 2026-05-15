@@ -1,5 +1,6 @@
 // lib/view/HomeView.dart
 
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -81,6 +82,9 @@ class _HomeViewState extends State<HomeView> {
   bool   _balLoaded = false;
   Stream<DocumentSnapshot>? _balanceStream;
 
+  // ✅ FIX: Lưu subscription để cancel khi logout/dispose
+  StreamSubscription<DocumentSnapshot>? _balanceSubscription;
+
   // ── Plan — realtime stream ────────────────────────────
   Stream<DocumentSnapshot>? _planStream;
 
@@ -106,12 +110,14 @@ class _HomeViewState extends State<HomeView> {
     _initAll();
   }
 
+  // ✅ FIX: Lưu subscription vào biến để cancel sau
   void _setupBalanceStream() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
     _balanceStream = FirebaseFirestore.instance
         .collection('users').doc(uid).snapshots();
-    _balanceStream!.listen((doc) {
+
+    _balanceSubscription = _balanceStream!.listen((doc) {
       if (!doc.exists || !mounted) return;
       final d = doc.data() as Map<String, dynamic>? ?? {};
       setState(() {
@@ -132,6 +138,13 @@ class _HomeViewState extends State<HomeView> {
           .collection('plans').doc('current_plan')
           .snapshots();
     });
+  }
+
+  // ✅ FIX: Cancel subscription khi widget bị destroy
+  @override
+  void dispose() {
+    _balanceSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _initAll() async {
@@ -843,6 +856,7 @@ class _HomeViewState extends State<HomeView> {
               borderRadius: BorderRadius.circular(12)),
           child: Icon(icon, color: isDark ? Colors.grey[400] : Colors.grey[700])));
 
+  // ✅ FIX: Hủy listener → signOut Firebase → navigate về Login
   void _showLogoutDialog() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(context: context, builder: (_) => AlertDialog(
@@ -857,10 +871,17 @@ class _HomeViewState extends State<HomeView> {
             child: Text('Hủy', style: TextStyle(
                 color: isDark ? Colors.grey[400] : Colors.grey[600]))),
         ElevatedButton(
-          onPressed: () {
+          onPressed: () async {
             Navigator.pop(context);
-            Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const LoginView()), (r) => false);
+            // ✅ Bước 1: Cancel Firestore listener TRƯỚC
+            await _balanceSubscription?.cancel();
+            // ✅ Bước 2: Sign out Firebase Auth
+            await FirebaseAuth.instance.signOut();
+            // ✅ Bước 3: Navigate về Login
+            if (mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginView()), (r) => false);
+            }
           },
           style: ElevatedButton.styleFrom(backgroundColor: Colors.red[600],
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
@@ -948,7 +969,6 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  // ── Budget warning widget ─────────────────────────────
   Widget _buildBudgetWarning({
     required String category,
     required double spent,
@@ -1167,7 +1187,6 @@ class _HomeViewState extends State<HomeView> {
                 ]),
               ),
 
-              // ── Plan rows ────────────────────────────────
               ...table.asMap().entries.map((e) {
                 final row      = e.value as Map;
                 final cat      = row['category'] as String? ?? '';
@@ -1185,7 +1204,6 @@ class _HomeViewState extends State<HomeView> {
                   Color(0xFFFF5722), Color(0xFF009688), Color(0xFFFFC107), Color(0xFF607D8B),
                 ];
                 final color    = colors[e.key % colors.length];
-                // Bar đỏ khi over, cam khi near, bình thường khi ok
                 final barColor = isOver ? Colors.red
                     : isNear ? Colors.orange
                     : color;
@@ -1250,7 +1268,6 @@ class _HomeViewState extends State<HomeView> {
                             ),
                           ),
                         ),
-                        // ── WARNING INLINE ──────────────────
                         if (isOver || isNear) ...[
                           const SizedBox(height: 4),
                           _buildBudgetWarning(
@@ -1269,7 +1286,6 @@ class _HomeViewState extends State<HomeView> {
                 ]);
               }).toList(),
 
-              // ── Chi tiêu ngoài kế hoạch ──────────────────
               ...() {
                 final planCats = table
                     .map((r) => (r['category'] as String? ?? '').toLowerCase().trim())
@@ -2372,6 +2388,7 @@ class _HomeViewState extends State<HomeView> {
       ]),
     );
   }
+
   // ── Saving Goals Section ─────────────────────────────
   Widget _buildSavingGoalsSection(bool isDark) {
     return StreamBuilder<List<SavingGoal>>(
@@ -2489,5 +2506,4 @@ class _HomeViewState extends State<HomeView> {
       ),
     );
   }
-
 }
