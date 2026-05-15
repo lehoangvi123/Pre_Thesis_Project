@@ -411,32 +411,32 @@ class _LoginViewState extends State<LoginView> {
                     ),
                     const SizedBox(width: 16),
 
-                    // Facebook Button
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _isLoading ? null : _signInWithFacebook,
-                        icon: const Icon(
-                          Icons.facebook,
-                          color: Color(0xFF1877F2),
-                          size: 24,
-                        ),
-                        label: const Text(
-                          'Facebook',
-                          style: TextStyle(
-                            color: Colors.black87,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: BorderSide(color: Colors.grey[300]!),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
+                    // // Facebook Button
+                    // Expanded(
+                    //   child: OutlinedButton.icon(
+                    //     onPressed: _isLoading ? null : _signInWithFacebook,
+                    //     icon: const Icon(
+                    //       Icons.facebook,
+                    //       color: Color(0xFF1877F2),
+                    //       size: 24,
+                    //     ),
+                    //     label: const Text(
+                    //       'Facebook',
+                    //       style: TextStyle(
+                    //         color: Colors.black87,
+                    //         fontSize: 15,
+                    //         fontWeight: FontWeight.w600,
+                    //       ),
+                    //     ),
+                    //     style: OutlinedButton.styleFrom(
+                    //       padding: const EdgeInsets.symmetric(vertical: 14),
+                    //       side: BorderSide(color: Colors.grey[300]!),
+                    //       shape: RoundedRectangleBorder(
+                    //         borderRadius: BorderRadius.circular(12),
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
                   ],
                 ),
                 const SizedBox(height: 24),
